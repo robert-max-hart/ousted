@@ -57,8 +57,8 @@ for harvest and stocking up, and winter is the test.
 - Water level plane. Cells under water cannot be built on and block walking.
 - **Manipulation:**
   - Placing a building automatically flattens its footprint (only up to a maximum slope).
-  - Raise, lower and flatten brush tools (instant in the prototype; later they become labor jobs
-    that cost worker hours and move dirt and stone).
+  - Raise, lower and flatten brush tools (instant in the prototype; **decided:** they become labor
+    jobs that cost worker hours. Whether dirt and stone are moved as resources is not decided).
   - Later: dig irrigation channels connected to water, which raise the moisture of nearby fields.
 
 ### 3.4 Buildings
@@ -210,7 +210,9 @@ Save and load should probably move earlier (M2/M3) once state shapes stabilise, 
 2. **Map size and scale:** 128 m is enough for a prototype. A full game probably wants 256–512 m
    with chunk streaming or LOD.
 3. **Storage model:** colony-wide (simple, current) or per-building physical stock (deeper logistics)?
-4. **Terraforming cost:** free and instant, labor only, or labor plus dirt as a resource?
+4. ~~**Terraforming cost**~~ **Decided (2026-10-23):** terraforming requires citizen labor (not
+   free and instant). Dirt is not a resource, for now. The current brush UI is too chunky and needs
+   fine-tuning later. Whether this lands in M5 as planned or earlier is not decided.
 5. **Art direction:** low-poly stylised (it fits the procedural approach) or something more realistic?
 6. **Failure state:** does the game end when everyone dies, or are there "settler wave" recovery options?
 

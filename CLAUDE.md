@@ -27,12 +27,14 @@ What works: a heightmap terrain split into 32×32 chunks, which can be edited wi
 
 A headless run of one full in-game year had no errors: the colony harvests wheat once and survives winter.
 
+### Decided
+- **Terraforming cost (2026-10-23):** terraforming must require citizen labor, not be free and instant. Dirt is not a resource for now. The current terraform UI is chunky and needs fine-tuning later. The plan has this in M5, but the timing is not settled.
+
 ### Waiting on the user
 These are the open questions from `docs/plan.md` §7. Ask before building anything that depends on them:
 1. **Ageing.** A year is about 64 minutes at 1x. Should citizens age faster than the calendar, or should years be longer?
 2. **Storage.** Keep the shared colony-wide stock (current), or give each storage building its own inventory?
-3. **Terraforming cost.** Free and instant (current), citizen labor, or labor plus dirt as a resource?
-4. **Crop speed.** Wheat gets one harvest a year because early spring is cold. Keep that, or tune for rotation within a year?
+3. **Crop speed.** Wheat gets one harvest a year because early spring is cold. Keep that, or tune for rotation within a year?
 
 ### Likely next steps (M2, Logistics & economy; see plan)
 - Per-storage inventories and capacity, a granary, and food spoilage.
