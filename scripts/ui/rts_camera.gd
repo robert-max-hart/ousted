@@ -2,7 +2,8 @@
 # RTSCamera
 #     Orbiting strategy camera. The rig sits on the ground; the camera
 #     hangs off it at a pitch and distance.
-#       WASD/arrows pan, Q/E rotate, wheel zooms, middle-drag orbits.
+#       WASD/arrows pan, Q/E rotate, wheel zooms, middle-drag orbits,
+#       right-drag pans (grabs the ground).
 # ----------------------------------------------------------------
 class_name RTSCamera extends Node3D;
 
@@ -14,6 +15,7 @@ const MAX_DISTANCE  :float = 120.0;
 const MIN_PITCH     :float = -85.0 * PI / 180.0;
 const MAX_PITCH     :float = -20.0 * PI / 180.0;
 const DRAG_SENS     :float = 0.006;
+const CLICK_SLOP    :float = 4.0;       # px of right-button travel before it counts as a drag
 
 var camera          :Camera3D;
 var _yaw            :float = deg_to_rad(35.0);
@@ -21,6 +23,10 @@ var _pitch          :float = deg_to_rad(-52.0);
 var _distance       :float = 45.0;
 var _target_distance:float = 45.0;
 var _orbiting       :bool = false;
+var _panning        :bool = false;
+var _pan_travel     :float = 0.0;
+# True when the last right-button press turned into a pan, so a click handler can tell the two apart.
+var right_dragged   :bool = false;
 
 func _ready() -> void:
     camera = Camera3D.new();
@@ -68,10 +74,29 @@ func _unhandled_input(event:InputEvent) -> void:
             _target_distance = minf(MAX_DISTANCE, _target_distance * ZOOM_STEP);
         elif mb.button_index == MOUSE_BUTTON_MIDDLE:
             _orbiting = mb.pressed;
-    elif event is InputEventMouseMotion and _orbiting:
+        elif mb.button_index == MOUSE_BUTTON_RIGHT:
+            _panning = mb.pressed;
+            if mb.pressed:
+                _pan_travel = 0.0;
+                right_dragged = false;
+    elif event is InputEventMouseMotion:
         var mm:InputEventMouseMotion = event;
-        _yaw -= mm.relative.x * DRAG_SENS;
-        _pitch = clampf(_pitch - mm.relative.y * DRAG_SENS, MIN_PITCH, MAX_PITCH);
+        if _orbiting:
+            _yaw -= mm.relative.x * DRAG_SENS;
+            _pitch = clampf(_pitch - mm.relative.y * DRAG_SENS, MIN_PITCH, MAX_PITCH);
+        elif _panning:
+            _pan_travel += mm.relative.length();
+            if _pan_travel > CLICK_SLOP:
+                right_dragged = true;
+                _pan_by_pixels(mm.relative);
+
+# Moves the rig so the ground under the cursor follows the mouse.
+func _pan_by_pixels(rel:Vector2) -> void:
+    var view_h:float = maxf(1.0, get_viewport().get_visible_rect().size.y);
+    var per_px:float = 2.0 * _distance * tan(deg_to_rad(camera.fov) * 0.5) / view_h;
+    var forward_k:float = per_px / maxf(0.2, sin(-_pitch));   # the ground is foreshortened by the pitch
+    var local:Vector3 = Vector3(-rel.x * per_px, 0.0, -rel.y * forward_k);
+    position += Basis(Vector3.UP, _yaw) * local;
 
 func _apply() -> void:
     rotation = Vector3(0.0, _yaw, 0.0);

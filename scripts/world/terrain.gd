@@ -22,6 +22,8 @@ const COLOR_ROCK        :Color = Color(0.48, 0.46, 0.43);
 const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
 const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
+const DETAIL_AMOUNT     :float = 0.055;
+const DETAIL_SATURATION :float = 1.15;
 const GRASS_BY_SEASON   :Array[Color] = [
     Color(0.3, 0.47, 0.2), Color(0.36, 0.47, 0.18), Color(0.5, 0.45, 0.22), Color(0.8, 0.83, 0.86),
 ];
@@ -33,6 +35,7 @@ var _dirty  :Dictionary = {};
 var _material:StandardMaterial3D;
 var _season :int = 0;
 var _tint_noise:FastNoiseLite;
+var _detail_noise:FastNoiseLite;
 
 func _ready() -> void:
     _material = StandardMaterial3D.new();
@@ -60,6 +63,12 @@ func generate(world_seed:int) -> void:
     _tint_noise.seed = world_seed + 3;
     _tint_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
     _tint_noise.frequency = 0.04;
+    _detail_noise = FastNoiseLite.new();
+    _detail_noise.seed = world_seed + 4;
+    _detail_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
+    _detail_noise.frequency = 0.3;
+    _detail_noise.fractal_type = FastNoiseLite.FRACTAL_FBM;
+    _detail_noise.fractal_octaves = 2;
     var base:FastNoiseLite = FastNoiseLite.new();
     base.seed = world_seed;
     base.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
@@ -272,6 +281,15 @@ func _cell_color(c:Vector2i) -> Color:
         v += _tint_noise.get_noise_2d(c.x, c.y) * 0.04;
     return Color(col.r + v, col.g + v, col.b + v);
 
+# Fine texture sampled per corner (shared by the cells around it, so it stays smooth) plus a little
+# extra saturation to counter the washed-out look. Roads and fields don't use this.
+func _detail(col:Color, x:int, z:int) -> Color:
+    var d:float = _detail_noise.get_noise_2d(x, z) if _detail_noise != null else 0.0;
+    var gray:float = col.get_luminance();
+    var out:Color = Color(gray, gray, gray).lerp(col, DETAIL_SATURATION);
+    # brighter and yellower in one direction, darker and bluer in the other
+    return Color(out.r + d * DETAIL_AMOUNT * 1.2, out.g + d * DETAIL_AMOUNT, out.b + d * DETAIL_AMOUNT * 0.5);
+
 @warning_ignore("integer_division")
 func _build_chunk(ci:int) -> void:
     var cx0:int = (ci % CHUNKS) * CHUNK;
@@ -324,7 +342,7 @@ func _build_chunk(ci:int) -> void:
                         if in_bounds(nc) and overlay[index(nc)] == Overlay.NONE:
                             sum += cell_cols[li + o.y * span + o.x];
                             n += 1;
-                    colors[v + j] = sum / float(n);
+                    colors[v + j] = _detail(sum / float(n), x + (1 if (j == 1 or j == 2) else 0), z + (1 if (j == 2 or j == 3) else 0));
             # clockwise winding seen from above
             indices[k] = v;
             indices[k + 1] = v + 1;

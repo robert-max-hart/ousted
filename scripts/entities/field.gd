@@ -148,10 +148,8 @@ func on_hour() -> void:
     for i in plot_count():
         # soil moisture: rain wets, warmth dries, nearby water keeps it up
         var m:float = moisture[i];
-        if Weather.is_raining:
-            m += 0.04;
-        else:
-            m -= 0.003 + maxf(0.0, temp) * 0.0006;
+        var dry:float = 1.0 - Weather.intensity;
+        m += 0.04 * Weather.intensity - (0.003 + maxf(0.0, temp) * 0.0006) * dry;
         if near_water[i] == 1:
             m = maxf(m, 0.45);
         moisture[i] = clampf(m, 0.0, 1.0);

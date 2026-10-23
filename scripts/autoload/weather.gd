@@ -12,9 +12,15 @@ const DAILY_SWING       :float = 4.0;
 const RAIN_START_CHANCE :Array[float] = [0.06, 0.03, 0.06, 0.05];   # per hour
 const RAIN_STOP_CHANCE  :float = 0.12;                                # per hour
 const RAIN_COOLING      :float = 2.0;
+const RAMP_IN_HOURS     :float = 1.5;                         # game hours for rain/snow to build to full
+const RAMP_OUT_HOURS    :float = 2.5;                         # ... and to clear away again
+const SNOW_BELOW        :float = 0.0;                         # C: all precipitation is snow
+const RAIN_ABOVE        :float = 3.0;                         # C: all precipitation is rain
 
 var temperature     :float = 10.0;
-var is_raining      :bool = false;
+var is_raining      :bool = false;      # a precipitation spell is active (the target state)
+var intensity       :float = 0.0;       # 0..1, eases toward the spell; use this for anything visible
+var _dry_temperature:float = 10.0;
 var _day_offset     :float = 0.0;
 var _rng            :RandomNumberGenerator = RandomNumberGenerator.new();
 
@@ -23,6 +29,14 @@ func _ready() -> void:
     GameClock.hour_changed.connect(_on_hour);
     GameClock.day_changed.connect(_on_day);
     _roll_day();
+    _update_temperature();
+
+func _process(delta:float) -> void:
+    var target:float = 1.0 if is_raining else 0.0;
+    if is_equal_approx(intensity, target):
+        return;
+    var hours:float = RAMP_IN_HOURS if is_raining else RAMP_OUT_HOURS;
+    intensity = move_toward(intensity, target, GameClock.game_hours(delta) / hours);
     _update_temperature();
 
 func _on_day(_day:int) -> void:
@@ -55,14 +69,24 @@ func _update_temperature() -> void:
     var h:float = GameClock.hour();
     # coldest around 04:00, warmest around 16:00
     var daily:float = -cos((h - 4.0) / 24.0 * TAU) * DAILY_SWING;
-    temperature = mean_temperature() + daily - (RAIN_COOLING if is_raining else 0.0);
+    _dry_temperature = mean_temperature() + daily;
+    temperature = _dry_temperature - RAIN_COOLING * intensity;
+
+# Share of precipitation falling as snow: 1 at or below SNOW_BELOW, 0 at or above RAIN_ABOVE.
+# Judged at the temperature of a full spell, so it stays steady while the spell ramps in and out.
+func snow_fraction() -> float:
+    var t:float = _dry_temperature - RAIN_COOLING;
+    return clampf((RAIN_ABOVE - t) / (RAIN_ABOVE - SNOW_BELOW), 0.0, 1.0);
 
 func is_snowing() -> bool:
-    return is_raining and temperature < 0.0;
+    return intensity > 0.05 and snow_fraction() > 0.5;
 
 func description() -> String:
-    if is_snowing():
-        return "Snow";
-    if is_raining:
-        return "Rain";
+    if intensity > 0.05:
+        var f:float = snow_fraction();
+        if f >= 1.0:
+            return "Snow";
+        if f <= 0.0:
+            return "Rain";
+        return "Sleet";
     return "Clear";

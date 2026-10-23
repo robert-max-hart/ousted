@@ -29,12 +29,13 @@ A headless run of one full in-game year had no errors: the colony harvests wheat
 
 ### Decided
 - **Terraforming cost (2026-10-23):** terraforming must require citizen labor, not be free and instant. Dirt is not a resource for now. The current terraform UI is chunky and needs fine-tuning later. The plan has this in M5, but the timing is not settled.
+- **Storage (2026-10-23):** each storage building has its own inventory (and capacity), replacing the shared colony-wide stock. This is the first M2 task. `Stock` is the current autoload, with reservations, and will need reworking.
+- **Crop speed (2026-10-23):** crops differ in speed, so there is no single rule. Fast crops (lettuce, radishes) give several harvests a year, slow ones (pumpkins) give one. Some crops are **multi-harvest per sowing**: they keep producing without replanting until they die off. This needs new crops and a per-crop attribute in `Defs.CROPS` (today only wheat and beans, both replant-per-harvest). The wheat/bean tuning is a per-crop matter now.
+- **Ageing (2026-10-23):** hybrid. Citizens age faster than the calendar, at an adjustable rate (a setting). Under 5 is a baby (never works, never leaves the house), 5 to 17 is a child (school is their work, or real work if there is no school), 18 and over is an adult. A policy to allow or forbid child labor, with a happiness effect, is a nice-to-have. Schools have a capacity and need a teacher (a worker who staffs the building). A child's role is re-evaluated each time their task ends, with school taking priority, so nobody is locked into the workforce. This is M3 work.
 
 ### Waiting on the user
 These are the open questions from `docs/plan.md` §7. Ask before building anything that depends on them:
-1. **Ageing.** A year is about 64 minutes at 1x. Should citizens age faster than the calendar, or should years be longer?
-2. **Storage.** Keep the shared colony-wide stock (current), or give each storage building its own inventory?
-3. **Crop speed.** Wheat gets one harvest a year because early spring is cold. Keep that, or tune for rotation within a year?
+None at the moment. The M3 ageing details are still open: the old-age curve numbers (decided in shape: see plan §7), the default ageing rate, and school capacity and teacher numbers (see `docs/plan.md` §7).
 
 ### Likely next steps (M2, Logistics & economy; see plan)
 - Per-storage inventories and capacity, a granary, and food spoilage.

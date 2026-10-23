@@ -106,8 +106,10 @@ func _unhandled_input(event:InputEvent) -> void:
     if not (event is InputEventMouseButton):
         return;
     var mb:InputEventMouseButton = event;
-    if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-        _cancel();
+    if mb.button_index == MOUSE_BUTTON_RIGHT:
+        # right-drag pans the camera, so only a plain click (on release) cancels
+        if not mb.pressed and not World.instance.camera_rig.right_dragged:
+            _cancel();
     elif mb.button_index == MOUSE_BUTTON_LEFT:
         _update_hover();
         if mb.pressed:

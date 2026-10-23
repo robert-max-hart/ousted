@@ -42,7 +42,7 @@ var _sky        :ProceduralSkyMaterial;
 var _sun        :DirectionalLight3D;
 var _water      :MeshInstance3D;
 var _rain       :CPUParticles3D;
-var _rain_mat   :StandardMaterial3D;
+var _snow       :CPUParticles3D;
 
 static func alive(o:Variant) -> bool:
     return o != null and is_instance_valid(o) and not o.removed;
@@ -107,6 +107,7 @@ func _ready() -> void:
 
 func _process(_delta:float) -> void:
     _update_lighting();
+    _update_precip();
 
 func idx(c:Vector2i) -> int:
     return c.y * Terrain.SIZE + c.x;
@@ -563,7 +564,8 @@ func _update_lighting() -> void:
     var a:Array = LIGHT_KEYS[k];
     var b:Array = LIGHT_KEYS[k + 1];
     var t:float = smoothstep(0.0, 1.0, (h - a[0]) / (b[0] - a[0]));
-    var gloom:float = 1.0 if not Weather.is_raining else 0.6;
+    var wet:float = Weather.intensity;
+    var gloom:float = lerpf(1.0, 0.6, wet);
 
     # the sun crosses the sky by day and the moon by night, along one
     # continuous arc so the light never jumps at the handover
@@ -579,9 +581,8 @@ func _update_lighting() -> void:
 
     var top:Color = (a[5] as Color).lerp(b[5], t);
     var horizon:Color = (a[6] as Color).lerp(b[6], t);
-    if Weather.is_raining:
-        top = top.lerp(RAIN_GREY * top.get_luminance() * 2.0, 0.6);
-        horizon = horizon.lerp(RAIN_GREY * horizon.get_luminance() * 1.4, 0.6);
+    top = top.lerp(RAIN_GREY * top.get_luminance() * 2.0, 0.6 * wet);
+    horizon = horizon.lerp(RAIN_GREY * horizon.get_luminance() * 1.4, 0.6 * wet);
     _sky.sky_top_color = top;
     _sky.sky_horizon_color = horizon;
     _sky.ground_horizon_color = horizon;
@@ -589,43 +590,77 @@ func _update_lighting() -> void:
     _env.ambient_light_color = (a[3] as Color).lerp(b[3], t);
     _env.ambient_light_energy = lerpf(a[4], b[4], t);
     _env.fog_light_color = horizon;
-    _env.fog_density = 0.0012 if not Weather.is_raining else 0.004;
+    _env.fog_density = lerpf(0.0012, 0.004, wet);
+
+const RAIN_PARTICLES :int = 2500;
+const SNOW_PARTICLES :int = 1800;
+
+func _make_precip(extents:float) -> CPUParticles3D:
+    var p:CPUParticles3D = CPUParticles3D.new();
+    p.local_coords = false;
+    p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX;
+    p.emission_box_extents = Vector3(extents, 0.5, extents);
+    p.direction = Vector3.DOWN;
+    p.spread = 3.0;
+    p.position = Vector3(0, 22, 0);
+    p.emitting = false;
+    p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+    camera_rig.add_child(p);
+    return p;
+
+func _precip_material(color:Color) -> StandardMaterial3D:
+    var m:StandardMaterial3D = StandardMaterial3D.new();
+    m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
+    m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
+    m.albedo_color = color;
+    return m;
 
 func _setup_weather_fx() -> void:
-    _rain = CPUParticles3D.new();
-    _rain.amount = 2500;
-    _rain.local_coords = false;
-    _rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX;
-    _rain.emission_box_extents = Vector3(35, 0.5, 35);
-    _rain.direction = Vector3.DOWN;
-    _rain.spread = 3.0;
-    _rain.position = Vector3(0, 22, 0);
-    _rain.emitting = false;
+    _rain = _make_precip(35.0);
+    _rain.lifetime = 1.1;
+    _rain.initial_velocity_min = 18.0;
+    _rain.initial_velocity_max = 20.0;
+    _rain.gravity = Vector3(0, -9.8, 0);
     var drop:BoxMesh = BoxMesh.new();
     drop.size = Vector3(0.03, 0.5, 0.03);
-    _rain_mat = StandardMaterial3D.new();
-    _rain_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
-    _rain_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
-    drop.material = _rain_mat;
+    drop.material = _precip_material(Color(0.7, 0.75, 0.85, 0.45));
     _rain.mesh = drop;
-    _rain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-    camera_rig.add_child(_rain);
 
+    _snow = _make_precip(35.0);
+    _snow.lifetime = 9.0;
+    _snow.initial_velocity_min = 2.0;
+    _snow.initial_velocity_max = 2.5;
+    _snow.gravity = Vector3(0.3, -0.5, 0);
+    var flake:BoxMesh = BoxMesh.new();
+    flake.size = Vector3(0.08, 0.08, 0.08);
+    flake.material = _precip_material(Color(1, 1, 1, 0.9));
+    _snow.mesh = flake;
+
+const RAIN_ALPHA :float = 0.45;
+const SNOW_ALPHA :float = 0.9;
+
+# Between the freezing and rain-only temperatures the two emitters share the sky: mostly snow near
+# 0 C, mostly rain near 3 C. The mix is set hourly (changing an emitter's amount restarts it)...
 func _on_weather_changed() -> void:
     if _rain == null:
         return;
-    _rain.emitting = Weather.is_raining;
-    if Weather.is_snowing():
-        _rain.lifetime = 9.0;
-        _rain.initial_velocity_min = 2.0;
-        _rain.initial_velocity_max = 2.5;
-        _rain.gravity = Vector3(0.3, -0.5, 0);
-        (_rain.mesh as BoxMesh).size = Vector3(0.08, 0.08, 0.08);
-        _rain_mat.albedo_color = Color(1, 1, 1, 0.9);
-    else:
-        _rain.lifetime = 1.1;
-        _rain.initial_velocity_min = 18.0;
-        _rain.initial_velocity_max = 20.0;
-        _rain.gravity = Vector3(0, -9.8, 0);
-        (_rain.mesh as BoxMesh).size = Vector3(0.03, 0.5, 0.03);
-        _rain_mat.albedo_color = Color(0.7, 0.75, 0.85, 0.45);
+    var snow_f:float = Weather.snow_fraction();
+    var rain_n:int = maxi(1, int(RAIN_PARTICLES * (1.0 - snow_f)));
+    var snow_n:int = maxi(1, int(SNOW_PARTICLES * snow_f));
+    if absi(rain_n - _rain.amount) > 50:
+        _rain.amount = rain_n;
+    if absi(snow_n - _snow.amount) > 50:
+        _snow.amount = snow_n;
+
+# ... while the spell fading in and out is a per-frame alpha ramp.
+func _update_precip() -> void:
+    if _rain == null:
+        return;
+    var wet:float = Weather.intensity;
+    var snow_f:float = Weather.snow_fraction();
+    _rain.emitting = wet > 0.01 and snow_f < 1.0;
+    _snow.emitting = wet > 0.01 and snow_f > 0.0;
+    var rain_mat:StandardMaterial3D = (_rain.mesh as BoxMesh).material as StandardMaterial3D;
+    var snow_mat:StandardMaterial3D = (_snow.mesh as BoxMesh).material as StandardMaterial3D;
+    rain_mat.albedo_color.a = RAIN_ALPHA * wet;
+    snow_mat.albedo_color.a = SNOW_ALPHA * wet;

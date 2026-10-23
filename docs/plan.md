@@ -39,7 +39,7 @@ for harvest and stocking up, and winter is the test.
 - Prototype values (all tunable in `GameClock`): **1 game hour = 5 s at 1x**, 24 h days,
   **8 days per season**, 4 seasons, so a year is 32 days (about 64 min at 1x).
 - Day and night: citizens work in daylight (06:00 to 21:00) and sleep at night.
-- **Open question:** citizen ageing is decoupled from the calendar (see §7).
+- Citizen ageing is decoupled from the calendar: citizens age faster, at an adjustable rate (see §7).
 
 ### 3.2 Weather & seasons
 - **Temperature** follows a smooth seasonal curve, a daily curve and a random offset per day.
@@ -79,6 +79,22 @@ for harvest and stocking up, and winter is the test.
   a family in a house can have children. Death from old age.
 - **Decisions:** each pawn picks its next task from: urgent needs → hand off carried goods →
   sleep at night → profession work → general labor → idle.
+
+- **Experience (idea, M3; not built):** each pawn has a general experience value that speeds up all
+  work, plus a per-job experience (one per job type or job building) that speeds up that job only.
+  Doing a job raises its experience and school raises the general value. Pawns have an age and
+  nothing else of this kind today. Work speed is currently the same for everyone.
+  Decided (2026-10-23): experience never decays; job-specific experience is earned at any age
+  (including children doing child labor); gains get harder the higher the value (logarithmic or
+  diminishing returns), for both general and job-specific experience.
+  Decided (2026-10-23): the HUD profession +/- counters pick by experience. Adding takes the Laborer
+  with the most experience in that job. Removing takes the member with the least. Ties fall back to
+  list order. Experience is stored per pawn per job type, so reassigning loses nothing. A way to
+  assign specific citizens in the inspector is a possible later addition.
+  Idea (later, not scheduled): a college-style building where adults earn general experience, as
+  something for idle citizens to do. It has much lower priority than school, so it only takes pawns
+  who would otherwise idle, and it may differ from school in other ways (capacity, teacher
+  requirement, cost, effect size). Details not decided.
 
 ### 3.6 Jobs & labor
 - **Professions** (Banished-style +/− counters in the HUD): Laborer, Builder, Farmer, Gatherer.
@@ -193,23 +209,38 @@ Save and load should probably move earlier (M2/M3) once state shapes stabilise, 
 
 | Input | Action |
 |---|---|
-| WASD / arrows | Pan camera |
+| WASD / arrows, RMB-drag | Pan camera (RMB-drag grabs the ground) |
 | Q / E, middle-drag | Rotate (and tilt) camera |
 | Mouse wheel | Zoom |
 | Space, 1/2/3 | Pause, game speed |
 | LMB | Select / use tool (drag for areas) |
-| RMB / Esc | Cancel tool, deselect |
+| RMB click / Esc | Cancel tool, deselect (RMB click means no drag) |
 | R | Rotate building footprint |
 
 ---
 
 ## 7. Open questions
 
-1. **Ageing vs calendar:** at 64 minutes per year, a 60-year life is far too long. Options: age
-   faster than the calendar (Banished-style), or make years longer and lives shorter.
+1. ~~**Ageing vs calendar**~~ **Decided (2026-10-23):** hybrid. Citizens age faster than the calendar,
+   and the rate is an adjustable setting (the calendar and farming stay as they are). Life stages:
+   - **Baby, under 5:** never works or attends school, stays home.
+   - **Child, 5 to 17:** attends school as their "work". If no school is available, they work instead.
+   - **Adult, 18 and over:** works.
+   Wanted later: a policy to allow or forbid child labor, with a happiness effect either way.
+   Schools have a capacity and need a teacher, who "works" the school like any other job building.
+   A child's role is re-evaluated each time their task ends (JobManager.choose_task), with school
+   taking priority over labor: if a school loses its teacher or is demolished, children finish the
+   current task and fall back to child labor (if the policy allows it, otherwise idle at home); if
+   one opens or gets a teacher, working children move to it on their next pick, in order up to its
+   capacity. Nobody is locked into the workforce.
+   Old age (decided 2026-10-23): work efficiency drops only a few percentage points through most of
+   old age, then falls steeply once a citizen is very old. Death rolls also begin in old age, rising
+   more gently than the efficiency drop. Experience gain is never reduced by age.
+   Still open: the default ageing rate; capacity and teacher numbers; the exact age thresholds and curves.
 2. **Map size and scale:** 128 m is enough for a prototype. A full game probably wants 256–512 m
    with chunk streaming or LOD.
-3. **Storage model:** colony-wide (simple, current) or per-building physical stock (deeper logistics)?
+3. ~~**Storage model**~~ **Decided (2026-10-23):** per-building physical stock. Each storage building has its
+   own inventory and capacity. The colony-wide count (current) is a prototype simplification.
 4. ~~**Terraforming cost**~~ **Decided (2026-10-23):** terraforming requires citizen labor (not
    free and instant). Dirt is not a resource, for now. The current brush UI is too chunky and needs
    fine-tuning later. Whether this lands in M5 as planned or earlier is not decided.
@@ -222,6 +253,9 @@ Save and load should probably move earlier (M2/M3) once state shapes stabilise, 
 
 - A one-year soak run: the colony builds houses, a well and fields, gets one wheat harvest
   (planted early spring, ripe at the start of autumn) and gets through winter on stored food.
+- **Decided (2026-10-23):** crop speed varies per crop. Quick crops (lettuce, radishes) allow multiple harvests a year,
+  slow ones (pumpkins) one. Some crops give multiple harvests per sowing and only need replanting after they die off.
+  Needs a per-crop "multi-harvest" attribute and more crops (see M4).
 - Wheat ripens slowly because early spring is cold (around 3 °C mean). One harvest per year fits
   "realistic", but bean/wheat rotation in a single year isn't possible yet. This is a tuning question.
 - Spring frosts can kill early plantings, and farmers plant as soon as the daily mean is above
