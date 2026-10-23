@@ -22,17 +22,24 @@ func _ready() -> void:
     for x in range(-6, 12):
         world.set_road(th.origin + Vector2i(x, 5), true);
 
+const SHOT_HOURS:Array[float] = [6.2, 12.0, 20.0, 23.5];
+
+@warning_ignore("integer_division")
 func _process(_delta:float) -> void:
     _frame += 1;
     Weather.is_raining = false;
-    if _frame == 240:
-        _shot("shot_overview.png");
-        world.tools.select(world.pawns[0]);
-    if _frame == 600:
-        world.camera_rig.focus_on(world.town_hall.position);
-        _shot("shot_later.png");
-    if _frame == 610:
+    # let things settle, then jump the clock to each hour and capture it
+    if _frame < 120:
+        return;
+    var i:int = (_frame - 120) / 10;
+    if i >= SHOT_HOURS.size():
         get_tree().quit();
+        return;
+    if (_frame - 120) % 10 == 0:
+        GameClock.set_speed(0);
+        GameClock.total_hours = SHOT_HOURS[i];
+    elif (_frame - 120) % 10 == 5:
+        _shot("shot_%02d.png" % int(SHOT_HOURS[i]));
 
 func _shot(file:String) -> void:
     var img:Image = get_viewport().get_texture().get_image();

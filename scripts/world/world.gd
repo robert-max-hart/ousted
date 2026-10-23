@@ -468,6 +468,7 @@ func _setup_environment() -> void:
 
     _sun = DirectionalLight3D.new();
     _sun.shadow_enabled = true;
+    _sun.shadow_opacity = 0.8;
     _sun.directional_shadow_max_distance = 140.0;
     add_child(_sun);
 
@@ -485,29 +486,54 @@ func _setup_environment() -> void:
     water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     add_child(water);
 
+# Light keyframes over the day. Night is lit by a cool moon rather than
+# going dark, so the cycle reads as color temperature, not brightness.
+#   hour, light color, light energy, ambient color, ambient energy, sky top, sky horizon
+const LIGHT_KEYS:Array = [
+    [0.0,  Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
+    [4.5,  Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
+    [6.0,  Color(1.0, 0.72, 0.5),  0.64, Color(0.76, 0.68, 0.66), 0.31, Color(0.35, 0.4, 0.62),  Color(0.95, 0.66, 0.46)],
+    [8.0,  Color(1.0, 1.0, 1.0),   0.7,  Color(0.7, 0.72, 0.75),  0.3,  Color(0.3, 0.5, 0.82),   Color(0.75, 0.8, 0.86)],
+    [18.0, Color(1.0, 1.0, 1.0),   0.7,  Color(0.7, 0.72, 0.75),  0.3,  Color(0.3, 0.5, 0.82),   Color(0.75, 0.8, 0.86)],
+    [20.0, Color(1.0, 0.66, 0.45), 0.64, Color(0.76, 0.66, 0.65), 0.31, Color(0.32, 0.34, 0.58), Color(0.95, 0.58, 0.4)],
+    [21.5, Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
+    [24.0, Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
+];
+const RAIN_GREY:Color = Color(0.55, 0.58, 0.62);
+
 func _update_lighting() -> void:
     var h:float = GameClock.hour();
+    var k:int = 0;
+    while k < LIGHT_KEYS.size() - 2 and h >= LIGHT_KEYS[k + 1][0]:
+        k += 1;
+    var a:Array = LIGHT_KEYS[k];
+    var b:Array = LIGHT_KEYS[k + 1];
+    var t:float = smoothstep(0.0, 1.0, (h - a[0]) / (b[0] - a[0]));
+    var gloom:float = 1.0 if not Weather.is_raining else 0.6;
+
+    # the sun crosses the sky by day and the moon by night, along one
+    # continuous arc so the light never jumps at the handover
     var day_t:float = (h - 5.0) / 16.0;      # 05:00 .. 21:00
-    var arc:float = sin(clampf(day_t, 0.0, 1.0) * PI);
-    var daylight:float = sqrt(arc) if day_t > 0.0 and day_t < 1.0 else 0.0;
-    var gloom:float = 0.55 if Weather.is_raining else 1.0;
+    var is_day:bool = day_t >= 0.0 and day_t <= 1.0;
+    var night_t:float = fposmod(h - 21.0, 24.0) / 8.0;
+    var arc:float = sin((day_t if is_day else night_t) * PI);
+    var elevation:float = lerpf(6.0, 62.0 if is_day else 45.0, arc);
+    var azimuth:float = lerpf(110.0, -110.0, day_t) if is_day else lerpf(-110.0, 110.0, night_t);
+    _sun.rotation = Vector3(-deg_to_rad(elevation), deg_to_rad(azimuth), 0.0);
+    _sun.light_color = (a[1] as Color).lerp(b[1], t);
+    _sun.light_energy = lerpf(a[2], b[2], t) * gloom;
 
-    _sun.rotation = Vector3(-deg_to_rad(lerpf(4.0, 62.0, arc)), deg_to_rad(lerpf(110.0, -110.0, clampf(day_t, 0.0, 1.0))), 0.0);
-    _sun.light_energy = daylight * 0.7 * gloom;
-    _sun.light_color = Color(1.0, 0.72, 0.5).lerp(Color(1.0, 0.97, 0.9), arc);
-    _sun.visible = daylight > 0.01;
-
-    var day_top:Color = Color(0.28, 0.48, 0.8).lerp(Color(0.45, 0.48, 0.52), 1.0 - gloom);
-    var day_horizon:Color = Color(0.72, 0.78, 0.84).lerp(Color(0.6, 0.62, 0.65), 1.0 - gloom);
-    var night_top:Color = Color(0.02, 0.03, 0.08);
-    var night_horizon:Color = Color(0.06, 0.08, 0.15);
-    var horizon:Color = night_horizon.lerp(day_horizon, daylight);
-    _sky.sky_top_color = night_top.lerp(day_top, daylight);
+    var top:Color = (a[5] as Color).lerp(b[5], t);
+    var horizon:Color = (a[6] as Color).lerp(b[6], t);
+    if Weather.is_raining:
+        top = top.lerp(RAIN_GREY * top.get_luminance() * 2.0, 0.6);
+        horizon = horizon.lerp(RAIN_GREY * horizon.get_luminance() * 1.4, 0.6);
+    _sky.sky_top_color = top;
     _sky.sky_horizon_color = horizon;
     _sky.ground_horizon_color = horizon;
     _sky.ground_bottom_color = horizon.darkened(0.5);
-    _env.ambient_light_color = Color(0.25, 0.3, 0.55).lerp(Color(0.6, 0.65, 0.72), daylight);
-    _env.ambient_light_energy = lerpf(0.35, 0.3, daylight);
+    _env.ambient_light_color = (a[3] as Color).lerp(b[3], t);
+    _env.ambient_light_energy = lerpf(a[4], b[4], t);
     _env.fog_light_color = horizon;
     _env.fog_density = 0.0012 if not Weather.is_raining else 0.004;
 
