@@ -108,6 +108,25 @@ for harvest and stocking up, and winter is the test.
   prototype, but pawns still physically walk goods to and from the nearest storage. Later: each
   storage building holds its own inventory with a capacity.
 
+#### Woodcutter (decided 2026-10-23)
+- A building and a job (new Woodcutter profession, +/- counter, 2 worker slots). It works inside a
+  visible radius (15 cells) and has three toggleable jobs: **chop** (setting: off, mature trees only,
+  or all trees), **plant** trees, and **convert** wood to firewood. Priority is chop, convert, plant.
+- Trees have a sapling stage and grow all year, slower in winter. They need water, but far less
+  strictly than crops. Planting is allowed all year.
+- It is also storage for wood and firewood (120 units, accepts only those).
+- Firewood: 1 wood makes 5 firewood, with an adjustable production cap. If the building has no wood
+  to split, workers haul wood in from other storage. Houses will burn firewood for warmth.
+- **Heating (decided and built 2026-10-23):** each house holds its own firewood (40) and burns it only when
+  it is below 15 C, faster the colder it is (2 a day at 0 C), only while someone lives there. Laborers and
+  woodcutters keep houses stocked to a per-house target. Without firewood the house is cold: residents
+  get no warmth recovery and still lose warmth slowly, and health starts to drop once warmth falls under
+  0.2. The Town Hall needs no firewood and is always warm. Heating can be switched off per house, and the
+  stock target is adjustable per house.
+  **Any building that produces something should have a production cap setting.**
+  Firewood only spoils when it is lying outside on the ground, at the same 10x penalty food gets.
+- General rule going forward: tools raise work efficiency, they are not required to work.
+
 ### 3.7 Agriculture (the deep system)
 | Mechanic | Prototype | Later |
 |---|---|---|
@@ -128,7 +147,12 @@ Fields are player-placed rectangles (fixed 6×6 in the prototype, drag-sized lat
 - Raw resources: wood (trees), stone (rocks), iron (ore deposits), food (forage, farms), water (wells).
 - Later chains: wood → firewood (warmth), iron + wood → tools (work speed), flax → linen →
   clothing (warmth), wheat → flour → bread (better nutrition).
-- Food spoils over time unless stored in a granary or cellar.
+- Food spoils over time. **Decided (2026-10-23):** each food type has its own spoilage rate, ambient
+  temperature scales it (warmer spoils faster, near and below freezing it nearly stops), and the
+  storage building scales it too: the Granary halves the rate. More food storage buildings and
+  upgrades or add-ons with different modifiers are planned (`spoil_mult` in the building def).
+  Prototype numbers: berries 8 days, beans 90, wheat 120 (time constants at 10 C). Food on the ground spoils 10x
+  faster than in ordinary storage, as a penalty for lacking storage.
 
 ### 3.9 Trade & barter
 - A Trading Post. Merchants arrive by river or road a few times per season with randomized wants and offers.
@@ -193,7 +217,7 @@ Decisions and why:
 | # | Name | Contents |
 |---|---|---|
 | **M1** | **Core loop prototype** *(built: first pass)* | Terrain gen and editing, camera, clock/seasons/day-night, weather, trees/rocks/bushes, harvest designation, roads, construction with hauling, pawns with needs, professions, basic farming (wheat/beans, fertility, moisture, frost), HUD |
-| M2 | Logistics & economy | Per-storage inventories and capacity, granary/spoilage, woodcutter/quarry/mine buildings, firewood and warmth, tools, field drag-sizing |
+| M2 | Logistics & economy *(in progress: storage, granary, filters, ground piles, spoilage and drag-sized fields done)* | Per-storage inventories and capacity, granary/spoilage, woodcutter/quarry/mine buildings, firewood and warmth, tools, field drag-sizing |
 | M3 | Population | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
 | M4 | Agriculture depth | More crops, sowing calendars, seeds, pests, irrigation channels, fertility overlay, orchards, livestock and manure |
 | M5 | Terrain as labor | Terraforming as worker jobs, dirt and stone moved, nicer terrain shader (texture splat, snow) |
@@ -241,6 +265,11 @@ Save and load should probably move earlier (M2/M3) once state shapes stabilise, 
    with chunk streaming or LOD.
 3. ~~**Storage model**~~ **Decided (2026-10-23):** per-building physical stock. Each storage building has its
    own inventory and capacity. The colony-wide count (current) is a prototype simplification.
+   Details decided 2026-10-23: a new **Granary** holds food only. Every storage building also has
+   player-set item filters (allow or forbid each item). Capacity is one total per building. When no
+   storage has room, workers stop starting gather jobs for that item and any carried goods are
+   dropped on the ground as a loose pile that can be hauled later. A storage building can't be
+   demolished until it is empty.
 4. ~~**Terraforming cost**~~ **Decided (2026-10-23):** terraforming requires citizen labor (not
    free and instant). Dirt is not a resource, for now. The current brush UI is too chunky and needs
    fine-tuning later. Whether this lands in M5 as planned or earlier is not decided.

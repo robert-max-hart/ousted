@@ -1,52 +1,51 @@
 # ----------------------------------------------------------------
 # Stock (autoload)
-#     Colony-wide inventory. Pawns still physically carry goods to and
-#     from storage buildings; this just tracks the totals. Reservations
-#     keep two pawns from claiming the same units.
+#     Read-only colony totals. The goods themselves live in the
+#     inventories of storage buildings (Building.stored); this adds
+#     them up for the HUD and for decisions like "is there food?".
 # ----------------------------------------------------------------
 extends Node;
 
-signal changed;
-
-var _items      :Dictionary = {};   # StringName -> int
-var _reserved   :Dictionary = {};   # StringName -> int
-
-func reset(start:Dictionary) -> void:
-    _items = start.duplicate();
-    _reserved.clear();
-    changed.emit();
+func _storages() -> Array[Building]:
+    var out:Array[Building] = [];
+    if World.instance == null:
+        return out;
+    for b in World.instance.buildings:
+        if b.is_storage():
+            out.append(b);
+    return out;
 
 func amount(item:StringName) -> int:
-    return _items.get(item, 0);
+    var n:int = 0;
+    for b in _storages():
+        n += b.amount(item);
+    return n;
 
+# Units not already promised to someone on the way to collect them.
 func available(item:StringName) -> int:
-    return amount(item) - _reserved.get(item, 0);
+    var n:int = 0;
+    for b in _storages():
+        n += b.available(item);
+    return n;
 
-func add(item:StringName, n:int) -> void:
-    if n <= 0:
-        return;
-    _items[item] = amount(item) + n;
-    changed.emit();
+func capacity() -> int:
+    var n:int = 0;
+    for b in _storages():
+        n += b.capacity();
+    return n;
 
-# Removes up to n units, returns how many were taken.
-func take(item:StringName, n:int) -> int:
-    var t:int = mini(n, amount(item));
-    _items[item] = amount(item) - t;
-    changed.emit();
-    return t;
+func used() -> int:
+    var n:int = 0;
+    for b in _storages():
+        n += b.used();
+    return n;
 
-# Reserves up to n available units, returns how many were reserved.
-func reserve(item:StringName, n:int) -> int:
-    var r:int = clampi(n, 0, available(item));
-    _reserved[item] = _reserved.get(item, 0) + r;
-    return r;
-
-func unreserve(item:StringName, n:int) -> void:
-    _reserved[item] = maxi(0, _reserved.get(item, 0) - n);
-
-func take_reserved(item:StringName, n:int) -> int:
-    unreserve(item, n);
-    return take(item, n);
+# Whether any storage building could take at least one unit of the item right now.
+func has_room_for(item:StringName) -> bool:
+    for b in _storages():
+        if b.can_store(item):
+            return true;
+    return false;
 
 # --------------------------------
 # Food helpers
@@ -54,7 +53,7 @@ func take_reserved(item:StringName, n:int) -> int:
 func food_total() -> int:
     var total:int = 0;
     for item in Defs.ITEMS:
-        if Defs.ITEMS[item].get("food", false):
+        if Defs.is_food(item):
             total += amount(item);
     return total;
 
@@ -63,7 +62,7 @@ func best_food() -> StringName:
     var best:StringName = &"";
     var best_n:int = 0;
     for item in Defs.ITEMS:
-        if Defs.ITEMS[item].get("food", false) and available(item) > best_n:
+        if Defs.is_food(item) and available(item) > best_n:
             best = item;
             best_n = available(item);
     return best;

@@ -9,7 +9,7 @@ class_name World extends Node3D;
 static var instance:World = null;
 
 const START_PAWNS       :int = 6;
-const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 90, &"berries": 30};
+const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 90, &"berries": 30, &"firewood": 30};
 const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
     JobManager.Profession.FARMER, JobManager.Profession.GATHERER,
@@ -31,12 +31,18 @@ var rng         :RandomNumberGenerator = RandomNumberGenerator.new();
 var buildings   :Array[Building] = [];
 var pawns       :Array[Pawn] = [];
 var nodes       :Array[ResourceNode] = [];
+var piles       :Array[GroundPile] = [];
 var occupant    :Array = [];        # Building per cell, or null
 var node_at     :Array = [];        # ResourceNode per cell, or null
 var soil_fertility:PackedFloat32Array;
 var town_hall   :Building;
 
 var _entities   :Node3D;
+var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
+var saplings    :Array[ResourceNode] = [];
+var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
+var _storage_warned:bool = false;
+var _spoiled_today:int = 0;
 var _env        :Environment;
 var _sky        :ProceduralSkyMaterial;
 var _sun        :DirectionalLight3D;
@@ -81,7 +87,8 @@ func _ready() -> void:
     var start:Vector2i = _find_start_cell();
     _clear_nodes(start, 10);
     town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
-    Stock.reset(START_STOCK);
+    for item in START_STOCK:
+        town_hall.store(item, START_STOCK[item]);
     _spawn_settlers(start);
 
     camera_rig = RTSCamera.new();
@@ -199,10 +206,68 @@ func add_node(kind:StringName, c:Vector2i) -> ResourceNode:
     renderer.mark_dirty();
     return rn;
 
+# Plants a new tree that grows up over time. Returns it, or null if the cell is not usable.
+func plant_tree(c:Vector2i) -> ResourceNode:
+    if not can_plant_tree(c):
+        return null;
+    var rn:ResourceNode = add_node(&"tree", c);
+    rn.make_sapling();
+    saplings.append(rn);
+    return rn;
+
+# Free, dry, gentle ground that is not road or field, and not touching another tree.
+func can_plant_tree(c:Vector2i) -> bool:
+    if not terrain.in_bounds(c) or terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4:
+        return false;
+    if occupant[idx(c)] != null or node_at[idx(c)] != null or terrain.get_overlay(c) != Terrain.Overlay.NONE:
+        return false;
+    if terrain.cell_slope(c) > 1.2 or planting.has(c):
+        return false;
+    for dz in range(-1, 2):
+        for dx in range(-1, 2):
+            var n:Vector2i = c + Vector2i(dx, dz);
+            if terrain.in_bounds(n) and node_at[idx(n)] != null and (node_at[idx(n)] as ResourceNode).kind == &"tree":
+                return false;
+    return true;
+
+func near_water(c:Vector2i, r:int = 4) -> bool:
+    for dz in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            var n:Vector2i = c + Vector2i(dx, dz);
+            if terrain.in_bounds(n) and terrain.is_water(n):
+                return true;
+    return false;
+
+# Growth per hour as a fraction of full growth. Year-round, but slow in winter, and far less
+# fussy about water than crops: dry ground still allows about a third of the pace.
+func tree_growth_rate(rn:ResourceNode) -> float:
+    var base:float = 1.0 / rn.def["grow_hours"];
+    var season:float = 0.25 if GameClock.season() == GameClock.Season.WINTER else 1.0;
+    var water:float = maxf(wetness, 0.8 if near_water(rn.cell) else 0.0);
+    return base * season * (0.35 + 0.65 * water);
+
+func _grow_trees() -> void:
+    if saplings.is_empty():
+        return;
+    for rn in saplings.duplicate():
+        if rn.removed:
+            saplings.erase(rn);
+            continue;
+        rn.set_growth(rn.growth + tree_growth_rate(rn));
+        if rn.is_mature():
+            saplings.erase(rn);
+    renderer.mark_dirty();
+
+func _update_wetness() -> void:
+    wetness += 0.03 * Weather.intensity;
+    wetness -= (0.004 + maxf(0.0, Weather.temperature) * 0.0003) * (1.0 - Weather.intensity);
+    wetness = clampf(wetness, 0.0, 1.0);
+
 func remove_node(rn:ResourceNode) -> void:
     if rn.removed:
         return;
     rn.removed = true;
+    saplings.erase(rn);
     nodes.erase(rn);
     node_at[idx(rn.cell)] = null;
     _refresh_nav(rn.cell);
@@ -268,15 +333,20 @@ func remove_building(b:Building, refund:bool) -> void:
     if b == town_hall:
         notify("The Town Hall can't be demolished.");
         return;
+    if b.is_storage() and not b.is_empty():
+        notify("%s can't be demolished until it is empty." % b.display_name());
+        return;
+    if b.fuel > 0:
+        deposit(&"firewood", b.fuel, b.position);
     if refund:
         var share:float = 1.0 if not b.is_complete() else 0.5;
         for item in b.delivered:
-            Stock.add(item, floori(b.delivered[item] * share));
+            deposit(item, floori(b.delivered[item] * share), b.position);
     for p in b.residents:
         p.home = null;
     # cancel work aimed at it now, while task callbacks can still see it
     for p in pawns:
-        if p.task != null and is_same(p.task.target, b):
+        if p.task != null and (is_same(p.task.target, b) or is_same(p.task.workplace, b)):
             p.end_task(false);
     var r:Rect2i = b.rect();
     for z in range(r.position.y, r.end.y):
@@ -325,15 +395,84 @@ func nearest_building(pos:Vector3, pred:Callable) -> Building:
             best_d = d;
     return best;
 
-func nearest_storage(pos:Vector3) -> Building:
+# Nearest storage building holding at least one unpromised unit of the item.
+func nearest_storage_with(item:StringName, pos:Vector3) -> Building:
     return nearest_building(pos, func(b:Building) -> bool:
-        return b.is_complete() and b.def.get("storage", false));
+        return b.is_storage() and b.available(item) > 0);
+
+# Nearest storage building that would accept the item and has room for it.
+func nearest_storage_for(item:StringName, pos:Vector3) -> Building:
+    return nearest_building(pos, func(b:Building) -> bool:
+        return b.can_store(item));
+
+# Puts n units into the nearest storage with room, spilling to further ones and finally onto
+# the ground near pos. Returns how many ended up in storage.
+func deposit(item:StringName, n:int, pos:Vector3) -> int:
+    var left:int = n;
+    while left > 0:
+        var b:Building = nearest_storage_for(item, pos);
+        if b == null:
+            break;
+        left -= b.store(item, left);
+    if left > 0:
+        drop_pile(item, left, terrain.world_to_cell(pos));
+    return n - left;
+
+# Where to go to warm up: a heated home, else the nearest heated shelter, else any shelter.
+func warm_shelter_for(p:Pawn) -> Building:
+    if alive(p.home) and p.home.is_complete() and p.home.is_heated():
+        return p.home;
+    var heated:Building = nearest_building(p.position, func(b:Building) -> bool:
+        return b.is_complete() and b.is_heated());
+    return heated if heated != null else shelter_for(p);
 
 func shelter_for(p:Pawn) -> Building:
     if alive(p.home) and p.home.is_complete():
         return p.home;
     return nearest_building(p.position, func(b:Building) -> bool:
         return b.is_complete() and b.def.has("beds"));
+
+# --------------------------------
+# Ground piles
+
+func pile_at(c:Vector2i) -> GroundPile:
+    for pl in piles:
+        if pl.cell == c:
+            return pl;
+    return null;
+
+# Leaves n units on the ground at the nearest suitable cell (merging with a pile of the same item).
+func drop_pile(item:StringName, n:int, near:Vector2i) -> void:
+    if n <= 0:
+        return;
+    for radius in 6:
+        for dz in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                if maxi(absi(dx), absi(dz)) != radius:
+                    continue;
+                var c:Vector2i = near + Vector2i(dx, dz);
+                if not terrain.in_bounds(c) or terrain.is_water(c) or occupant[idx(c)] != null or node_at[idx(c)] != null:
+                    continue;
+                var existing:GroundPile = pile_at(c);
+                if existing != null:
+                    if existing.item == item:
+                        existing.add(n);
+                        return;
+                    continue;
+                var pl:GroundPile = GroundPile.new();
+                pl.setup(self, item, n, c);
+                _entities.add_child(pl);
+                piles.append(pl);
+                return;
+    notify("No room to put down %d %s." % [n, Defs.item_name(item)]);
+
+func remove_pile(pl:GroundPile) -> void:
+    if pl.removed:
+        return;
+    # hidden now; the collecting task frees it when it ends (see JobManager._collect_task)
+    pl.removed = true;
+    pl.visible = false;
+    piles.erase(pl);
 
 # --------------------------------
 # Roads
@@ -434,10 +573,35 @@ func _on_terrain_changed(r:Rect2i) -> void:
 func _on_hour(_h:int) -> void:
     for b in buildings:
         b.on_hour();
+        if b.is_storage():
+            _spoiled_today += b.spoil_tick(1.0);
+    for pl in piles.duplicate():
+        _spoiled_today += pl.spoil_tick(1.0);
+        if pl.amount <= 0 and not pl.removed and pl.reserved_by == null:
+            remove_pile(pl);
+            pl.queue_free();
+    _update_wetness();
+    _grow_trees();
+    _check_storage_full();
+
+# Warns once when all storage fills up; re-arms after it drops below 90%.
+func _check_storage_full() -> void:
+    var cap:int = Stock.capacity();
+    if cap <= 0:
+        return;
+    if Stock.used() >= cap:
+        if not _storage_warned:
+            _storage_warned = true;
+            notify("Storage is full. Build more storage or workers will stop gathering.");
+    elif Stock.used() < cap * 0.9:
+        _storage_warned = false;
 
 func _on_day(_d:int) -> void:
     for b in buildings:
         b.on_day();
+    if _spoiled_today >= 5:
+        notify("%d units of food spoiled yesterday." % _spoiled_today);
+    _spoiled_today = 0;
     var s:int = GameClock.season();
     if s == GameClock.Season.SPRING or s == GameClock.Season.SUMMER:
         for rn in nodes:

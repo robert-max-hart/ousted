@@ -7,6 +7,7 @@ class_name Pawn extends Node3D;
 
 const WALK_SPEED        :float = 3.0;      # metres per real second at 1x
 const ROAD_SPEED_MULT   :float = 1.5;
+const COLD_DAMAGE_BELOW:float = 0.2;      # warmth under this starts hurting health, more the lower it gets
 const CARRY_CAP         :int = 6;
 const HUNGER_HOURS      :float = 30.0;     # full -> empty
 const THIRST_HOURS      :float = 20.0;
@@ -31,6 +32,7 @@ var energy      :float = 1.0;
 var warmth      :float = 1.0;
 var health      :float = 1.0;
 var indoors     :bool = false;
+var shelter     :Building = null;   # the building we are inside
 var sleeping    :bool = false;
 
 var carry_item  :StringName = &"";
@@ -95,8 +97,13 @@ func _update_needs(dh:float) -> void:
     else:
         energy = maxf(0.0, energy - dh / ENERGY_HOURS);
     var temp:float = Weather.temperature;
-    if indoors:
+    if indoors and (shelter == null or not World.alive(shelter) or shelter.is_heated()):
         warmth = minf(1.0, warmth + dh * 0.25);
+    elif indoors and temp < 8.0:
+        # a cold house keeps the wind off, but nobody warms up in it
+        warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.004);
+    elif indoors:
+        warmth = minf(1.0, warmth + dh * 0.1);
     elif temp < 8.0:
         warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.006);
     else:
@@ -106,8 +113,8 @@ func _update_needs(dh:float) -> void:
         damage += 1.0 / 36.0;
     if thirst <= 0.0:
         damage += 1.0 / 18.0;
-    if warmth <= 0.0:
-        damage += 1.0 / 24.0;
+    if warmth < COLD_DAMAGE_BELOW:
+        damage += (1.0 - warmth / COLD_DAMAGE_BELOW) / 24.0;
     if damage > 0.0:
         health = maxf(0.0, health - damage * dh);
     else:
@@ -133,7 +140,7 @@ func _death_cause() -> String:
         return "thirst";
     if hunger <= 0.0:
         return "starvation";
-    if warmth <= 0.0:
+    if warmth < COLD_DAMAGE_BELOW:
         return "exposure";
     return "poor health";
 
@@ -164,6 +171,7 @@ func clear_carry() -> void:
 
 func go_inside(b:Building, sleep:bool) -> void:
     indoors = true;
+    shelter = b;
     sleeping = sleep;
     visible = false;
     if b != null:
@@ -173,6 +181,7 @@ func go_outside() -> void:
     if not indoors:
         return;
     indoors = false;
+    shelter = null;
     sleeping = false;
     visible = true;
     # step back onto a walkable cell next to wherever we were

@@ -14,6 +14,7 @@ var kind            :StringName;
 var label           :String;
 var interruptible   :bool = true;
 var target          :Variant = null;     # what to avoid retrying if it fails
+var workplace       :Variant = null;     # job building this task serves; ends if it is demolished
 var steps           :Array[Dictionary] = [];
 var index           :int = 0;
 var on_cancel       :Callable;

@@ -17,6 +17,7 @@ var regrows     :bool;
 var designated  :bool = false;      # player marked for harvest/clearing
 var reserved_by :Object = null;     # pawn currently working it
 var removed     :bool = false;
+var growth      :float = 1.0;       # 0..1; trees are saplings until this reaches 1
 # visual variation
 var offset      :Vector2;
 var yaw         :float;
@@ -37,7 +38,20 @@ func _init(k:StringName, c:Vector2i, rng:RandomNumberGenerator) -> void:
     scale = rng.randf_range(0.75, 1.25);
 
 func display_name() -> String:
-    return def["name"];
+    return def["name"] if is_mature() else "%s sapling" % def["name"];
+
+func is_mature() -> bool:
+    return growth >= 1.0;
+
+# Starts this node as a freshly planted sapling (it yields little until it grows up).
+func make_sapling() -> void:
+    growth = 0.0;
+    amount = 1;
+
+# Sets growth and the wood a tree holds to match it.
+func set_growth(g:float) -> void:
+    growth = clampf(g, 0.0, 1.0);
+    amount = maxi(1, roundi(max_amount * growth)) if growth < 1.0 else max_amount;
 
 # Gathered without the player asking (berry bushes).
 func is_auto() -> bool:
@@ -45,6 +59,8 @@ func is_auto() -> bool:
 
 func info_text() -> String:
     var s:String = "%s: %d / %d\n" % [Defs.item_name(item), amount, max_amount];
+    if not is_mature():
+        s += "Growing: %d%%\n" % roundi(growth * 100.0);
     if designated:
         s += "Marked for harvest\n";
     elif is_auto():

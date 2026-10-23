@@ -56,6 +56,10 @@ func _process(_delta:float) -> void:
         _visual_dirty = false;
         _rebuild_crops();
 
+# The def's work value is for the default 6x6 field; bigger fields take proportionally longer to till.
+func work_required() -> float:
+    return def["work"] * plot_count() / 36.0;
+
 func plot_count() -> int:
     return size.x * size.y;
 
@@ -86,7 +90,8 @@ func can_plant() -> bool:
 # Work for farmers
 
 # Returns {"index": int, "action": StringName} for the closest open plot, or {}.
-func find_work(from:Vector2i, only_action:StringName = &"") -> Dictionary:
+# has_room(item) -> bool, when given, stops harvesting crops that nothing could store.
+func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable()) -> Dictionary:
     if state != State.COMPLETE:
         return {};
     var plantable:bool = can_plant();
@@ -99,6 +104,8 @@ func find_work(from:Vector2i, only_action:StringName = &"") -> Dictionary:
         var action:StringName = &"";
         match plot_state[i]:
             Plot.RIPE:
+                if has_room.is_valid() and not has_room.call(Defs.CROPS[plot_crop[i]]["item"]):
+                    continue;
                 action = &"harvest";
             Plot.DEAD:
                 action = &"clear";

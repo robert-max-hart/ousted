@@ -5,7 +5,7 @@
 # ----------------------------------------------------------------
 class_name HUD extends CanvasLayer;
 
-const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"stone", &"iron"];
+const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"firewood", &"stone", &"iron"];
 const LOG_SECONDS   :float = 10.0;
 const REFRESH_RATE  :float = 0.25;
 
@@ -21,6 +21,10 @@ var _info       :PanelContainer;
 var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
+var _filter_box :VBoxContainer;
+var _controls_box:VBoxContainer;
+var _controls_for:Variant = null;       # the building the control widgets were built for
+var _filter_checks:Dictionary = {};     # item -> CheckBox
 var _refresh    :float = 0.0;
 
 func _ready() -> void:
@@ -73,7 +77,7 @@ func _refresh_all() -> void:
     parts.append("Food %d" % Stock.food_total());
     parts.append("Pop %d" % w.pawns.size());
     _stock.text = "   ".join(parts);
-    var food_tip:PackedStringArray = [];
+    var food_tip:PackedStringArray = ["Storage: %d / %d" % [Stock.used(), Stock.capacity()]];
     for item in Defs.ITEMS:
         if Defs.ITEMS[item].get("food", false):
             food_tip.append("%s: %d" % [Defs.item_name(item), Stock.amount(item)]);
@@ -96,8 +100,104 @@ func _refresh_info() -> void:
         _info_title.text = obj.display_name();
     _info_body.text = obj.info_text();
     _info_btn.visible = obj is Field;
+    _refresh_filters(obj);
+    _refresh_controls(obj);
     if obj is Field:
         _info_btn.text = "Change crop (%s)" % (obj as Field).crop()["name"];
+
+# Per-building settings (see the "controls" schema in Defs): a cycling choice, a toggle, or a
+# production cap with - and + buttons.
+func _refresh_controls(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    var show:bool = b != null and b.is_complete() and b.def.has("controls");
+    _controls_box.visible = show;
+    if not show:
+        _controls_for = null;
+        return;
+    if is_same(_controls_for, b):
+        return;
+    _controls_for = b;
+    for child in _controls_box.get_children():
+        _controls_box.remove_child(child);
+        child.queue_free();
+    var title:Label = Label.new();
+    title.text = "Settings:";
+    _controls_box.add_child(title);
+    for c in b.def["controls"]:
+        _controls_box.add_child(_make_control(b, c));
+
+func _make_control(b:Building, c:Dictionary) -> Control:
+    var id:String = c["id"];
+    match c["type"]:
+        "toggle":
+            var check:CheckBox = CheckBox.new();
+            check.text = c["label"];
+            check.focus_mode = Control.FOCUS_NONE;
+            check.button_pressed = b.settings[id];
+            check.toggled.connect(func(on:bool) -> void:
+                b.settings[id] = on);
+            return check;
+        "choice":
+            var btn:Button = Button.new();
+            btn.focus_mode = Control.FOCUS_NONE;
+            var opts:Array = c["options"];
+            var label_for:Callable = func() -> String:
+                return "%s: %s" % [c["label"], opts[b.settings[id]]];
+            btn.text = label_for.call();
+            btn.pressed.connect(func() -> void:
+                b.settings[id] = (b.settings[id] + 1) % opts.size();
+                btn.text = label_for.call());
+            return btn;
+        "cap":
+            var row:HBoxContainer = HBoxContainer.new();
+            var l:Label = Label.new();
+            l.text = c["label"];
+            l.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+            row.add_child(l);
+            var value:Label = Label.new();
+            value.custom_minimum_size.x = 64;
+            value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
+            var show_value:Callable = func() -> void:
+                value.text = "No cap" if b.settings[id] <= 0 else str(b.settings[id]);
+            show_value.call();
+            var step:int = c.get("step", 10);
+            var minus:Button = Button.new();
+            minus.text = "-";
+            minus.focus_mode = Control.FOCUS_NONE;
+            minus.pressed.connect(func() -> void:
+                b.settings[id] = maxi(0, b.settings[id] - step);
+                show_value.call());
+            var plus:Button = Button.new();
+            plus.text = "+";
+            plus.focus_mode = Control.FOCUS_NONE;
+            plus.pressed.connect(func() -> void:
+                b.settings[id] = b.settings[id] + step;
+                show_value.call());
+            row.add_child(minus);
+            row.add_child(value);
+            row.add_child(plus);
+            return row;
+    return Control.new();
+
+# Item filter checkboxes for storage buildings.
+func _refresh_filters(obj:Variant) -> void:
+    var show:bool = obj is Building and (obj as Building).is_storage();
+    _filter_box.visible = show;
+    if not show:
+        return;
+    var b:Building = obj;
+    for item in _filter_checks:
+        var check:CheckBox = _filter_checks[item];
+        var can:bool = Defs.is_food(item) or not b.def.get("food_only", false);
+        if b.def.has("accepts_items"):
+            can = (b.def["accepts_items"] as Array).has(item);
+        check.visible = can;
+        check.set_pressed_no_signal(not b.forbidden.has(item));
+
+func _on_filter_toggled(on:bool, item:StringName) -> void:
+    var obj:Variant = World.instance.tools.selected;
+    if obj is Building and World.alive(obj):
+        (obj as Building).set_forbidden(item, not on);
 
 # --------------------------------
 # Callbacks
@@ -232,6 +332,22 @@ func _build_info_panel(root:Control) -> void:
     _info_btn.focus_mode = Control.FOCUS_NONE;
     _info_btn.pressed.connect(_on_info_button);
     col.add_child(_info_btn);
+    _controls_box = VBoxContainer.new();
+    _controls_box.visible = false;
+    col.add_child(_controls_box);
+    _filter_box = VBoxContainer.new();
+    _filter_box.visible = false;
+    col.add_child(_filter_box);
+    var ftitle:Label = Label.new();
+    ftitle.text = "Accepts:";
+    _filter_box.add_child(ftitle);
+    for item in Defs.ITEMS:
+        var check:CheckBox = CheckBox.new();
+        check.text = Defs.item_name(item);
+        check.focus_mode = Control.FOCUS_NONE;
+        check.toggled.connect(_on_filter_toggled.bind(item));
+        _filter_box.add_child(check);
+        _filter_checks[item] = check;
 
 func _build_log(root:Control) -> void:
     _log = VBoxContainer.new();

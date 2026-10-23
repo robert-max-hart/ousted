@@ -24,6 +24,8 @@ const MODE_HINTS:Dictionary = {
 const BRUSH_RADIUS  :float = 2.5;
 const BRUSH_RATE    :float = 3.0;      # metres per second
 const PICK_PIXELS   :float = 22.0;
+const FIELD_MIN_SIDE:int = 2;
+const FIELD_MAX_SIDE:int = 16;
 
 var mode        :int = Mode.SELECT;
 var build_id    :StringName = &"";
@@ -41,6 +43,8 @@ var _brushing   :bool = false;
 var _flatten_h  :float = 0.0;
 
 var _ghosts     :Array[MeshInstance3D] = [];
+var _radius_line:MeshInstance3D;
+var _radius_key :String = "";
 var _mat_ok     :StandardMaterial3D;
 var _mat_bad    :StandardMaterial3D;
 var _mat_area   :StandardMaterial3D;
@@ -66,6 +70,16 @@ func _ready() -> void:
     _ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     _ring.visible = false;
     add_child(_ring);
+    _radius_line = MeshInstance3D.new();
+    _radius_line.mesh = ImmediateMesh.new();
+    var lm:StandardMaterial3D = StandardMaterial3D.new();
+    lm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
+    lm.albedo_color = Color(1.0, 0.95, 0.5, 0.95);
+    lm.no_depth_test = true;
+    _radius_line.material_override = lm;
+    _radius_line.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+    _radius_line.visible = false;
+    add_child(_radius_line);
 
 func set_mode(m:int, id:StringName = &"") -> void:
     mode = m;
@@ -73,6 +87,9 @@ func set_mode(m:int, id:StringName = &"") -> void:
     if m == Mode.BUILD:
         build_size = Defs.BUILDINGS[id]["size"];
         hint = "%s (%s). %s" % [Defs.BUILDINGS[id]["name"], Defs.cost_string(Defs.BUILDINGS[id]["cost"]), MODE_HINTS[m]];
+        if _is_field_mode():
+            hint = "%s. Drag to size it (%d to %d cells a side), or click for a default %dx%d field." % [
+                Defs.BUILDINGS[id]["name"], FIELD_MIN_SIDE, FIELD_MAX_SIDE, build_size.x, build_size.y];
     else:
         hint = MODE_HINTS[m];
     error = "";
@@ -130,6 +147,10 @@ func _on_press() -> void:
         Mode.SELECT:
             select(_pick());
         Mode.BUILD:
+            if _is_field_mode():
+                _dragging = true;
+                _drag_start = _hover_cell;
+                return;
             var origin:Vector2i = _build_origin();
             error = World.instance.can_place(build_id, origin, build_size);
             if error == "":
@@ -148,6 +169,12 @@ func _on_release() -> void:
     _dragging = false;
     var w:World = World.instance;
     match mode:
+        Mode.BUILD:
+            # a plain click (no drag) keeps the default footprint
+            var fr:Rect2i = _field_rect();
+            error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "Fields must be at least %dx%d." % [FIELD_MIN_SIDE, FIELD_MIN_SIDE];
+            if error == "":
+                World.instance.place_building(build_id, fr.position, fr.size);
         Mode.HARVEST:
             var n:int = 0;
             for rn in w.nodes:
@@ -188,6 +215,7 @@ func _process(delta:float) -> void:
                 w.terrain.apply_brush(_hover_pt, BRUSH_RADIUS, amount, _flatten_h, locked);
     _update_ghosts();
     _update_ring();
+    _update_radius();
 
 func _update_hover() -> void:
     var cam:Camera3D = get_viewport().get_camera_3d();
@@ -204,6 +232,23 @@ func _update_hover() -> void:
 func _build_origin() -> Vector2i:
     # center the footprint on the cursor
     return Vector2i(roundi(_hover_pt.x - build_size.x * 0.5), roundi(_hover_pt.z - build_size.y * 0.5));
+
+func _is_field_mode() -> bool:
+    return mode == Mode.BUILD and Defs.BUILDINGS[build_id].get("field", false);
+
+# The field footprint for the current drag, or the default footprint for a click without a drag.
+func _field_rect() -> Rect2i:
+    if _drag_start == _hover_cell:
+        return Rect2i(_build_origin(), build_size);
+    # the corner under the start stays put; the far edge follows the cursor up to the size limit
+    var d:Vector2i = _hover_cell - _drag_start;
+    var far:Vector2i = _drag_start + Vector2i(clampi(d.x, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1), clampi(d.y, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1));
+    var lo:Vector2i = Vector2i(mini(_drag_start.x, far.x), mini(_drag_start.y, far.y));
+    var hi:Vector2i = Vector2i(maxi(_drag_start.x, far.x), maxi(_drag_start.y, far.y));
+    return Rect2i(lo, hi - lo + Vector2i.ONE);
+
+func _field_rect_valid(r:Rect2i) -> bool:
+    return r.size.x >= FIELD_MIN_SIDE and r.size.y >= FIELD_MIN_SIDE;
 
 func _drag_rect() -> Rect2i:
     var a:Vector2i = _drag_start;
@@ -262,6 +307,11 @@ func _update_ghosts() -> void:
     var w:World = World.instance;
     match mode:
         Mode.BUILD:
+            if _is_field_mode() and _dragging:
+                var fr:Rect2i = _field_rect();
+                var fok:bool = _field_rect_valid(fr) and w.can_place(build_id, fr.position, fr.size) == "";
+                _show_box(0, fr, 0.3, _mat_ok if fok else _mat_bad);
+                return;
             var origin:Vector2i = _build_origin();
             var ok:bool = w.can_place(build_id, origin, build_size) == "";
             var h:float = maxf(0.3, Defs.BUILDINGS[build_id]["height"]);
@@ -293,6 +343,35 @@ func _show_box(i:int, r:Rect2i, height:float, mat:Material) -> void:
     g.position = Vector3(r.position.x + r.size.x * 0.5, (hr.x + hr.y + height) * 0.5, r.position.y + r.size.y * 0.5);
     g.material_override = mat;
     g.visible = true;
+
+# A ring on the ground showing a job building's work radius, while placing one or with one selected.
+func _update_radius() -> void:
+    var center:Vector2 = Vector2.ZERO;
+    var r:float = 0.0;
+    if mode == Mode.BUILD and _hover_ok and Defs.BUILDINGS[build_id].has("radius"):
+        center = Vector2(_build_origin()) + Vector2(build_size) * 0.5;
+        r = Defs.BUILDINGS[build_id]["radius"];
+    elif selected is Building and (selected as Building).radius() > 0.0:
+        center = (selected as Building).center_cell();
+        r = (selected as Building).radius();
+    _radius_line.visible = r > 0.0;
+    if r <= 0.0:
+        _radius_key = "";
+        return;
+    var key:String = "%.1f,%.1f,%.1f" % [center.x, center.y, r];
+    if key == _radius_key:
+        return;
+    _radius_key = key;
+    var im:ImmediateMesh = _radius_line.mesh;
+    im.clear_surfaces();
+    im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP);
+    var t:Terrain = World.instance.terrain;
+    for i in 97:
+        var a:float = TAU * i / 96.0;
+        var x:float = clampf(center.x + cos(a) * r, 0.0, Terrain.SIZE - 0.01);
+        var z:float = clampf(center.y + sin(a) * r, 0.0, Terrain.SIZE - 0.01);
+        im.surface_add_vertex(Vector3(x, t.height_at(x, z) + 0.25, z));
+    im.surface_end();
 
 func _update_ring() -> void:
     if selected != null and not World.alive(selected):

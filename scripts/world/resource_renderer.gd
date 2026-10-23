@@ -104,6 +104,8 @@ func _rebuild() -> void:
         for i in list.size():
             var rn:ResourceNode = list[i];
             var s:float = rn.scale;
+            if not rn.is_mature():
+                s *= lerpf(0.25, 1.0, rn.growth);
             var tint:Color = Color.WHITE;
             if rn.regrows:
                 # bushes shrink and dull as they are picked clean

@@ -20,6 +20,18 @@ var residents   :Array[Pawn] = [];
 var removed     :bool = false;
 var world       :World;
 
+# Storage buildings only
+var stored      :Dictionary = {};   # item -> int in the building
+var out_reserved:Dictionary = {};   # item -> int promised to a pawn who is on the way to collect it
+var in_reserved :int = 0;           # units of space promised to pawns on the way to deliver
+var forbidden   :Dictionary = {};   # item -> true when the player has forbidden it here
+var settings    :Dictionary = {};   # control id -> current value (see Defs control schema)
+var fuel        :int = 0;           # firewood stocked here (houses)
+var fuel_incoming:int = 0;          # firewood being carried here
+var workers     :int = 0;           # citizens currently working here (job buildings)
+var _spoil_acc  :Dictionary = {};
+var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
+
 var _body       :MeshInstance3D;
 var _roof       :MeshInstance3D;
 var _body_mat   :StandardMaterial3D;
@@ -31,6 +43,8 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     origin = o;
     size = s;
     name = "%s_%d_%d" % [id, o.x, o.y];
+    for c in def.get("controls", []):
+        settings[c["id"]] = c["default"];
     var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
     position = Vector3(center.x, w.terrain.height_at(center.x, center.y), center.y);
     _build_visual();
@@ -47,6 +61,129 @@ func is_complete() -> bool:
 
 func is_walkable() -> bool:
     return def.get("walkable", false);
+
+# --------------------------------
+# Storage
+
+func is_storage() -> bool:
+    return state == State.COMPLETE and def.get("storage", false);
+
+func capacity() -> int:
+    return def.get("capacity", 0);
+
+func used() -> int:
+    var n:int = 0;
+    for item in stored:
+        n += stored[item];
+    return n;
+
+# Space that is neither filled nor promised to someone already on the way.
+func free_space() -> int:
+    return maxi(0, capacity() - used() - in_reserved);
+
+# Whether this building would take the item at all (type rules and the player's filter).
+func accepts(item:StringName) -> bool:
+    if not is_storage() or forbidden.has(item):
+        return false;
+    if def.has("accepts_items"):
+        return (def["accepts_items"] as Array).has(item);
+    return Defs.is_food(item) or not def.get("food_only", false);
+
+func can_store(item:StringName) -> bool:
+    return accepts(item) and free_space() > 0;
+
+func amount(item:StringName) -> int:
+    return stored.get(item, 0);
+
+func available(item:StringName) -> int:
+    return amount(item) - out_reserved.get(item, 0);
+
+# Stores up to n units straight away, returns how many fit.
+func store(item:StringName, n:int) -> int:
+    var t:int = mini(n, maxi(0, capacity() - used()));
+    if t > 0:
+        stored[item] = amount(item) + t;
+    return t;
+
+# Promises up to n units of space to an arriving pawn, returns how many were promised.
+func reserve_space(n:int) -> int:
+    var r:int = clampi(n, 0, free_space());
+    in_reserved += r;
+    return r;
+
+func release_space(n:int) -> void:
+    in_reserved = maxi(0, in_reserved - n);
+
+# Reserves up to n available units for a pawn who is coming to collect them.
+func reserve_out(item:StringName, n:int) -> int:
+    var r:int = clampi(n, 0, available(item));
+    out_reserved[item] = out_reserved.get(item, 0) + r;
+    return r;
+
+func release_out(item:StringName, n:int) -> void:
+    out_reserved[item] = maxi(0, out_reserved.get(item, 0) - n);
+
+# Removes up to n units, returns how many were taken.
+func take(item:StringName, n:int) -> int:
+    var t:int = mini(n, amount(item));
+    stored[item] = amount(item) - t;
+    if stored[item] <= 0:
+        stored.erase(item);
+    return t;
+
+func take_reserved(item:StringName, n:int) -> int:
+    release_out(item, n);
+    return take(item, n);
+
+# True when nothing is stored and nobody is coming to collect or deliver.
+func is_empty() -> bool:
+    if in_reserved > 0:
+        return false;
+    for item in out_reserved:
+        if out_reserved[item] > 0:
+            return false;
+    return used() == 0;
+
+# Multiplier on spoilage speed here (granary 0.5, and so on). Room for upgrades and add-ons later.
+func spoil_mult() -> float:
+    return def.get("spoil_mult", 1.0);
+
+# Spoils stored food for `hours` game hours at the current temperature. Returns units lost.
+# Units promised to a pawn who is on the way to collect them are spared.
+func spoil_tick(hours:float) -> int:
+    var lost:int = 0;
+    var k:float = Defs.spoil_temp_factor(Weather.temperature) * spoil_mult() * hours;
+    for item in stored.keys():
+        var rate:float = Defs.spoil_per_hour(item);
+        if rate <= 0.0 or Defs.ITEMS[item].get("outside_only", false):
+            continue;
+        _spoil_acc[item] = _spoil_acc.get(item, 0.0) + available(item) * rate * k;
+        var whole:int = mini(floori(_spoil_acc[item]), available(item));
+        if whole > 0:
+            _spoil_acc[item] -= whole;
+            take(item, whole);
+            lost += whole;
+    return lost;
+
+# Production cap for an output item: 0 means no cap. The cap compares against the colony-wide stock.
+func production_cap(item:StringName) -> int:
+    return settings.get("cap_%s" % item, 0);
+
+func production_allowed(item:StringName) -> bool:
+    var cap:int = production_cap(item);
+    return cap <= 0 or Stock.amount(item) < cap;
+
+func radius() -> float:
+    return def.get("radius", 0.0);
+
+func center_cell() -> Vector2:
+    return Vector2(origin) + Vector2(size) * 0.5;
+
+func set_forbidden(item:StringName, forbid:bool) -> void:
+    if forbid:
+        forbidden[item] = true;
+    else:
+        forbidden.erase(item);
 
 # --------------------------------
 # Construction
@@ -103,13 +240,42 @@ func complete() -> void:
 # Simulation hooks (called by World)
 
 func on_hour() -> void:
-    pass;
+    _burn_fuel(1.0);
 
 func on_day() -> void:
     pass;
 
 func on_terrain_changed() -> void:
     pass;
+
+# --------------------------------
+# Heating (housing)
+
+# Whether occupants stay warm here. Buildings with no fuel need (the Town Hall) are always warm.
+func is_heated() -> bool:
+    if not def.has("beds"):
+        return false;
+    if not def.has("fuel_capacity"):
+        return true;
+    return settings.get("heating", false) and fuel > 0;
+
+func fuel_wanted() -> int:
+    if not def.has("fuel_capacity") or not settings.get("heating", false) or not is_complete():
+        return 0;
+    return maxi(0, mini(def["fuel_capacity"], settings.get("fuel_target", 0)) - fuel - fuel_incoming);
+
+# Burns firewood while it is cold and someone lives here; the colder, the faster.
+func _burn_fuel(hours:float) -> void:
+    if not def.has("fuel_capacity") or not is_complete() or not settings.get("heating", false):
+        return;
+    if residents.is_empty() or Weather.temperature >= Defs.HEATING_BELOW:
+        return;
+    var cold:float = (Defs.HEATING_BELOW - Weather.temperature) / Defs.HEATING_BELOW;
+    _burn_acc += cold * Defs.FIREWOOD_PER_DAY_AT_0C / GameClock.HOURS_PER_DAY * hours;
+    var whole:int = floori(_burn_acc + 0.0001);
+    if whole > 0:
+        _burn_acc -= whole;
+        fuel = maxi(0, fuel - whole);
 
 # --------------------------------
 # Info
@@ -127,6 +293,19 @@ func info_text() -> String:
         s += "Builders: %d\n" % builders;
     else:
         s += def.get("desc", "") + "\n";
+    if def.get("storage", false) and state == State.COMPLETE:
+        s += "Stored %d / %d\n" % [used(), capacity()];
+        for item in stored:
+            s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
+        if def.has("spoil_mult"):
+            s += "Food keeps %s here.\n" % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
+    if def.has("fuel_capacity") and state == State.COMPLETE:
+        s += "Firewood: %d / %d" % [fuel, def["fuel_capacity"]];
+        if not settings.get("heating", false):
+            s += " (heating off)";
+        elif fuel <= 0:
+            s += " (cold!)";
+        s += "\n";
     if def.has("beds"):
         var names:PackedStringArray = [];
         for p in residents:
