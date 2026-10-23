@@ -40,6 +40,7 @@ var _entities   :Node3D;
 var _env        :Environment;
 var _sky        :ProceduralSkyMaterial;
 var _sun        :DirectionalLight3D;
+var _water      :MeshInstance3D;
 var _rain       :CPUParticles3D;
 var _rain_mat   :StandardMaterial3D;
 
@@ -420,6 +421,8 @@ func is_corner_locked(x:int, z:int) -> bool:
 func _on_terrain_changed(r:Rect2i) -> void:
     _refresh_nav_rect(r);
     renderer.mark_dirty();
+    if _water != null:
+        _rebuild_water();
     for b in buildings:
         if b.rect().intersects(r):
             b.on_terrain_changed();
@@ -472,19 +475,70 @@ func _setup_environment() -> void:
     _sun.directional_shadow_max_distance = 140.0;
     add_child(_sun);
 
-    var water:MeshInstance3D = MeshInstance3D.new();
-    var plane:PlaneMesh = PlaneMesh.new();
-    plane.size = Vector2(Terrain.SIZE + 200, Terrain.SIZE + 200);
-    water.mesh = plane;
+    _water = MeshInstance3D.new();
     var wm:StandardMaterial3D = StandardMaterial3D.new();
-    wm.albedo_color = Color(0.18, 0.38, 0.55, 0.78);
+    wm.vertex_color_use_as_albedo = true;
+    wm.vertex_color_is_srgb = true;
     wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
     wm.roughness = 0.15;
     wm.metallic = 0.2;
-    water.material_override = wm;
-    water.position = Vector3(Terrain.SIZE * 0.5, Terrain.WATER_LEVEL, Terrain.SIZE * 0.5);
-    water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-    add_child(water);
+    _water.material_override = wm;
+    _water.position = Vector3(0.0, Terrain.WATER_LEVEL, 0.0);
+    _water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+    add_child(_water);
+    _rebuild_water();
+
+# The water surface is a grid matching the terrain corners. Vertex color fades from shallow to deep
+# and from transparent to opaque with depth, so shorelines blend instead of cutting a hard line.
+const WATER_SHALLOW :Color = Color(0.36, 0.62, 0.68);
+const WATER_DEEP    :Color = Color(0.18, 0.38, 0.55);
+const WATER_FADE    :float = 0.6;       # depth (m) at which water becomes fully opaque
+const WATER_MARGIN  :float = 100.0;     # flat skirt past the map edge
+
+func _rebuild_water() -> void:
+    var xs:PackedFloat32Array = PackedFloat32Array();
+    xs.append(-WATER_MARGIN);
+    for i in Terrain.SIZE + 1:
+        xs.append(float(i));
+    xs.append(Terrain.SIZE + WATER_MARGIN);
+    var n:int = xs.size();
+    var verts:PackedVector3Array = PackedVector3Array();
+    var colors:PackedColorArray = PackedColorArray();
+    verts.resize(n * n);
+    colors.resize(n * n);
+    for zi in n:
+        for xi in n:
+            var depth:float = Terrain.WATER_LEVEL - terrain.corner(int(xs[xi]), int(xs[zi]));
+            var t:float = smoothstep(0.0, WATER_FADE, depth);
+            var col:Color = WATER_SHALLOW.lerp(WATER_DEEP, t);
+            col.a = t * 0.78;
+            verts[zi * n + xi] = Vector3(xs[xi], 0.0, xs[zi]);
+            colors[zi * n + xi] = col;
+    var indices:PackedInt32Array = PackedInt32Array();
+    indices.resize((n - 1) * (n - 1) * 6);
+    var k:int = 0;
+    for zi in n - 1:
+        for xi in n - 1:
+            var a:int = zi * n + xi;
+            indices[k] = a;
+            indices[k + 1] = a + 1;
+            indices[k + 2] = a + n + 1;
+            indices[k + 3] = a;
+            indices[k + 4] = a + n + 1;
+            indices[k + 5] = a + n;
+            k += 6;
+    var normals:PackedVector3Array = PackedVector3Array();
+    normals.resize(n * n);
+    normals.fill(Vector3.UP);
+    var arrays:Array = [];
+    arrays.resize(Mesh.ARRAY_MAX);
+    arrays[Mesh.ARRAY_VERTEX] = verts;
+    arrays[Mesh.ARRAY_NORMAL] = normals;
+    arrays[Mesh.ARRAY_COLOR] = colors;
+    arrays[Mesh.ARRAY_INDEX] = indices;
+    var mesh:ArrayMesh = ArrayMesh.new();
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays);
+    _water.mesh = mesh;
 
 # Light keyframes over the day. Night is lit by a cool moon rather than
 # going dark, so the cycle reads as color temperature, not brightness.

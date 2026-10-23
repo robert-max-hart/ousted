@@ -32,6 +32,7 @@ var _chunks :Array[MeshInstance3D] = [];
 var _dirty  :Dictionary = {};
 var _material:StandardMaterial3D;
 var _season :int = 0;
+var _tint_noise:FastNoiseLite;
 
 func _ready() -> void:
     _material = StandardMaterial3D.new();
@@ -55,6 +56,10 @@ func _process(_delta:float) -> void:
 # Generation
 
 func generate(world_seed:int) -> void:
+    _tint_noise = FastNoiseLite.new();
+    _tint_noise.seed = world_seed + 3;
+    _tint_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
+    _tint_noise.frequency = 0.04;
     var base:FastNoiseLite = FastNoiseLite.new();
     base.seed = world_seed;
     base.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
@@ -261,8 +266,10 @@ func _cell_color(c:Vector2i) -> Color:
                 col = COLOR_ROCK.lerp(COLOR_SNOW, 0.5) if _season == GameClock.Season.WINTER else COLOR_ROCK;
             else:
                 col = GRASS_BY_SEASON[_season].lerp(COLOR_ROCK, clampf((slope - 0.8) / 0.6, 0.0, 1.0));
-    # cheap per-cell variation so the grid doesn't look flat
-    var v:float = float(absi(hash(c)) % 1000) / 1000.0 * 0.08 - 0.04;
+    # soft, low-frequency patches plus a faint per-cell speckle so the grid doesn't look flat
+    var v:float = float(absi(hash(c)) % 1000) / 1000.0 * 0.012 - 0.006;
+    if _tint_noise != null:
+        v += _tint_noise.get_noise_2d(c.x, c.y) * 0.04;
     return Color(col.r + v, col.g + v, col.b + v);
 
 @warning_ignore("integer_division")
@@ -278,12 +285,22 @@ func _build_chunk(ci:int) -> void:
     normals.resize(cells * 4);
     colors.resize(cells * 4);
     indices.resize(cells * 6);
+    # cell colors for this chunk plus a one-cell border, so natural surfaces can blend across cells
+    var span:int = CHUNK + 2;
+    var cell_cols:Array[Color] = [];
+    cell_cols.resize(span * span);
+    for z in span:
+        for x in span:
+            var c:Vector2i = Vector2i(clampi(cx0 + x - 1, 0, SIZE - 1), clampi(cz0 + z - 1, 0, SIZE - 1));
+            cell_cols[z * span + x] = _cell_color(c);
     var v:int = 0;
     var k:int = 0;
     for z in range(cz0, cz0 + CHUNK):
         for x in range(cx0, cx0 + CHUNK):
-            var col:Color = _cell_color(Vector2i(x, z));
-            # each cell gets its own 4 vertices so surface colors stay crisp
+            var cell:Vector2i = Vector2i(x, z);
+            var li:int = (z - cz0 + 1) * span + (x - cx0 + 1);
+            var own:Color = cell_cols[li];
+            # each cell gets its own 4 vertices; roads and fields stay crisp, natural ground blends
             verts[v] = Vector3(x, corner(x, z), z);
             verts[v + 1] = Vector3(x + 1, corner(x + 1, z), z);
             verts[v + 2] = Vector3(x + 1, corner(x + 1, z + 1), z + 1);
@@ -292,8 +309,22 @@ func _build_chunk(ci:int) -> void:
             normals[v + 1] = _corner_normal(x + 1, z);
             normals[v + 2] = _corner_normal(x + 1, z + 1);
             normals[v + 3] = _corner_normal(x, z + 1);
-            for j in 4:
-                colors[v + j] = col;
+            if overlay[index(cell)] != Overlay.NONE:
+                for j in 4:
+                    colors[v + j] = own;
+            else:
+                # corner j touches the cells on its (dx, dz) side; average the natural ones
+                for j in 4:
+                    var dx:int = 1 if (j == 1 or j == 2) else -1;
+                    var dz:int = 1 if (j == 2 or j == 3) else -1;
+                    var sum:Color = own;
+                    var n:int = 1;
+                    for o in [Vector2i(dx, 0), Vector2i(0, dz), Vector2i(dx, dz)]:
+                        var nc:Vector2i = cell + o;
+                        if in_bounds(nc) and overlay[index(nc)] == Overlay.NONE:
+                            sum += cell_cols[li + o.y * span + o.x];
+                            n += 1;
+                    colors[v + j] = sum / float(n);
             # clockwise winding seen from above
             indices[k] = v;
             indices[k + 1] = v + 1;
