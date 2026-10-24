@@ -37,6 +37,20 @@ func _init(k:StringName, c:Vector2i, rng:RandomNumberGenerator) -> void:
     yaw = rng.randf() * TAU;
     scale = rng.randf_range(0.75, 1.25);
 
+# [kind, cell, amount, growth, designated, offset, yaw, scale]
+func to_array() -> Array:
+    return [kind, cell, amount, growth, designated, offset, yaw, scale];
+
+static func from_array(a:Array, rng:RandomNumberGenerator) -> ResourceNode:
+    var rn:ResourceNode = ResourceNode.new(a[0], a[1], rng);
+    rn.amount = a[2];
+    rn.growth = a[3];
+    rn.designated = a[4];
+    rn.offset = a[5];
+    rn.yaw = a[6];
+    rn.scale = a[7];
+    return rn;
+
 func display_name() -> String:
     return def["name"] if is_mature() else "%s sapling" % def["name"];
 

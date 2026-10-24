@@ -6,9 +6,9 @@
 # ----------------------------------------------------------------
 class_name JobManager extends RefCounted;
 
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith"];
 const MAX_BUILDERS_PER_SITE :int = 4;
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
 
@@ -52,6 +52,11 @@ func choose_task(p:Pawn) -> Task:
         if t != null:
             return t;
 
+    if p.tool == &"":
+        t = _equip_task(p);
+        if t != null:
+            return t;
+
     for job in _job_order(p.profession):
         t = (job as Callable).call(p);
         if t != null:
@@ -68,7 +73,11 @@ func _job_order(prof:int) -> Array[Callable]:
             return [_forage_task, _clear_task, _haul_task, _fuel_task, _collect_task];
         Profession.WOODCUTTER:
             return [_woodcutter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, _clear_task, _haul_task, _collect_task, _build_task, _forage_if_hungry_task];
+        Profession.BLACKSMITH:
+            return [_blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.MINER:
+            return [_miner_task, _surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+    return [_fuel_task, _supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _forage_if_hungry_task];
 
 # --------------------------------
 # Professions
@@ -211,7 +220,7 @@ func _haul_task(p:Pawn) -> Task:
     var best_item:StringName = &"";
     var best_d:float = INF;
     for b in world.buildings:
-        if b.is_complete() or p.has_failed(b):
+        if not b.is_site() or p.has_failed(b):
             continue;
         for item in b.cost():
             if b.remaining(item) > 0 and Stock.available(item) > 0:
@@ -270,38 +279,50 @@ func _fuel_task(p:Pawn) -> Task:
     if best == null:
         return null;
     var house:Building = best;
-    var src:Building = world.nearest_storage_with(&"firewood", p.position);
+    var fuel_items:Array[StringName] = [&"firewood", &"coal"];
+    match house.settings.get("fuel_type", 0):
+        0: fuel_items = [&"firewood"];
+        1: fuel_items = [&"coal"];
+    var item:StringName = &"";
+    var src:Building = null;
+    for candidate in fuel_items:
+        src = world.nearest_storage_with(candidate, p.position);
+        if src != null:
+            item = candidate;
+            break;
     if src == null:
         return null;
-    var n:int = src.reserve_out(&"firewood", mini(Pawn.CARRY_CAP, house.fuel_wanted()));
+    var heat:int = Defs.ITEMS[item]["heat"];
+    var n:int = src.reserve_out(item, mini(Pawn.CARRY_CAP, ceili(float(house.fuel_wanted()) / heat)));
     if n == 0:
         return null;
-    house.fuel_incoming += n;
+    house.fuel_incoming += n * heat;
     var st:Dictionary = {"picked": false, "done": false};
-    var t:Task = Task.new(&"fuel", "Bringing firewood to a house");
+    var name:String = Defs.item_name(item).to_lower();
+    var t:Task = Task.new(&"fuel", "Bringing %s to a house" % name);
     t.target = house;
-    t.move_rect(src.rect(), src.is_walkable(), "Fetching firewood");
+    t.move_rect(src.rect(), src.is_walkable(), "Fetching %s" % name);
     t.act(func(pw:Pawn) -> bool:
-        pw.set_carry(&"firewood", src.take_reserved(&"firewood", n));
+        pw.set_carry(item, src.take_reserved(item, n));
         st["picked"] = true;
         return true);
-    t.move_rect(house.rect(), house.is_walkable(), "Bringing firewood to a house");
+    t.move_rect(house.rect(), house.is_walkable(), "Bringing %s to a house" % name);
     t.act(func(pw:Pawn) -> bool:
         st["done"] = true;
-        house.fuel_incoming = maxi(0, house.fuel_incoming - n);
+        house.fuel_incoming = maxi(0, house.fuel_incoming - n * heat);
         var room:int = maxi(0, house.def["fuel_capacity"] - house.fuel);
-        var put:int = mini(room, pw.carry_amount);
-        house.fuel += put;
+        var put:int = mini(ceili(float(room) / heat), pw.carry_amount);
+        house.fuel = mini(house.def["fuel_capacity"], house.fuel + put * heat);
         if put >= pw.carry_amount:
             pw.clear_carry();
         else:
-            pw.set_carry(&"firewood", pw.carry_amount - put);
+            pw.set_carry(item, pw.carry_amount - put);
         return true);
     t.on_cancel = func(_pw:Pawn) -> void:
         if not st["picked"] and World.alive(src):
-            src.release_out(&"firewood", n);
+            src.release_out(item, n);
         if not st["done"] and World.alive(house):
-            house.fuel_incoming = maxi(0, house.fuel_incoming - n);
+            house.fuel_incoming = maxi(0, house.fuel_incoming - n * heat);
     return t;
 
 # Picks up goods lying on the ground (see GroundPile) so they can be stored once there is room.
@@ -357,7 +378,7 @@ func _build_task(p:Pawn) -> Task:
         return null;
     var b:Building = best;
     b.builders += 1;
-    var verb:String = "Tilling" if b is Field else "Building";
+    var verb:String = "Tilling" if b is Field else "Upgrading" if b.upgrading != &"" else "Building";
     var t:Task = Task.new(&"build", "%s %s" % [verb, b.display_name()]);
     t.target = b;
     t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name());
@@ -449,11 +470,216 @@ func _woodcutter_task(p:Pawn) -> Task:
     for b in sites:
         if _workers_at(b) >= b.def.get("worker_slots", 1):
             continue;
-        for job in [_chop_task, _split_task, _supply_task, _plant_task]:
+        for job in [_chop_task, _forge_task, _stock_inputs_task, _plant_task]:
             var t:Task = (job as Callable).call(p, b);
             if t != null:
                 t.workplace = b;
                 return t;
+    return null;
+
+# --------------------------------
+# Tools
+
+# Fetches the best tool in storage for a citizen who has none.
+func _equip_task(p:Pawn) -> Task:
+    var item:StringName = &"";
+    for candidate in Defs.TOOL_PRIORITY:
+        if Stock.available(candidate) > 0:
+            item = candidate;
+            break;
+    if item == &"":
+        return null;
+    var src:Building = world.nearest_storage_with(item, p.position);
+    if src == null or p.has_failed(src) or src.reserve_out(item, 1) == 0:
+        return null;
+    var st:Dictionary = {"picked": false};
+    var t:Task = Task.new(&"equip", "Fetching a %s" % Defs.item_name(item).to_lower());
+    t.target = src;
+    t.move_rect(src.rect(), src.is_walkable());
+    t.act(func(pw:Pawn) -> bool:
+        st["picked"] = true;
+        if src.take_reserved(item, 1) < 1:
+            return false;
+        pw.equip(item);
+        return true);
+    t.on_cancel = func(_pw:Pawn) -> void:
+        if not st["picked"] and World.alive(src):
+            src.release_out(item, 1);
+    return t;
+
+# Brings inputs from storage to a production building that is short of them.
+func _stock_inputs_task(p:Pawn, b:Building) -> Task:
+    var want:Dictionary = b.inputs_wanted();
+    var item:StringName = &"";
+    var src:Building = null;
+    var most:int = 0;
+    for in_item in want:
+        if want[in_item] > most and Stock.available(in_item) > 0:
+            var s:Building = world.nearest_storage_with(in_item, p.position);
+            if s != null:
+                item = in_item;
+                src = s;
+                most = want[in_item];
+    if src == null:
+        return null;
+    var n:int = src.reserve_out(item, mini(Pawn.CARRY_CAP, most));
+    if n == 0:
+        return null;
+    b.input_incoming[item] = b.input_incoming.get(item, 0) + n;
+    var st:Dictionary = {"picked": false, "done": false};
+    var t:Task = Task.new(&"supply", "Fetching %s for %s" % [Defs.item_name(item).to_lower(), b.display_name().to_lower()]);
+    t.target = b;
+    t.move_rect(src.rect(), src.is_walkable(), "Fetching %s" % Defs.item_name(item).to_lower());
+    t.act(func(pw:Pawn) -> bool:
+        pw.set_carry(item, src.take_reserved(item, n));
+        st["picked"] = true;
+        return true);
+    t.move_rect(b.rect(), b.is_walkable());
+    t.act(func(pw:Pawn) -> bool:
+        if not World.alive(b):
+            return false;
+        st["done"] = true;
+        b.cancel_input_incoming(item, n);
+        b.add_input(item, pw.carry_amount);
+        pw.clear_carry();
+        return true);
+    t.on_cancel = func(_pw:Pawn) -> void:
+        if not st["picked"] and World.alive(src):
+            src.release_out(item, n);
+        if not st["done"] and World.alive(b):
+            b.cancel_input_incoming(item, n);
+    return t;
+
+# General labor: top up any production building that is short of inputs.
+func _supply_inputs_task(p:Pawn) -> Task:
+    for b in world.buildings:
+        if not b.is_complete() or p.has_failed(b) or b.inputs_wanted().is_empty():
+            continue;
+        var t:Task = _stock_inputs_task(p, b);
+        if t != null:
+            return t;
+    return null;
+
+func _blacksmith_task(p:Pawn) -> Task:
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b.is_complete() and b.def.get("profession", "") == "BLACKSMITH":
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    for b in sites:
+        if _workers_at(b) >= b.def.get("worker_slots", 1):
+            continue;
+        for job in [_forge_task, _stock_inputs_task]:
+            var t:Task = (job as Callable).call(p, b);
+            if t != null:
+                t.workplace = b;
+                return t;
+    return null;
+
+# Runs the first recipe that is switched on, under its cap and has its inputs, for up to its batch size
+# (the Blacksmith makes one tool, the Woodcutter splits a couple of logs at a time).
+@warning_ignore("integer_division")
+func _forge_task(_p:Pawn, b:Building) -> Task:
+    for item in b.def["recipes"]:
+        var recipe:Dictionary = b.def["recipes"][item];
+        if not b.recipe_enabled(item):
+            continue;
+        var per:int = recipe.get("yield", 1);
+        var crafts:int = recipe.get("batch", 1);
+        for in_item in recipe["inputs"]:
+            crafts = mini(crafts, b.input_amount(in_item) / recipe["inputs"][in_item]);
+        var cap:int = b.production_cap(item);
+        if cap > 0:
+            crafts = mini(crafts, ceili(float(cap - Stock.amount(item)) / per));
+        crafts = mini(crafts, b.free_space() / per);
+        if crafts <= 0:
+            continue;
+        for in_item in recipe["inputs"]:
+            b.take_input(in_item, recipe["inputs"][in_item] * crafts);
+        var out:int = per * crafts;
+        var space:int = b.reserve_space(out);
+        var st:Dictionary = {"done": false};
+        var label:String = "Splitting firewood" if item == &"firewood" else "Making a %s" % Defs.item_name(item).to_lower();
+        var t:Task = Task.new(&"forge", label);
+        t.target = b;
+        t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name().to_lower());
+        t.work_for(recipe["hours"] * crafts, label);
+        t.act(func(_pw:Pawn) -> bool:
+            st["done"] = true;
+            b.release_space(space);
+            b.store(item, out);
+            return true);
+        t.on_cancel = func(_pw:Pawn) -> void:
+            if not st["done"] and World.alive(b):
+                b.release_space(space);
+                for in_item in recipe["inputs"]:
+                    b.add_input(in_item, recipe["inputs"][in_item] * crafts);
+        return t;
+    return null;
+
+# --------------------------------
+# Mining
+
+func _miner_task(p:Pawn) -> Task:
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b.is_complete() and b.def.get("profession", "") == "MINER":
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    for b in sites:
+        if _workers_at(b) >= b.def.get("worker_slots", 1):
+            continue;
+        var t:Task = _dig_task(p, b);
+        if t != null:
+            t.workplace = b;
+            return t;
+    return null;
+
+# Digs a few units and carries them out. Iron comes first; stone once iron is at its cap or
+# has nowhere to go.
+func _dig_task(_p:Pawn, b:Building) -> Task:
+    var item:StringName = &"";
+    for candidate in [&"iron", &"coal", &"stone"]:
+        if b.item_unlocked(candidate) and b.production_allowed(candidate) and Stock.has_room_for(candidate):
+            item = candidate;
+            break;
+    if item == &"":
+        return null;
+    var n:int = Defs.MINE_BATCH;
+    var cap:int = b.production_cap(item);
+    if cap > 0:
+        n = clampi(cap - Stock.amount(item), 1, n);
+    var verb:String = "Quarrying" if item == &"stone" else "Mining";
+    var t:Task = Task.new(&"dig", "%s %s" % [verb, Defs.item_name(item).to_lower()]);
+    t.target = b;
+    t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name().to_lower());
+    var unit_hours:float = b.def["mine_hours"][item];
+    var min_bonus:float = b.def.get("needs_tool", {}).get(item, 0.0);
+    var dig:Callable = func(pw:Pawn, dh:float) -> bool:
+        if not World.alive(b):
+            return true;
+        # progress lives on the mine, so a unit started before sleep or a meal is not lost
+        var progress:float = b.dig_progress.get(item, 0.0) + dh * (1.0 if pw.tool_bonus() >= min_bonus - 0.001 else Defs.HARD_ORE_UNTOOLED_SPEED);
+        while progress >= unit_hours and pw.carry_amount < n:
+            progress -= unit_hours;
+            pw.add_carry(item, 1);
+        b.dig_progress[item] = progress;
+        return pw.carry_amount >= n;
+    t.work(dig);
+    return t;
+
+# With no mine to work at, miners gather loose rock and iron on the surface (iron first).
+func _surface_mine_task(p:Pawn) -> Task:
+    for b in world.buildings:
+        if b.is_complete() and b.def.get("profession", "") == "MINER" and _workers_at(b) < b.def.get("worker_slots", 1):
+            return null;
+    for item in [&"iron", &"stone"]:
+        var t:Task = _harvest_node_task(p, func(rn:ResourceNode) -> bool:
+            return rn.item == item);
+        if t != null:
+            return t;
     return null;
 
 func _workers_at(b:Building) -> int:
@@ -472,77 +698,6 @@ func _chop_task(p:Pawn, b:Building) -> Task:
         return null;
     return _harvest_node_task(p, func(rn:ResourceNode) -> bool:
         return rn.kind == &"tree" and _in_radius(b, rn.cell) and (mode == 2 or rn.is_mature()));
-
-# Splits wood stored here into firewood, a couple of logs at a time.
-@warning_ignore("integer_division")
-func _split_task(_p:Pawn, b:Building) -> Task:
-    if not b.settings.get("convert", false) or not b.production_allowed(&"firewood"):
-        return null;
-    var per:int = Defs.FIREWOOD_PER_WOOD;
-    var n:int = mini(b.available(&"wood"), Defs.SPLIT_BATCH);
-    var cap:int = b.production_cap(&"firewood");
-    if cap > 0:
-        n = mini(n, ceili(float(cap - Stock.amount(&"firewood")) / per));
-    n = mini(n, b.free_space() / (per - 1));
-    if n <= 0:
-        return null;
-    n = b.reserve_out(&"wood", n);
-    var space:int = b.reserve_space(n * (per - 1));
-    var st:Dictionary = {"done": false};
-    var t:Task = Task.new(&"split", "Splitting firewood");
-    t.target = b;
-    t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name().to_lower());
-    t.work_for(Defs.SPLIT_HOURS_PER_WOOD * n, "Splitting firewood");
-    t.act(func(_pw:Pawn) -> bool:
-        st["done"] = true;
-        b.take_reserved(&"wood", n);
-        b.release_space(space);
-        b.store(&"firewood", n * per);
-        return true);
-    t.on_cancel = func(_pw:Pawn) -> void:
-        if not st["done"] and World.alive(b):
-            b.release_out(&"wood", n);
-            b.release_space(space);
-    return t;
-
-# Brings wood from other storage to a woodcutter that has none to split.
-func _supply_task(p:Pawn, b:Building) -> Task:
-    if not b.settings.get("convert", false) or not b.production_allowed(&"firewood"):
-        return null;
-    if b.available(&"wood") >= Defs.SPLIT_BATCH or b.in_reserved > 0:
-        return null;
-    var src:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-        return x != b and x.is_storage() and x.available(&"wood") > 0);
-    if src == null:
-        return null;
-    var n:int = src.reserve_out(&"wood", mini(Pawn.CARRY_CAP, b.free_space()));
-    if n == 0:
-        return null;
-    var space:int = b.reserve_space(n);
-    var st:Dictionary = {"picked": false, "done": false};
-    var t:Task = Task.new(&"supply", "Fetching wood for %s" % b.display_name().to_lower());
-    t.target = b;
-    t.move_rect(src.rect(), src.is_walkable(), "Fetching wood");
-    t.act(func(pw:Pawn) -> bool:
-        pw.set_carry(&"wood", src.take_reserved(&"wood", n));
-        st["picked"] = true;
-        return true);
-    t.move_rect(b.rect(), b.is_walkable());
-    t.act(func(pw:Pawn) -> bool:
-        st["done"] = true;
-        b.release_space(space);
-        var put:int = b.store(&"wood", pw.carry_amount);
-        if put >= pw.carry_amount:
-            pw.clear_carry();
-        else:
-            pw.set_carry(&"wood", pw.carry_amount - put);
-        return true);
-    t.on_cancel = func(_pw:Pawn) -> void:
-        if not st["picked"] and World.alive(src):
-            src.release_out(&"wood", n);
-        if not st["done"] and World.alive(b):
-            b.release_space(space);
-    return t;
 
 func _plant_task(_p:Pawn, b:Building) -> Task:
     if not b.settings.get("plant", false):

@@ -45,6 +45,18 @@ func _emit_hour(abs_hour:int) -> void:
             season_changed.emit(season());
 
 # --------------------------------
+# Save and load
+
+func save_state() -> Dictionary:
+    return {"total_hours": total_hours, "speed_index": speed_index, "resume_speed": _resume_speed};
+
+func restore_state(d:Dictionary) -> void:
+    total_hours = d["total_hours"];
+    _last_hour = int(total_hours);          # no hour signals for the time that "passed" while loading
+    _resume_speed = d["resume_speed"];
+    set_speed(d["speed_index"]);
+
+# --------------------------------
 # Time scaling
 
 # Game hours elapsed for a frame of real_delta seconds.

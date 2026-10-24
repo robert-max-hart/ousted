@@ -6,6 +6,9 @@
 # ----------------------------------------------------------------
 class_name Defs extends RefCounted;
 
+# heat:     burns as house fuel; how many firewood-equivalents one unit is worth (coal burns twice as long)
+# tool:     an item citizens equip. bonus: extra work speed (0.10 = 10% faster). uses: game hours of work
+#           before it breaks. A citizen carries one tool and keeps it until it breaks.
 # outside_only: only spoils when lying on the ground, never inside a storage building (firewood)
 # spoil_days: spoilage time constant. A steady fraction of the stock spoils each hour, so after this
 #             many days at the reference temperature (10 C) in ordinary storage about 63% is gone.
@@ -16,14 +19,29 @@ const ITEMS:Dictionary = {
     &"iron":    {"name": "Iron",    "color": Color(0.55, 0.35, 0.3)},
     &"berries": {"name": "Berries", "color": Color(0.7, 0.15, 0.25), "food": true, "nutrition": 0.3, "spoil_days": 8.0},
     &"wheat":   {"name": "Wheat",   "color": Color(0.9, 0.78, 0.35), "food": true, "nutrition": 0.45, "spoil_days": 120.0},
-    &"firewood": {"name": "Firewood", "color": Color(0.72, 0.5, 0.26), "spoil_days": 60.0, "outside_only": true},
+    &"firewood": {"name": "Firewood", "color": Color(0.72, 0.5, 0.26), "spoil_days": 60.0, "outside_only": true, "heat": 1},
     &"beans":   {"name": "Beans",   "color": Color(0.45, 0.6, 0.3),  "food": true, "nutrition": 0.4, "spoil_days": 90.0},
+    &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
+    &"tool_wood":  {"name": "Wooden Tool", "color": Color(0.7, 0.55, 0.35), "tool": {"bonus": 0.10, "uses": 100.0}},
+    &"tool_iron":  {"name": "Iron Tool",   "color": Color(0.6, 0.6, 0.65),  "tool": {"bonus": 0.25, "uses": 200.0}},
+    &"tool_steel": {"name": "Steel Tool",  "color": Color(0.75, 0.82, 0.9), "tool": {"bonus": 0.50, "uses": 500.0}},
 };
 
 # shape:    visual style used by Building
 # work:     labor-hours to construct
 # storage:  goods can be stored here
 # accepts_items: storage that only takes these items (woodcutter: wood and firewood)
+# upgrades: id -> {name, cost, work, desc, excludes: [ids], requires: [ids]}. Paid for and built like a
+#           building (materials hauled in, then labor), one at a time, while the building keeps working.
+#           "excludes" makes upgrades mutually exclusive; a building may have any number of them.
+# locked_until: item -> upgrade id that must be built before the building handles that item (mine: coal)
+# inputs:   production buildings keep their own input inventory: item -> how many to keep stocked.
+#           Inputs are not part of the colony stock. Citizens fetch them from storage.
+# recipes:  output item -> {inputs: item -> n per craft, hours: labor-hours per craft, yield: units made per craft
+#           (default 1), batch: crafts per task (default 1), toggle: id of the on/off control (default "make_<item>")}.
+#           Recipes are tried in the order written, so list the preferred one first.
+# needs_tool: item -> minimum tool bonus to dig it at full speed; weaker or no tools dig it at HARD_ORE_UNTOOLED_SPEED
+# mine_hours: labor-hours to dig one unit of each item (a surface rock or deposit is 2.5x quicker)
 # radius:   work radius in cells (shown when placing and selecting)
 # worker_slots, profession: how many citizens of that profession work here
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
@@ -48,7 +66,8 @@ const BUILDINGS:Dictionary = {
         "beds": 5, "fuel_capacity": 40,
         "controls": [
             {"id": "heating", "type": "toggle", "label": "Heating", "default": true},
-            {"id": "fuel_target", "type": "cap", "label": "Keep firewood stocked", "default": 20, "step": 5},
+            {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
+            {"id": "fuel_target", "type": "cap", "label": "Keep fuel stocked", "default": 20, "step": 5},
         ],
         "desc": "Shelter for up to 5 citizens. Burns firewood to keep them warm when it is cold.",
     },
@@ -73,16 +92,63 @@ const BUILDINGS:Dictionary = {
     &"woodcutter": {
         "name": "Woodcutter", "size": Vector2i(3, 3), "cost": {&"wood": 10, &"stone": 2}, "work": 10.0,
         "shape": "house", "height": 1.8, "color": Color(0.5, 0.38, 0.26), "roof": Color(0.3, 0.36, 0.2),
-        "storage": true, "capacity": 120, "accepts_items": [&"wood", &"firewood"],
+        "storage": true, "capacity": 120, "accepts_items": [&"firewood"],
         "radius": 15.0, "worker_slots": 2, "profession": "WOODCUTTER",
         "produces": [&"firewood"],
+        "inputs": {&"wood": 6},
+        "recipes": {
+            &"firewood": {"inputs": {&"wood": 1}, "yield": 5, "hours": 0.5, "batch": 2, "toggle": "convert"},
+        },
         "controls": [
             {"id": "chop", "type": "choice", "label": "Chop trees", "options": ["Off", "Mature only", "All"], "default": 2},
             {"id": "plant", "type": "toggle", "label": "Plant trees", "default": true},
             {"id": "convert", "type": "toggle", "label": "Make firewood", "default": true},
             {"id": "cap_firewood", "type": "cap", "label": "Firewood cap", "item": &"firewood", "default": 100, "step": 20},
         ],
-        "desc": "Fells and plants trees in a radius and splits wood into firewood. Also stores wood and firewood.",
+        "desc": "Fells and plants trees in a radius, and splits wood fetched from storage into firewood (1 wood makes 5). Stores the firewood.",
+    },
+    &"mine": {
+        "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
+        "shape": "mine", "height": 1.6, "color": Color(0.5, 0.48, 0.45), "roof": Color(0.36, 0.28, 0.2),
+        "worker_slots": 3, "profession": "MINER",
+        "produces": [&"iron", &"stone"],
+        "mine_hours": {&"stone": 1.5, &"iron": 3.0, &"coal": 6.0},
+        "needs_tool": {&"coal": 0.25},
+        "locked_until": {&"coal": &"deep_shafts"},
+        "upgrades": {
+            &"deep_shafts": {
+                "name": "Deep Shafts", "cost": {&"wood": 20, &"stone": 12, &"iron": 6}, "work": 24.0,
+                "desc": "Sinks shafts down to the coal seams. Unlocks mining coal here.",
+            },
+        },
+        "controls": [
+            {"id": "cap_iron", "type": "cap", "label": "Iron cap", "item": &"iron", "default": 40, "step": 10},
+            {"id": "cap_coal", "type": "cap", "label": "Coal cap", "item": &"coal", "default": 30, "step": 10, "requires_upgrade": &"deep_shafts"},
+            {"id": "cap_stone", "type": "cap", "label": "Stone cap", "item": &"stone", "default": 100, "step": 20},
+        ],
+        "desc": "Digs iron, coal and stone without running out, but 2.5 times slower than gathering at the surface, and coal takes twice as long as iron (miners without an iron or steel tool dig it at a quarter of the speed). Iron comes first, then coal, then stone, each until its cap is reached. Coal needs the Deep Shafts upgrade. No storage. Miners carry the ore to a storage building, and work the surface if there is no mine to work at.",
+    },
+    &"blacksmith": {
+        "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
+        "shape": "house", "height": 1.9, "color": Color(0.38, 0.36, 0.36), "roof": Color(0.25, 0.22, 0.22),
+        "storage": true, "capacity": 60, "accepts_items": [&"tool_wood", &"tool_iron", &"tool_steel"],
+        "worker_slots": 2, "profession": "BLACKSMITH",
+        "produces": [&"tool_steel", &"tool_iron", &"tool_wood"],
+        "inputs": {&"wood": 4, &"iron": 3, &"coal": 3},
+        "recipes": {
+            &"tool_steel": {"inputs": {&"wood": 1, &"iron": 1, &"coal": 1}, "hours": 2.0},
+            &"tool_iron":  {"inputs": {&"wood": 1, &"iron": 1}, "hours": 1.0},
+            &"tool_wood":  {"inputs": {&"wood": 1}, "hours": 0.5},
+        },
+        "controls": [
+            {"id": "make_tool_steel", "type": "toggle", "label": "Make steel tools", "default": true},
+            {"id": "cap_tool_steel", "type": "cap", "label": "Steel tool cap", "item": &"tool_steel", "default": 5, "step": 5},
+            {"id": "make_tool_iron", "type": "toggle", "label": "Make iron tools", "default": true},
+            {"id": "cap_tool_iron", "type": "cap", "label": "Iron tool cap", "item": &"tool_iron", "default": 5, "step": 5},
+            {"id": "make_tool_wood", "type": "toggle", "label": "Make wooden tools", "default": true},
+            {"id": "cap_tool_wood", "type": "cap", "label": "Wooden tool cap", "item": &"tool_wood", "default": 5, "step": 5},
+        ],
+        "desc": "Makes tools that speed up work: steel first, then iron, then wooden, whichever it has the materials for. Tiers can be switched off. Stores finished tools; citizens pick them up and equip them.",
     },
     &"field": {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
@@ -92,7 +158,7 @@ const BUILDINGS:Dictionary = {
     },
 };
 
-const BUILD_MENU:Array[StringName] = [&"house", &"well", &"stockpile", &"granary", &"woodcutter", &"field"];
+const BUILD_MENU:Array[StringName] = [&"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"field"];
 
 # grow_days:  days to ripen at ideal conditions
 # min_temp:   no growth below this; also the planting threshold
@@ -135,14 +201,17 @@ static func spoil_per_hour(item:StringName) -> float:
     var days:float = ITEMS[item].get("spoil_days", 0.0) if ITEMS.has(item) else 0.0;
     return 0.0 if days <= 0.0 else 1.0 / (days * GameClock.HOURS_PER_DAY);
 
-const FIREWOOD_PER_WOOD :int = 5;       # one wood splits into this many firewood (confirmed 2026-10-23)
 const HEATING_BELOW      :float = 15.0;   # C: houses burn firewood below this
 const FIREWOOD_PER_DAY_AT_0C:float = 2.0;   # burn rate at 0 C; scales linearly with how far below HEATING_BELOW it is
-const SPLIT_BATCH       :int = 2;       # wood split per task
-const SPLIT_HOURS_PER_WOOD:float = 0.5;  # labor hours to split one wood
+const TOOL_PRIORITY:Array[StringName] = [&"tool_steel", &"tool_iron", &"tool_wood"];   # best first, for equipping
+const HARD_ORE_UNTOOLED_SPEED:float = 0.25;
+const MINE_BATCH        :int = 4;       # units dug per task
 
 static func is_food(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].get("food", false);
+
+static func is_tool(item:StringName) -> bool:
+    return ITEMS.has(item) and ITEMS[item].has("tool");
 
 static func item_name(item:StringName) -> String:
     return ITEMS[item]["name"] if ITEMS.has(item) else String(item);

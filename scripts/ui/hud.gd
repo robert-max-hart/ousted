@@ -5,7 +5,7 @@
 # ----------------------------------------------------------------
 class_name HUD extends CanvasLayer;
 
-const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"firewood", &"stone", &"iron"];
+const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron"];
 const LOG_SECONDS   :float = 10.0;
 const REFRESH_RATE  :float = 0.25;
 
@@ -23,6 +23,11 @@ var _info_body  :Label;
 var _info_btn   :Button;
 var _filter_box :VBoxContainer;
 var _controls_box:VBoxContainer;
+var _info_scroll:ScrollContainer;
+var _info_col:VBoxContainer;
+var _upgrade_box:VBoxContainer;
+var _upgrade_sig:String = "";             # what the upgrade buttons were last built for
+var _controls_sig:String = "";
 var _controls_for:Variant = null;       # the building the control widgets were built for
 var _filter_checks:Dictionary = {};     # item -> CheckBox
 var _refresh    :float = 0.0;
@@ -102,8 +107,12 @@ func _refresh_info() -> void:
     _info_btn.visible = obj is Field;
     _refresh_filters(obj);
     _refresh_controls(obj);
+    _refresh_upgrades(obj);
     if obj is Field:
         _info_btn.text = "Change crop (%s)" % (obj as Field).crop()["name"];
+    const TOP_BAR:float = 48.0;
+    const BOTTOM_BAR:float = 70.0;
+    _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, get_viewport().get_visible_rect().size.y - TOP_BAR - BOTTOM_BAR);
 
 # Per-building settings (see the "controls" schema in Defs): a cycling choice, a toggle, or a
 # production cap with - and + buttons.
@@ -114,9 +123,11 @@ func _refresh_controls(obj:Variant) -> void:
     if not show:
         _controls_for = null;
         return;
-    if is_same(_controls_for, b):
+    var sig:String = str(b.upgrades_done.keys());
+    if is_same(_controls_for, b) and sig == _controls_sig:
         return;
     _controls_for = b;
+    _controls_sig = sig;
     for child in _controls_box.get_children():
         _controls_box.remove_child(child);
         child.queue_free();
@@ -124,7 +135,49 @@ func _refresh_controls(obj:Variant) -> void:
     title.text = "Settings:";
     _controls_box.add_child(title);
     for c in b.def["controls"]:
+        if c.has("requires_upgrade") and not b.has_upgrade(c["requires_upgrade"]):
+            continue;
         _controls_box.add_child(_make_control(b, c));
+
+# Upgrade buttons for a finished building: one per upgrade in its def. Blocked ones are disabled and say why;
+# while one is being built the only button is Cancel.
+func _refresh_upgrades(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    var show:bool = b != null and b.is_complete() and b.def.has("upgrades");
+    _upgrade_box.visible = show;
+    if not show:
+        _upgrade_sig = "";
+        return;
+    var sig:String = "%d|%s|%s" % [b.get_instance_id(), b.upgrading, b.upgrades_done.keys()];
+    if sig == _upgrade_sig:
+        return;
+    _upgrade_sig = sig;
+    for child in _upgrade_box.get_children():
+        _upgrade_box.remove_child(child);
+        child.queue_free();
+    var title:Label = Label.new();
+    title.text = "Upgrades:";
+    _upgrade_box.add_child(title);
+    var ups:Dictionary = b.def["upgrades"];
+    for id in ups:
+        var up:Dictionary = ups[id];
+        var btn:Button = Button.new();
+        btn.focus_mode = Control.FOCUS_NONE;
+        btn.tooltip_text = up.get("desc", "");
+        var why:String = b.upgrade_block_reason(id);
+        if b.upgrading == id:
+            btn.text = "Cancel upgrade: %s" % up["name"];
+            btn.pressed.connect(b.cancel_upgrade);
+        elif b.has_upgrade(id):
+            btn.text = "%s (built)" % up["name"];
+            btn.disabled = true;
+        elif why != "":
+            btn.text = "%s (%s)" % [up["name"], why.to_lower()];
+            btn.disabled = true;
+        else:
+            btn.text = "Upgrade: %s (%s)" % [up["name"], Defs.cost_string(up["cost"])];
+            btn.pressed.connect(b.start_upgrade.bind(id));
+        _upgrade_box.add_child(btn);
 
 func _make_control(b:Building, c:Dictionary) -> Control:
     var id:String = c["id"];
@@ -250,6 +303,14 @@ func _build_top_bar(root:Control) -> void:
         row.add_child(b);
         _speed_btns.append(b);
 
+func _save_button(text:String, tip:String, action:Callable) -> Button:
+    var b:Button = Button.new();
+    b.text = text;
+    b.tooltip_text = tip;
+    b.focus_mode = Control.FOCUS_NONE;
+    b.pressed.connect(action);
+    return b;
+
 func _build_toolbar(root:Control) -> void:
     var panel:PanelContainer = _panel(root);
     panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE);
@@ -310,6 +371,12 @@ func _build_jobs_panel(root:Control) -> void:
             b.custom_minimum_size.x = 28;
             b.pressed.connect(jobs.change_profession.bind(prof, d));
             row.add_child(b);
+    var save_row:HBoxContainer = HBoxContainer.new();
+    col.add_child(save_row);
+    var do_save:Callable = func() -> void: SaveGame.save(World.instance);
+    var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
+    save_row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
+    save_row.add_child(_save_button("Load", "Load the quicksave (F9)", do_load));
 
 func _build_info_panel(root:Control) -> void:
     _info = _panel(root);
@@ -319,8 +386,14 @@ func _build_info_panel(root:Control) -> void:
     _info.offset_right = -8;
     _info.offset_left = -308;
     _info.offset_top = 48;
+    # long inspectors (a blacksmith with its settings and filters) scroll instead of running off screen
+    _info_scroll = ScrollContainer.new();
+    _info_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    _info.add_child(_info_scroll);
     var col:VBoxContainer = VBoxContainer.new();
-    _info.add_child(col);
+    col.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    _info_scroll.add_child(col);
+    _info_col = col;
     _info_title = Label.new();
     _info_title.add_theme_font_size_override("font_size", 20);
     col.add_child(_info_title);
@@ -332,6 +405,9 @@ func _build_info_panel(root:Control) -> void:
     _info_btn.focus_mode = Control.FOCUS_NONE;
     _info_btn.pressed.connect(_on_info_button);
     col.add_child(_info_btn);
+    _upgrade_box = VBoxContainer.new();
+    _upgrade_box.visible = false;
+    col.add_child(_upgrade_box);
     _controls_box = VBoxContainer.new();
     _controls_box.visible = false;
     col.add_child(_controls_box);

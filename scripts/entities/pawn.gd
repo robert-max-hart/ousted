@@ -14,11 +14,13 @@ const THIRST_HOURS      :float = 20.0;
 const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
+const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
 const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul"];
 
 const MALE_NAMES        :Array[String] = ["Aldric", "Bram", "Cedric", "Dunstan", "Edwin", "Godric", "Hal", "Osric", "Rowan", "Wystan", "Alden", "Tobin"];
 const FEMALE_NAMES      :Array[String] = ["Aelwen", "Bryony", "Cerys", "Edith", "Elfreda", "Hilda", "Isolde", "Maud", "Rowena", "Wren", "Tamsin", "Agnes"];
 
+var look_seed   :int = 0;       # seeds the cosmetic randomness (shirt, skin) so a loaded citizen looks the same
 var first_name  :String;
 var is_male     :bool;
 var age         :int;
@@ -37,6 +39,9 @@ var sleeping    :bool = false;
 
 var carry_item  :StringName = &"";
 var carry_amount:int = 0;
+
+var tool        :StringName = &"";      # equipped tool item, or &"" for none
+var tool_uses   :float = 0.0;           # game hours of work left in it
 
 var task        :Task = null;
 var status      :String = "Idle";
@@ -63,7 +68,47 @@ func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[
     age = rng.randi_range(18, 40);
     position = w.terrain.cell_center(cell);
     name = "Pawn_%s" % first_name;
-    _build_visual(rng);
+    look_seed = rng.randi();
+    _build_look();
+
+# Builds the body from look_seed.
+func _build_look() -> void:
+    var look:RandomNumberGenerator = RandomNumberGenerator.new();
+    look.seed = look_seed;
+    _build_visual(look);
+
+func to_dict() -> Dictionary:
+    return {
+        "name": first_name, "is_male": is_male, "age": age, "profession": profession, "look_seed": look_seed,
+        "hunger": hunger, "thirst": thirst, "energy": energy, "warmth": warmth, "health": health,
+        "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
+        "position": position, "home": world.buildings.find(home) if home != null else -1,
+    };
+
+@warning_ignore("integer_division")
+# Rebuilds a saved citizen. The task is not saved: it starts idle and picks something new. A citizen who was
+# indoors is put on the nearest walkable cell.
+func restore(w:World, d:Dictionary) -> void:
+    world = w;
+    first_name = d["name"];
+    is_male = d["is_male"];
+    age = d["age"];
+    profession = d["profession"];
+    look_seed = d["look_seed"];
+    hunger = d["hunger"];
+    thirst = d["thirst"];
+    energy = d["energy"];
+    warmth = d["warmth"];
+    health = d["health"];
+    carry_item = d["carry_item"];
+    carry_amount = d["carry_amount"];
+    tool = d["tool"];
+    tool_uses = d["tool_uses"];
+    name = "Pawn_%s" % first_name;
+    _build_look();
+    var c:Vector2i = w.nav.nearest_walkable(w.terrain.world_to_cell(d["position"]), 8);
+    position = w.terrain.cell_center(c if c != NavGrid.NO_CELL else Vector2i(Terrain.SIZE / 2, Terrain.SIZE / 2));
+    _update_carry_visual();
 
 func _process(delta:float) -> void:
     var dh:float = GameClock.game_hours(delta);
@@ -82,6 +127,24 @@ func _process(delta:float) -> void:
             return;
     _run_task(delta * GameClock.speed(), dh);
     position.y = world.terrain.height_at(position.x, position.z);
+
+# --------------------------------
+# Tools
+
+func tool_bonus() -> float:
+    return Defs.ITEMS[tool]["tool"]["bonus"] if tool != &"" else 0.0;
+
+func equip(item:StringName) -> void:
+    tool = item;
+    tool_uses = Defs.ITEMS[item]["tool"]["uses"];
+
+func _wear_tool(dh:float) -> void:
+    if tool == &"":
+        return;
+    tool_uses -= dh;
+    if tool_uses <= 0.0:
+        world.notify("%s's %s broke." % [first_name, Defs.item_name(tool).to_lower()]);
+        tool = &"";
 
 func cell() -> Vector2i:
     return world.terrain.world_to_cell(position);
@@ -224,7 +287,11 @@ func _run_task(move_dt:float, dh:float) -> void:
             if _follow_path(move_dt):
                 task.index += 1;
         Task.Step.WORK:
-            if (step["tick"] as Callable).call(self, dh):
+            var working:bool = not NON_WORK_KINDS.has(task.kind);
+            var speed:float = 1.0 + tool_bonus() if working else 1.0;
+            if working:
+                _wear_tool(dh);
+            if (step["tick"] as Callable).call(self, dh * speed):
                 task.index += 1;
         Task.Step.ACT:
             if (step["fn"] as Callable).call(self):
@@ -286,6 +353,10 @@ func profession_name() -> String:
 func info_text() -> String:
     var s:String = "%s, %s, age %d\n" % [profession_name(), "male" if is_male else "female", age];
     s += "Doing: %s\n" % status;
+    if tool != &"":
+        s += "Tool: %s (%d%% left)\n" % [Defs.item_name(tool), roundi(100.0 * tool_uses / Defs.ITEMS[tool]["tool"]["uses"])];
+    else:
+        s += "Tool: none\n";
     if carry_amount > 0:
         s += "Carrying: %d %s\n" % [carry_amount, Defs.item_name(carry_item)];
     s += "Home: %s\n\n" % (home.display_name() if home != null else "none");

@@ -36,6 +36,17 @@ func _ready() -> void:
     camera.make_current();
     _apply();
 
+func save_state() -> Dictionary:
+    return {"position": position, "yaw": _yaw, "pitch": _pitch, "distance": _distance};
+
+func restore_state(d:Dictionary) -> void:
+    position = d["position"];
+    _yaw = d["yaw"];
+    _pitch = d["pitch"];
+    _distance = d["distance"];
+    _target_distance = _distance;
+    _apply();
+
 func focus_on(p:Vector3) -> void:
     position = p;
     _apply();

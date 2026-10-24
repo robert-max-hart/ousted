@@ -26,8 +26,14 @@ var out_reserved:Dictionary = {};   # item -> int promised to a pawn who is on t
 var in_reserved :int = 0;           # units of space promised to pawns on the way to deliver
 var forbidden   :Dictionary = {};   # item -> true when the player has forbidden it here
 var settings    :Dictionary = {};   # control id -> current value (see Defs control schema)
-var fuel        :int = 0;           # firewood stocked here (houses)
+var fuel        :int = 0;           # fuel stocked here in firewood-equivalents (houses; coal counts double)
 var fuel_incoming:int = 0;          # firewood being carried here
+var inputs      :Dictionary = {};   # item -> int in the input inventory (production buildings)
+var input_incoming:Dictionary = {}; # item -> int being carried here
+var upgrades_done:Dictionary = {};   # upgrade id -> true
+var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (while set, delivered/incoming/work_done belong to it)
+var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
+var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
 var workers     :int = 0;           # citizens currently working here (job buildings)
 var _spoil_acc  :Dictionary = {};
 var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
@@ -173,6 +179,44 @@ func production_allowed(item:StringName) -> bool:
     var cap:int = production_cap(item);
     return cap <= 0 or Stock.amount(item) < cap;
 
+# --------------------------------
+# Input inventory (production buildings: see "inputs" and "recipes" in Defs)
+
+func input_amount(item:StringName) -> int:
+    return inputs.get(item, 0)
+
+func add_input(item:StringName, n:int) -> void:
+    inputs[item] = input_amount(item) + n;
+
+func take_input(item:StringName, n:int) -> void:
+    inputs[item] = maxi(0, input_amount(item) - n);
+
+func cancel_input_incoming(item:StringName, n:int) -> void:
+    input_incoming[item] = maxi(0, input_incoming.get(item, 0) - n);
+
+func recipe_enabled(item:StringName) -> bool:
+    var toggle:String = def["recipes"][item].get("toggle", "make_%s" % item);
+    return settings.get(toggle, true) and production_allowed(item);
+
+func has_inputs(recipe:Dictionary) -> bool:
+    for item in recipe["inputs"]:
+        if input_amount(item) < recipe["inputs"][item]:
+            return false;
+    return true;
+
+# Input units still wanted for the recipes that are switched on and under their cap.
+func inputs_wanted() -> Dictionary:
+    var want:Dictionary = {};
+    if not is_complete() or not def.has("recipes"):
+        return want;
+    for item in def["recipes"]:
+        if recipe_enabled(item):
+            for in_item in def["recipes"][item]["inputs"]:
+                var n:int = def["inputs"].get(in_item, 0) - input_amount(in_item) - input_incoming.get(in_item, 0);
+                if n > 0:
+                    want[in_item] = n;
+    return want;
+
 func radius() -> float:
     return def.get("radius", 0.0);
 
@@ -189,7 +233,11 @@ func set_forbidden(item:StringName, forbid:bool) -> void:
 # Construction
 
 func cost() -> Dictionary:
-    return def["cost"];
+    return def["upgrades"][upgrading]["cost"] if upgrading != &"" else def["cost"];
+
+# True while the building is being constructed or upgraded: materials and labor are still wanted.
+func is_site() -> bool:
+    return state == State.CONSTRUCTION or upgrading != &"";
 
 # Units of item still needed that nobody is bringing yet.
 func remaining(item:StringName) -> int:
@@ -202,7 +250,7 @@ func has_all_materials() -> bool:
     return true;
 
 func work_required() -> float:
-    return def["work"];
+    return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"];
 
 func progress() -> float:
     if work_required() <= 0.0:
@@ -210,7 +258,7 @@ func progress() -> float:
     return clampf(work_done / work_required(), 0.0, 1.0);
 
 func ready_for_work() -> bool:
-    return state == State.CONSTRUCTION and has_all_materials() and world.is_site_clear(self);
+    return is_site() and has_all_materials() and (upgrading != &"" or world.is_site_clear(self));
 
 func receive(item:StringName, n:int) -> void:
     incoming[item] = maxi(0, incoming.get(item, 0) - n);
@@ -221,14 +269,88 @@ func cancel_incoming(item:StringName, n:int) -> void:
 
 # Adds labor; returns true once construction is finished.
 func add_work(hours:float) -> bool:
-    if state != State.CONSTRUCTION:
+    if not is_site():
         return true;
     work_done += hours;
     _update_visual();
     if work_done >= work_required():
-        complete();
+        if upgrading != &"":
+            _finish_upgrade();
+        else:
+            complete();
         return true;
     return false;
+
+# --------------------------------
+# Upgrades (see "upgrades" in Defs)
+
+func has_upgrade(id:StringName) -> bool:
+    return upgrades_done.has(id);
+
+# Why an upgrade can't be started right now, or "" when it can.
+func upgrade_block_reason(id:StringName) -> String:
+    var ups:Dictionary = def.get("upgrades", {});
+    if not ups.has(id) or not is_complete():
+        return "Not available";
+    if has_upgrade(id):
+        return "Already built";
+    if upgrading != &"":
+        return "Another upgrade is in progress";
+    for other in upgrades_done:
+        if (ups[id].get("excludes", []) as Array).has(other) or (ups.get(other, {}).get("excludes", []) as Array).has(id):
+            return "Excluded by %s" % ups[other]["name"];
+    for req in ups[id].get("requires", []):
+        if not has_upgrade(req):
+            return "Needs %s first" % ups[req]["name"];
+    return "";
+
+func start_upgrade(id:StringName) -> bool:
+    if upgrade_block_reason(id) != "":
+        return false;
+    _base_spent = delivered;
+    delivered = {};
+    incoming = {};
+    work_done = 0.0;
+    upgrading = id;
+    return true;
+
+# Stops the upgrade in progress and returns the materials already delivered to it.
+func cancel_upgrade() -> void:
+    if upgrading == &"":
+        return;
+    for item in delivered:
+        world.deposit(item, delivered[item], position);
+    # hauling and building aimed here stops now, before the project it served is gone
+    for p in world.pawns:
+        if p.task != null and is_same(p.task.target, self) and p.task.kind in [&"haul", &"build"]:
+            p.end_task(false);
+    delivered = _base_spent;
+    _base_spent = {};
+    incoming = {};
+    work_done = work_required();
+    upgrading = &"";
+
+func _finish_upgrade() -> void:
+    for item in _base_spent:
+        delivered[item] = delivered.get(item, 0) + _base_spent[item];
+    _base_spent = {};
+    incoming = {};
+    upgrades_done[upgrading] = true;
+    world.notify("%s: %s built." % [display_name(), def["upgrades"][upgrading]["name"]]);
+    upgrading = &"";
+    work_done = def["work"];
+
+# Whether this building handles the item yet (a mine needs Deep Shafts before it digs coal).
+func item_unlocked(item:StringName) -> bool:
+    var need:Variant = def.get("locked_until", {}).get(item, null);
+    return need == null or has_upgrade(need);
+
+# All materials ever delivered here, for refunds.
+func all_delivered() -> Dictionary:
+    var all:Dictionary = _base_spent.duplicate();
+    for item in delivered:
+        all[item] = all.get(item, 0) + delivered[item];
+    return all;
 
 func complete() -> void:
     state = State.COMPLETE;
@@ -278,6 +400,38 @@ func _burn_fuel(hours:float) -> void:
         fuel = maxi(0, fuel - whole);
 
 # --------------------------------
+# Save and load. Reservations, incoming deliveries and who is working here are not saved: citizens
+# start over without tasks, so those are all empty again.
+
+func to_dict() -> Dictionary:
+    return {
+        "id": def_id, "origin": origin, "size": size, "state": state, "delivered": delivered.duplicate(),
+        "work_done": work_done, "stored": stored.duplicate(), "forbidden": forbidden.duplicate(),
+        "settings": settings.duplicate(), "fuel": fuel, "inputs": inputs.duplicate(),
+        "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
+        "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
+    };
+
+func restore_dict(d:Dictionary) -> void:
+    state = d["state"];
+    delivered = d["delivered"];
+    work_done = d["work_done"];
+    stored = d["stored"];
+    forbidden = d["forbidden"];
+    for key in d["settings"]:
+        if settings.has(key):          # controls added since the save keep their defaults
+            settings[key] = d["settings"][key];
+    fuel = d["fuel"];
+    inputs = d["inputs"];
+    upgrades_done = d["upgrades_done"];
+    upgrading = d["upgrading"];
+    _base_spent = d["base_spent"];
+    dig_progress = d["dig_progress"];
+    _spoil_acc = d["spoil_acc"];
+    _burn_acc = d["burn_acc"];
+    _update_visual();
+
+# --------------------------------
 # Info
 
 func info_text() -> String:
@@ -299,8 +453,25 @@ func info_text() -> String:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
         if def.has("spoil_mult"):
             s += "Food keeps %s here.\n" % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
+    if upgrading != &"":
+        s += "Upgrading: %s (%d%%)\n" % [def["upgrades"][upgrading]["name"], roundi(progress() * 100.0)];
+        for item in cost():
+            s += "  %s: %d / %d\n" % [Defs.item_name(item), delivered.get(item, 0), cost()[item]];
+        if not has_all_materials():
+            s += "Waiting for materials\n";
+        s += "Builders: %d\n" % builders;
+    if not upgrades_done.is_empty():
+        var names:PackedStringArray = [];
+        for id in upgrades_done:
+            names.append(def["upgrades"][id]["name"]);
+        s += "Upgrades: %s\n" % ", ".join(names);
+    if def.has("inputs") and state == State.COMPLETE:
+        var parts:PackedStringArray = [];
+        for item in def["inputs"]:
+            parts.append("%s %d/%d" % [Defs.item_name(item), input_amount(item), def["inputs"][item]]);
+        s += "Inputs: %s\n" % ", ".join(parts);
     if def.has("fuel_capacity") and state == State.COMPLETE:
-        s += "Firewood: %d / %d" % [fuel, def["fuel_capacity"]];
+        s += "Fuel: %d / %d" % [fuel, def["fuel_capacity"]];
         if not settings.get("heating", false):
             s += " (heating off)";
         elif fuel <= 0:
@@ -339,6 +510,19 @@ func _build_visual() -> void:
             var cap:PrismMesh = PrismMesh.new();
             cap.size = Vector3(1.6, 0.5, 1.2);
             _roof = _add_mesh(cap, _flat_mat(def.get("roof", Color.BROWN)), Vector3(0, h + 0.9, 0));
+        "mine":
+            var pit:BoxMesh = BoxMesh.new();
+            pit.size = Vector3(size.x - 0.3, 0.2, size.y - 0.3);
+            _add_mesh(pit, _flat_mat(Color(0.32, 0.28, 0.25)), Vector3(0, 0.1, 0));
+            var shed:BoxMesh = BoxMesh.new();
+            shed.size = Vector3(size.x * 0.5, h, size.y * 0.4);
+            _body = _add_mesh(shed, _body_mat, Vector3(-size.x * 0.2, h * 0.5, -size.y * 0.25));
+            var cap:PrismMesh = PrismMesh.new();
+            cap.size = Vector3(size.x * 0.55, h * 0.4, size.y * 0.45);
+            _roof = _add_mesh(cap, _flat_mat(def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
+            var heap:BoxMesh = BoxMesh.new();
+            heap.size = Vector3(1.2, 0.6, 1.2);
+            _add_mesh(heap, _flat_mat(Color(0.6, 0.6, 0.6)), Vector3(size.x * 0.25, 0.4, size.y * 0.2));
         "pile":
             var pad:BoxMesh = BoxMesh.new();
             pad.size = Vector3(size.x - 0.3, h, size.y - 0.3);

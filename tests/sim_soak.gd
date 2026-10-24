@@ -21,7 +21,7 @@ func _ready() -> void:
 func _issue_orders() -> void:
     var th:Building = world.town_hall;
     var placed:int = 0;
-    var wanted:Array[StringName] = [&"house", &"field", &"well", &"house", &"field"];
+    var wanted:Array[StringName] = [&"house", &"field", &"well", &"house", &"field", &"mine", &"blacksmith", &"woodcutter"];
     for r in range(4, 24):
         for dz in range(-r, r + 1, 3):
             for dx in range(-r, r + 1, 3):
@@ -34,6 +34,20 @@ func _issue_orders() -> void:
                     world.place_building(id, o, size);
                     print("placed %s at %s" % [id, o]);
                     placed += 1;
+    for pw in world.pawns:
+        if pw.profession == JobManager.Profession.LABORER:
+            pw.profession = JobManager.Profession.MINER;
+            break;
+    for pw in world.pawns:
+        if pw.profession == JobManager.Profession.LABORER:
+            pw.profession = JobManager.Profession.BLACKSMITH;
+            break;
+    for pw in world.pawns:
+        if pw.profession == JobManager.Profession.BUILDER:
+            pw.profession = JobManager.Profession.WOODCUTTER;
+            break;
+    th.store(&"stone", 40);    # keeps the mine from starving for stone when the random world is unlucky
+    th.store(&"coal", 6);       # no coal source yet, so seed some to exercise steel tools
     var n:int = 0;
     for rn in world.nodes:
         if not rn.is_auto() and Vector2(rn.cell - th.origin).length() < 22 and n < 25:
@@ -75,16 +89,55 @@ func _process(_delta:float) -> void:
     if d >= DAYS:
         get_tree().quit();
 
+var _upgrade_step:int = 0;
+
+# Exercises the upgrade system on the mine: start, cancel with refund, start again, and check the
+# exclusion and prerequisite rules on a copy of its definition.
+func _exercise_upgrades() -> void:
+    for b in world.buildings:
+        if b.def_id != &"mine" or not b.is_complete():
+            continue;
+        if _upgrade_step != 0:
+            continue;
+        _upgrade_step = 1;
+        var d:Dictionary = b.def.duplicate(true);
+        d["upgrades"][&"ventilation"] = {"name": "Ventilation", "cost": {}, "work": 1.0, "excludes": [&"deep_shafts"]};
+        d["upgrades"][&"lamps"] = {"name": "Lamps", "cost": {}, "work": 1.0, "requires": [&"ventilation"]};
+        var real_def:Dictionary = b.def;
+        b.def = d;
+        print("UPGRADE rules before: ventilation='", b.upgrade_block_reason(&"ventilation"), "' lamps='", b.upgrade_block_reason(&"lamps"), "'");
+        b.upgrades_done[&"deep_shafts"] = true;
+        print("UPGRADE rules with deep shafts built: ventilation='", b.upgrade_block_reason(&"ventilation"), "'");
+        b.upgrades_done.erase(&"deep_shafts");
+        b.def = real_def;
+        print("UPGRADE start: ", b.start_upgrade(&"deep_shafts"), " block now: ", b.upgrade_block_reason(&"deep_shafts"), " coal unlocked: ", b.item_unlocked(&"coal"));
+        # cancel part-way, once some materials have arrived
+        get_tree().create_timer(4.0).timeout.connect(func() -> void:
+            if not World.alive(b) or b.upgrading == &"":
+                print("UPGRADE finished before the cancel test");
+                return;
+            b.delivered[&"wood"] = 5;     # pretend some materials arrived, to check the refund
+            var before:String = "%d/%d/%d" % [Stock.amount(&"wood"), Stock.amount(&"stone"), Stock.amount(&"iron")];
+            print("UPGRADE cancelling, delivered ", b.delivered, " base ", b.all_delivered(), " stock ", before);
+            b.cancel_upgrade();
+            print("UPGRADE after cancel: stock ", Stock.amount(&"wood"), "/", Stock.amount(&"stone"), "/", Stock.amount(&"iron"), " delivered ", b.delivered, " upgrading '", b.upgrading, "'");
+            b.start_upgrade(&"deep_shafts"));
+
 func _report() -> void:
+    _exercise_upgrades();
     print("\n=== %s %s | %s %.1fC | pop %d" % [GameClock.date_string(), GameClock.time_string(), Weather.description(), Weather.temperature, world.pawns.size()]);
     var stock:PackedStringArray = [];
     for item in Defs.ITEMS:
         stock.append("%s=%d" % [item, Stock.amount(item)]);
     print("stock: ", ", ".join(stock));
     for p in world.pawns:
-        print("  %-8s %-9s H%.2f T%.2f E%.2f W%.2f HP%.2f | %s" % [p.first_name, p.profession_name(), p.hunger, p.thirst, p.energy, p.warmth, p.health, p.status]);
+        print("  %-8s %-9s H%.2f T%.2f E%.2f W%.2f HP%.2f | %s | tool %s" % [p.first_name, p.profession_name(), p.hunger, p.thirst, p.energy, p.warmth, p.health, p.status, p.tool]);
     for b in world.buildings:
         var extra:String = "";
         if b is Field and b.is_complete():
             extra = (b as Field).info_text().split("\n")[1];
+        elif b.def.has("upgrades"):
+            extra = "upgrading '%s' %d%% delivered %s done %s coal %s" % [b.upgrading, roundi(b.progress() * 100), b.delivered, b.upgrades_done.keys(), b.item_unlocked(&"coal")];
+        elif b.def.has("fuel_capacity") and b.is_complete():
+            extra = "fuel %d/%d" % [b.fuel, b.def["fuel_capacity"]];
         print("  [%s] %s %d%% builders=%d %s" % [b.display_name(), "done" if b.is_complete() else "building", roundi(b.progress() * 100), b.builders, extra]);

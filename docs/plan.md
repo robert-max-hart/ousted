@@ -225,7 +225,7 @@ Decisions and why:
 | M7 | Content & art pass | Real models and animation, audio, UI theme |
 | M8 | Meta | Save and load, map seeds and settings, scenarios and difficulty, tutorial |
 
-Save and load should probably move earlier (M2/M3) once state shapes stabilise, because it gets harder to add the longer it waits.
+Save and load was moved earlier and built at the end of M2 (quicksave, autosave and a round-trip test; see CLAUDE.md). M8 keeps the load menu, named slots, map seeds and settings.
 
 ---
 

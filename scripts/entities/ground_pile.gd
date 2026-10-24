@@ -33,6 +33,9 @@ func setup(w:World, it:StringName, n:int, c:Vector2i) -> void:
     add_child(_mesh);
     _update_visual();
 
+func to_dict() -> Dictionary:
+    return {"item": item, "amount": amount, "cell": cell, "spoil_acc": _spoil_acc};
+
 func display_name() -> String:
     return "%s pile" % Defs.item_name(item);
 

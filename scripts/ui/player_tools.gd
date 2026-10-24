@@ -115,6 +115,10 @@ func _unhandled_input(event:InputEvent) -> void:
                 GameClock.set_speed(2);
             KEY_3:
                 GameClock.set_speed(3);
+            KEY_F5:
+                SaveGame.save(World.instance);
+            KEY_F9:
+                SaveGame.load_slot(World.instance);
             KEY_R:
                 build_size = Vector2i(build_size.y, build_size.x);
             KEY_ESCAPE:

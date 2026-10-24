@@ -55,6 +55,15 @@ func _on_hour(_hour:int) -> void:
     _update_temperature();
     weather_changed.emit();
 
+func save_state() -> Dictionary:
+    return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset};
+
+func restore_state(d:Dictionary) -> void:
+    is_raining = d["is_raining"];
+    intensity = d["intensity"];
+    _day_offset = d["day_offset"];
+    _update_temperature();
+
 # Mean temperature for the current day (no daily swing / rain).
 func mean_temperature() -> float:
     # SEASON_TEMP values sit at the middle of each season; blend between them

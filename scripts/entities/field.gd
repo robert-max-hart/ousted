@@ -86,6 +86,25 @@ func can_plant() -> bool:
         return false;
     return Weather.mean_temperature() >= crop()["min_temp"];
 
+func to_dict() -> Dictionary:
+    var d:Dictionary = super.to_dict();
+    d["crop_id"] = crop_id;
+    d["plot_state"] = plot_state;
+    d["plot_crop"] = Array(plot_crop);
+    d["growth"] = growth;
+    d["moisture"] = moisture;
+    return d;
+
+func restore_dict(d:Dictionary) -> void:
+    super.restore_dict(d);
+    crop_id = d["crop_id"];
+    plot_state = d["plot_state"];
+    for i in plot_count():
+        plot_crop[i] = d["plot_crop"][i];
+    growth = d["growth"];
+    moisture = d["moisture"];
+    _visual_dirty = true;
+
 # --------------------------------
 # Work for farmers
 

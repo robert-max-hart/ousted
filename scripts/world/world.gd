@@ -7,6 +7,7 @@
 class_name World extends Node3D;
 
 static var instance:World = null;
+static var pending_load:Dictionary = {};     # set by SaveGame before a World is created from a save
 
 const START_PAWNS       :int = 6;
 const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 90, &"berries": 30, &"firewood": 30};
@@ -55,7 +56,12 @@ static func alive(o:Variant) -> bool:
 
 func _ready() -> void:
     instance = self;
-    if world_seed == 0:
+    var save:Dictionary = pending_load;
+    pending_load = {};
+    var loading:bool = not save.is_empty();
+    if loading:
+        world_seed = save["seed"];
+    elif world_seed == 0:
         world_seed = randi() % 1000000;
     rng.seed = world_seed;
     print("Ousted world seed: %d" % world_seed);
@@ -64,6 +70,10 @@ func _ready() -> void:
     terrain.name = "Terrain";
     add_child(terrain);
     terrain.generate(world_seed);
+    if loading:
+        terrain.heights = save["heights"];
+        terrain.overlay = save["overlay"];
+        terrain.mark_all_dirty();
     terrain.changed.connect(_on_terrain_changed);
 
     var n:int = Terrain.SIZE * Terrain.SIZE;
@@ -83,18 +93,24 @@ func _ready() -> void:
     add_child(renderer);
     jobs = JobManager.new(self);
 
-    _spawn_nature();
-    var start:Vector2i = _find_start_cell();
-    _clear_nodes(start, 10);
-    town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
-    for item in START_STOCK:
-        town_hall.store(item, START_STOCK[item]);
-    _spawn_settlers(start);
+    if loading:
+        _restore_entities(save);
+    else:
+        _spawn_nature();
+        var start:Vector2i = _find_start_cell();
+        _clear_nodes(start, 10);
+        town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
+        for item in START_STOCK:
+            town_hall.store(item, START_STOCK[item]);
+        _spawn_settlers(start);
 
     camera_rig = RTSCamera.new();
     camera_rig.name = "CameraRig";
     add_child(camera_rig);
-    camera_rig.focus_on(town_hall.position);
+    if loading:
+        camera_rig.restore_state(save["camera"]);
+    else:
+        camera_rig.focus_on(town_hall.position);
     _setup_weather_fx();
 
     tools = PlayerTools.new();
@@ -108,9 +124,9 @@ func _ready() -> void:
     GameClock.day_changed.connect(_on_day);
     GameClock.season_changed.connect(_on_season);
     Weather.weather_changed.connect(_on_weather_changed);
-    _on_season(GameClock.season());
+    _apply_season(GameClock.season());
     _on_weather_changed();
-    notify("Your settlers have arrived. Spring has begun.");
+    notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
 
 func _process(_delta:float) -> void:
     _update_lighting();
@@ -194,6 +210,65 @@ func _spawn_settlers(start:Vector2i) -> void:
             p.profession = START_PROFESSIONS[i];
         _entities.add_child(p);
         pawns.append(p);
+
+# --------------------------------
+# Save and load (see SaveGame)
+
+# Everything needed to rebuild this world. Citizens' tasks are not saved: they restart idle.
+func serialize() -> Dictionary:
+    var node_list:Array = [];
+    for rn in nodes:
+        node_list.append(rn.to_array());
+    var building_list:Array = [];
+    for b in buildings:
+        building_list.append(b.to_dict());
+    var pawn_list:Array = [];
+    for p in pawns:
+        pawn_list.append(p.to_dict());
+    var pile_list:Array = [];
+    for pl in piles:
+        pile_list.append(pl.to_dict());
+    return {
+        "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
+        "clock": GameClock.save_state(), "weather": Weather.save_state(),
+        "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
+        "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
+        "camera": camera_rig.save_state() if camera_rig != null else {},
+        "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
+    };
+
+# Rebuilds nature, buildings, piles and citizens from a save. The terrain and soil are loaded by the caller.
+func _restore_entities(save:Dictionary) -> void:
+    soil_fertility = save["soil"];
+    wetness = save["wetness"];
+    for a in save["nodes"]:
+        var rn:ResourceNode = ResourceNode.from_array(a, rng);
+        nodes.append(rn);
+        node_at[idx(rn.cell)] = rn;
+        if rn.growth < 1.0:
+            saplings.append(rn);
+    for bd in save["buildings"]:
+        var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true);
+        b.restore_dict(bd);
+        if bd["id"] == &"town_hall":
+            town_hall = b;
+    for pd in save["piles"]:
+        var pl:GroundPile = GroundPile.new();
+        pl.setup(self, pd["item"], pd["amount"], pd["cell"]);
+        pl._spoil_acc = pd["spoil_acc"];
+        _entities.add_child(pl);
+        piles.append(pl);
+    for pd in save["pawns"]:
+        var p:Pawn = Pawn.new();
+        p.restore(self, pd);
+        _entities.add_child(p);
+        pawns.append(p);
+        if pd["home"] >= 0 and pd["home"] < buildings.size():
+            p.home = buildings[pd["home"]];
+            p.home.residents.append(p);
+    _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
+    renderer.mark_dirty();
+    rng.state = save["rng_state"];
 
 # --------------------------------
 # Resource nodes
@@ -302,17 +377,20 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i) -> String:
         return "Ground is too steep (flatten it first)";
     return "";
 
-func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:bool = false) -> Building:
+# restoring: put a saved building back as it was (no flattening, clearing or overlay changes).
+func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:bool = false, restoring:bool = false) -> Building:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
-    if not is_field:
+    if not is_field and not restoring:
         terrain.flatten_rect(r);
     var b:Building = Field.new() if is_field else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
             occupant[idx(c)] = b;
+            if restoring:
+                continue;
             terrain.set_overlay(c, Terrain.Overlay.NONE);
             var rn:ResourceNode = node_at[idx(c)];
             if rn != null:
@@ -338,10 +416,14 @@ func remove_building(b:Building, refund:bool) -> void:
         return;
     if b.fuel > 0:
         deposit(&"firewood", b.fuel, b.position);
+    for item in b.inputs:
+        if b.inputs[item] > 0:
+            deposit(item, b.inputs[item], b.position);
     if refund:
         var share:float = 1.0 if not b.is_complete() else 0.5;
-        for item in b.delivered:
-            deposit(item, floori(b.delivered[item] * share), b.position);
+        var all:Dictionary = b.all_delivered();
+        for item in all:
+            deposit(item, floori(all[item] * share), b.position);
     for p in b.residents:
         p.home = null;
     # cancel work aimed at it now, while task callbacks can still see it
@@ -609,11 +691,15 @@ func _on_day(_d:int) -> void:
                 rn.amount += 1;
         renderer.mark_dirty();
 
-func _on_season(s:int) -> void:
+func _apply_season(s:int) -> void:
     terrain.set_season(s);
     renderer.set_season(s);
+
+func _on_season(s:int) -> void:
+    _apply_season(s);
     if GameClock.total_hours > GameClock.START_HOUR + 1.0:
         notify("%s has arrived." % GameClock.SEASON_NAMES[s]);
+        SaveGame.autosave(self);
 
 # --------------------------------
 # Environment, lighting, weather visuals
