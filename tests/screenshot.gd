@@ -20,10 +20,10 @@ func _ready() -> void:
     var th:Building = world.town_hall;
     world.place_building(&"field", th.origin + Vector2i(7, -1), Vector2i(6, 6));
     world.place_building(&"house", th.origin + Vector2i(-5, 0), Vector2i(3, 3));
-    for id in [&"mine", &"blacksmith"]:
+    for id in [&"mine", &"blacksmith", &"school"]:
         var size:Vector2i = Defs.BUILDINGS[id]["size"];
         for dz in range(-14, 14, 2):
-            var o:Vector2i = th.origin + Vector2i(-12 if id == &"mine" else -6, dz - (6 if id == &"mine" else 10));
+            var o:Vector2i = th.origin + Vector2i(-12 if id == &"mine" else -6 if id == &"blacksmith" else 8, dz - (6 if id == &"mine" else 10 if id == &"blacksmith" else -4));
             if world.can_place(id, o, size) == "":
                 var b:Building = world.place_building(id, o, size);
                 b.complete();
@@ -49,7 +49,7 @@ func _process(_delta:float) -> void:
         GameClock.set_speed(0);
         GameClock.total_hours = SHOT_HOURS[i];
         # noon shows the mine's inspector (upgrades), dusk the blacksmith's
-        var pick:StringName = &"mine" if i == 1 else &"blacksmith" if i == 2 else &"";
+        var pick:StringName = &"mine" if i == 1 else &"blacksmith" if i == 2 else &"school" if i == 3 else &"";
         world.tools.select(_picks.get(pick, null));
         if _picks.has(pick):
             world.camera_rig.focus_on((_picks[pick] as Building).position);

@@ -6,13 +6,15 @@
 # ----------------------------------------------------------------
 class_name JobManager extends RefCounted;
 
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher"];
 const MAX_BUILDERS_PER_SITE :int = 4;
+const TEACHER_EARLY        :float = 0.5;   # hours before school starts that the teacher heads over
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
 
 var world:World;
+var targets:Dictionary = {};       # profession -> how many citizens the player wants in it
 
 func _init(w:World) -> void:
     world = w;
@@ -35,9 +37,13 @@ func choose_task(p:Pawn) -> Task:
         if wants:
             p.block_needs(1.5);
 
+    if p.is_baby():
+        return _baby_task(p);
+
     var night:bool = GameClock.is_night();
     if p.carry_amount > 0:
-        if not night and p.carry_amount < Pawn.CARRY_CAP:
+        # no topping up the load when school is waiting for a child or the teacher
+        if not night and p.carry_amount < Pawn.CARRY_CAP and not _school_calls(p):
             t = _gather_more_task(p, p.carry_item);
             if t != null:
                 return t;
@@ -57,6 +63,11 @@ func choose_task(p:Pawn) -> Task:
         if t != null:
             return t;
 
+    if p.is_child():
+        t = _school_task(p);
+        if t != null:
+            return t;
+
     for job in _job_order(p.profession):
         t = (job as Callable).call(p);
         if t != null:
@@ -73,6 +84,8 @@ func _job_order(prof:int) -> Array[Callable]:
             return [_forage_task, _clear_task, _haul_task, _fuel_task, _collect_task];
         Profession.WOODCUTTER:
             return [_woodcutter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.TEACHER:
+            return [_teach_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.BLACKSMITH:
             return [_blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
@@ -89,18 +102,57 @@ func count(prof:int) -> int:
             n += 1;
     return n;
 
-# Moves one pawn between a profession and the laborer pool.
+# The player sets how many citizens should have each profession (a target); reconcile() moves citizens
+# between the laborer pool and professions to match, and keeps doing so as citizens die or are born.
+# A target the laborer pool can't fill stays and is filled as soon as someone is free.
+func target(prof:int) -> int:
+    return targets.get(prof, 0);
+
 func change_profession(prof:int, delta:int) -> void:
     if prof == Profession.LABORER:
         return;
-    var from:int = Profession.LABORER if delta > 0 else prof;
-    var to:int = prof if delta > 0 else Profession.LABORER;
+    targets[prof] = clampi(target(prof) + delta, 0, maxi(world.pawns.size(), count(prof)));
+    reconcile();
+
+# Makes the targets match who has which profession now (after setup, a load, or direct assignment).
+func sync_targets() -> void:
+    targets.clear();
     for p in world.pawns:
-        if p.profession == from:
-            p.profession = to;
-            if p.task != null and p.task.interruptible:
-                p.end_task(false);
-            return;
+        if p.profession != Profession.LABORER:
+            targets[p.profession] = targets.get(p.profession, 0) + 1;
+
+func reconcile() -> void:
+    for prof in PROFESSION_NAMES.size():
+        if prof == Profession.LABORER:
+            continue;
+        var have:int = count(prof);
+        while have > target(prof):
+            _assign(_least_experienced(prof), Profession.LABORER);
+            have -= 1;
+        while have < target(prof):
+            var p:Pawn = _most_experienced_laborer(prof);
+            if p == null:
+                break;
+            _assign(p, prof);
+            have += 1;
+
+# Experience does not exist yet, so ties (everyone) fall back to list order.
+func _most_experienced_laborer(_prof:int) -> Pawn:
+    for p in world.pawns:
+        if p.profession == Profession.LABORER and p.is_adult():
+            return p;
+    return null;
+
+func _least_experienced(prof:int) -> Pawn:
+    for p in world.pawns:
+        if p.profession == prof:
+            return p;
+    return null;
+
+func _assign(p:Pawn, prof:int) -> void:
+    p.profession = prof;
+    if p.task != null and p.task.interruptible:
+        p.end_task(false);
 
 # --------------------------------
 # Needs
@@ -158,6 +210,19 @@ func _warm_task(p:Pawn) -> Task:
     t.work(warm_tick, "Warming up");
     t.on_end = func(pw:Pawn) -> void:
         pw.go_outside();
+    return t;
+
+# Babies never work and never leave the house: they go indoors and stay there.
+func _baby_task(p:Pawn) -> Task:
+    var b:Building = world.shelter_for(p);
+    var t:Task = Task.new(&"stay_home", "Staying home", false);
+    if b != null and not (p.indoors and is_same(p.shelter, b)):
+        t.target = b;
+        t.move_rect(b.rect());
+        t.act(func(pw:Pawn) -> bool:
+            pw.go_inside(b, false);
+            return true);
+    t.work_for(1.0, "Staying home");
     return t;
 
 func _sleep_task(p:Pawn) -> Task:
@@ -476,6 +541,96 @@ func _woodcutter_task(p:Pawn) -> Task:
                 t.workplace = b;
                 return t;
     return null;
+
+# --------------------------------
+# School
+
+# Whether it is school time for this citizen: a child, or the teacher, with a school standing.
+func _school_calls(p:Pawn) -> bool:
+    if not (_school_hours() or (p.profession == Profession.TEACHER and GameClock.hour() >= Defs.SCHOOL_START - TEACHER_EARLY and GameClock.hour() < Defs.SCHOOL_END)):
+        return false;
+    if not (p.is_child() or p.profession == Profession.TEACHER):
+        return false;
+    for b in world.buildings:
+        if b.is_complete() and b.def.has("school_capacity"):
+            return true;
+    return false;
+
+func _school_hours() -> bool:
+    var h:float = GameClock.hour();
+    return h >= Defs.SCHOOL_START and h < Defs.SCHOOL_END;
+
+# A teacher works the school during school hours as long as there are children to teach.
+func _teach_task(p:Pawn) -> Task:
+    var h:float = GameClock.hour();
+    if h < Defs.SCHOOL_START - TEACHER_EARLY or h >= Defs.SCHOOL_END:     # the teacher is in place when the bell rings
+        return null;
+    var has_children:bool = false;
+    for pw in world.pawns:
+        if pw.is_child():
+            has_children = true;
+            break;
+    if not has_children:
+        return null;
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b.is_complete() and b.def.has("school_capacity") and _workers_at(b) < b.def.get("worker_slots", 1):
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    if sites.is_empty():
+        return null;
+    var school:Building = sites[0];
+    var t:Task = Task.new(&"teach", "Teaching");
+    t.target = school;
+    t.workplace = school;
+    t.move_rect(school.rect(), school.is_walkable(), "Walking to school");
+    t.act(func(_pw:Pawn) -> bool:
+        school.teaching = true;
+        return true);
+    var teach_tick:Callable = func(_pw:Pawn, _dh:float) -> bool:
+        if not World.alive(school) or GameClock.hour() >= Defs.SCHOOL_END or GameClock.hour() < Defs.SCHOOL_START - TEACHER_EARLY:
+            return true;
+        for pw in world.pawns:
+            if pw.is_child():
+                return false;
+        return true;
+    t.work(teach_tick, "Teaching");
+    t.on_end = func(_pw:Pawn) -> void:
+        if World.alive(school):
+            school.teaching = false;
+    return t;
+
+# A child goes to a school with a free seat while it is school hours and the colony has a teacher. School
+# comes before child labor; if the teacher never turns up, the child gives up and works instead.
+func _school_task(p:Pawn) -> Task:
+    if not _school_hours() or count(Profession.TEACHER) == 0:
+        return null;
+    var school:Building = world.nearest_building(p.position, func(b:Building) -> bool:
+        return b.is_complete() and b.def.has("school_capacity") and b.attendees < b.def["school_capacity"] and not p.has_failed(b));
+    if school == null:
+        return null;
+    school.attendees += 1;
+    var t:Task = Task.new(&"school", "Going to school");
+    t.target = school;
+    t.move_rect(school.rect(), school.is_walkable(), "Going to school");
+    var st:Dictionary = {"waited": 0.0};
+    var study:Callable = func(pw:Pawn, dh:float) -> bool:
+        if not World.alive(school) or not _school_hours():
+            return true;
+        if not school.teaching:
+            st["waited"] += dh;
+            if st["waited"] > 1.5:
+                pw.avoid(school, 3.0);
+                return true;
+            return false;
+        pw.learn(dh);
+        return false;
+    t.work(study, "Studying");
+    t.on_end = func(_pw:Pawn) -> void:
+        if World.alive(school):
+            school.attendees = maxi(0, school.attendees - 1);
+    return t;
 
 # --------------------------------
 # Tools

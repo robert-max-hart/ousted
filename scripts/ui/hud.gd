@@ -17,6 +17,7 @@ var _tool_btns  :Dictionary = {};       # key -> Button
 var _jobs_rows  :Array[Label] = [];
 var _log        :VBoxContainer;
 var _hint       :Label;
+var _toolbar    :PanelContainer;
 var _info       :PanelContainer;
 var _info_title :Label;
 var _info_body  :Label;
@@ -52,6 +53,9 @@ func _ready() -> void:
     _refresh_all();
 
 func _process(delta:float) -> void:
+    # the event log sits just above the toolbar, which grows a line when the window is narrow
+    _log.offset_bottom = -(_toolbar.size.y + 8.0);
+    _log.offset_top = _log.offset_bottom;
     _refresh -= delta;
     if _refresh <= 0.0:
         _refresh = REFRESH_RATE;
@@ -88,7 +92,10 @@ func _refresh_all() -> void:
             food_tip.append("%s: %d" % [Defs.item_name(item), Stock.amount(item)]);
     _stock.tooltip_text = "\n".join(food_tip);
     for prof in JobManager.PROFESSION_NAMES.size():
-        _jobs_rows[prof].text = "%s: %d" % [JobManager.PROFESSION_NAMES[prof], w.jobs.count(prof)];
+        var have:int = w.jobs.count(prof);
+        var want:int = w.jobs.target(prof);
+        var short:String = " (want %d)" % want if prof != JobManager.Profession.LABORER and want > have else "";
+        _jobs_rows[prof].text = "%s: %d%s" % [JobManager.PROFESSION_NAMES[prof], have, short];
     var tools:PlayerTools = w.tools;
     _hint.text = tools.hint + ("   " + tools.error if tools.error != "" else "");
     _refresh_info();
@@ -313,6 +320,7 @@ func _save_button(text:String, tip:String, action:Callable) -> Button:
 
 func _build_toolbar(root:Control) -> void:
     var panel:PanelContainer = _panel(root);
+    _toolbar = panel;
     panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE);
     panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
     var col:VBoxContainer = VBoxContainer.new();
@@ -320,7 +328,7 @@ func _build_toolbar(root:Control) -> void:
     _hint = Label.new();
     _hint.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7));
     col.add_child(_hint);
-    var row:HBoxContainer = HBoxContainer.new();
+    var row:HFlowContainer = HFlowContainer.new();     # wraps to a second line when the window is narrow
     col.add_child(row);
     var tools:PlayerTools = World.instance.tools;
     var group:ButtonGroup = ButtonGroup.new();
@@ -357,7 +365,7 @@ func _build_jobs_panel(root:Control) -> void:
         var row:HBoxContainer = HBoxContainer.new();
         col.add_child(row);
         var l:Label = Label.new();
-        l.custom_minimum_size.x = 110;
+        l.custom_minimum_size.x = 150;
         row.add_child(l);
         _jobs_rows.append(l);
         if prof == JobManager.Profession.LABORER:
@@ -446,7 +454,7 @@ func _panel(root:Control) -> PanelContainer:
     root.add_child(p);
     return p;
 
-func _tool_button(row:HBoxContainer, group:ButtonGroup, text:String, tip:String) -> Button:
+func _tool_button(row:Container, group:ButtonGroup, text:String, tip:String) -> Button:
     var b:Button = Button.new();
     b.text = text;
     b.tooltip_text = tip;

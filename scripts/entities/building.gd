@@ -34,6 +34,8 @@ var upgrades_done:Dictionary = {};   # upgrade id -> true
 var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (while set, delivered/incoming/work_done belong to it)
 var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
 var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
+var teaching     :bool = false;      # a teacher is at this school right now
+var attendees    :int = 0;           # children who have a seat here (school)
 var workers     :int = 0;           # citizens currently working here (job buildings)
 var _spoil_acc  :Dictionary = {};
 var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
@@ -453,6 +455,13 @@ func info_text() -> String:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
         if def.has("spoil_mult"):
             s += "Food keeps %s here.\n" % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
+    if def.has("school_capacity") and state == State.COMPLETE:
+        s += "Pupils: %d / %d\n" % [attendees, def["school_capacity"]];
+        s += "Teacher: %s\n" % ("teaching now" if teaching else "none present");
+    if def_id == &"town_hall" and not world.death_log.is_empty():
+        s += "Recent deaths:\n";
+        for entry in world.death_log.slice(-5):
+            s += "  %s, age %d, %s (%s)\n" % [entry["name"], entry["age"], entry["cause"], entry["when"]];
     if upgrading != &"":
         s += "Upgrading: %s (%d%%)\n" % [def["upgrades"][upgrading]["name"], roundi(progress() * 100.0)];
         for item in cost():

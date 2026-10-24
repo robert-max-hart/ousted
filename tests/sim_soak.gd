@@ -58,6 +58,7 @@ func _issue_orders() -> void:
 
 # Pokes the same code paths the player tools use.
 func _exercise_tools() -> void:
+    world.jobs.sync_targets();      # the professions above were set directly
     var th:Building = world.town_hall;
     var locked:Callable = world.is_corner_locked;
     var p:Vector3 = th.position + Vector3(14, 0, 14);
@@ -123,7 +124,29 @@ func _exercise_upgrades() -> void:
             print("UPGRADE after cancel: stock ", Stock.amount(&"wood"), "/", Stock.amount(&"stone"), "/", Stock.amount(&"iron"), " delivered ", b.delivered, " upgrading '", b.upgrading, "'");
             b.start_upgrade(&"deep_shafts"));
 
+var _killed:bool = false;
+
+# Kills a citizen who is carrying goods, to check the goods are dropped and that their profession is refilled
+# from the laborer pool.
+func _exercise_death() -> void:
+    if _killed or GameClock.day_index() < 3:
+        return;
+    _killed = true;
+    var victim:Pawn = null;
+    for p in world.pawns:
+        if p.profession == JobManager.Profession.FARMER:
+            victim = p;
+    if victim == null:
+        return;
+    world.jobs.change_profession(JobManager.Profession.WOODCUTTER, -1);     # frees a laborer to take the farmer's place
+    victim.set_carry(&"wheat", 4);
+    var piles_before:int = world.piles.size();
+    var farmers_before:int = world.jobs.count(JobManager.Profession.FARMER);
+    world.kill_pawn(victim, "old age", true);
+    print("DEATH: farmers ", farmers_before, " -> ", world.jobs.count(JobManager.Profession.FARMER), " (target ", world.jobs.target(JobManager.Profession.FARMER), "), piles ", piles_before, " -> ", world.piles.size(), ", log ", world.death_log);
+
 func _report() -> void:
+    _exercise_death();
     _exercise_upgrades();
     print("\n=== %s %s | %s %.1fC | pop %d" % [GameClock.date_string(), GameClock.time_string(), Weather.description(), Weather.temperature, world.pawns.size()]);
     var stock:PackedStringArray = [];

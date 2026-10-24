@@ -41,6 +41,7 @@ var town_hall   :Building;
 var _entities   :Node3D;
 var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
 var saplings    :Array[ResourceNode] = [];
+var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
 var _storage_warned:bool = false;
 var _spoiled_today:int = 0;
@@ -102,7 +103,9 @@ func _ready() -> void:
         town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
         for item in START_STOCK:
             town_hall.store(item, START_STOCK[item]);
+        Defs.ageing_days_per_year = 4.0;
         _spawn_settlers(start);
+        jobs.sync_targets();
 
     camera_rig = RTSCamera.new();
     camera_rig.name = "CameraRig";
@@ -232,7 +235,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
+        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -241,6 +244,7 @@ func serialize() -> Dictionary:
 func _restore_entities(save:Dictionary) -> void:
     soil_fertility = save["soil"];
     wetness = save["wetness"];
+    Defs.ageing_days_per_year = save.get("ageing_days_per_year", 4.0);
     for a in save["nodes"]:
         var rn:ResourceNode = ResourceNode.from_array(a, rng);
         nodes.append(rn);
@@ -269,6 +273,12 @@ func _restore_entities(save:Dictionary) -> void:
     _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
     renderer.mark_dirty();
     rng.state = save["rng_state"];
+    death_log = save.get("deaths", []);
+    var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
+    if saved_targets != null:
+        jobs.targets = saved_targets;
+    else:
+        jobs.sync_targets();
 
 # --------------------------------
 # Resource nodes
@@ -573,14 +583,21 @@ func set_road(c:Vector2i, on:bool) -> void:
 # --------------------------------
 # Pawns
 
-func kill_pawn(p:Pawn, cause:String) -> void:
+# at_home: a natural death (old age) happens in bed when the citizen has a home.
+func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
     if p.removed:
         return;
     p.removed = true;
     p.end_task(false);
+    var spot:Vector3 = p.home.position if at_home and alive(p.home) else p.position;
+    if p.carry_amount > 0:
+        drop_pile(p.carry_item, p.carry_amount, terrain.world_to_cell(spot));
+        p.clear_carry();
+    death_log.append({"name": p.first_name, "age": int(p.age), "cause": cause, "when": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "profession": p.profession_name()});
     if p.home != null:
         p.home.residents.erase(p);
     pawns.erase(p);
+    jobs.reconcile();
     notify("%s has died of %s." % [p.first_name, cause]);
     if tools != null and tools.selected == p:
         tools.select(null);
@@ -653,6 +670,7 @@ func _on_terrain_changed(r:Rect2i) -> void:
 # Time
 
 func _on_hour(_h:int) -> void:
+    jobs.reconcile();
     for b in buildings:
         b.on_hour();
         if b.is_storage():

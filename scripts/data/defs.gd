@@ -150,6 +150,12 @@ const BUILDINGS:Dictionary = {
         ],
         "desc": "Makes tools that speed up work: steel first, then iron, then wooden, whichever it has the materials for. Tiers can be switched off. Stores finished tools; citizens pick them up and equip them.",
     },
+    &"school": {
+        "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
+        "shape": "house", "height": 2.2, "color": Color(0.72, 0.64, 0.46), "roof": Color(0.34, 0.3, 0.42),
+        "worker_slots": 1, "profession": "TEACHER", "school_capacity": 12,
+        "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",
+    },
     &"field": {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
         "shape": "field", "height": 0.0, "color": Color(0.4, 0.28, 0.18),
@@ -158,7 +164,7 @@ const BUILDINGS:Dictionary = {
     },
 };
 
-const BUILD_MENU:Array[StringName] = [&"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"field"];
+const BUILD_MENU:Array[StringName] = [&"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"school", &"field"];
 
 # grow_days:  days to ripen at ideal conditions
 # min_temp:   no growth below this; also the planting threshold
@@ -200,6 +206,50 @@ static func spoil_temp_factor(temp:float) -> float:
 static func spoil_per_hour(item:StringName) -> float:
     var days:float = ITEMS[item].get("spoil_days", 0.0) if ITEMS.has(item) else 0.0;
     return 0.0 if days <= 0.0 else 1.0 / (days * GameClock.HOURS_PER_DAY);
+
+# --------------------------------
+# Life stages (decided 2026-10-23): baby under 5, child 5 to 17, adult from 18. Citizens age faster than the
+# calendar; ageing_days_per_year is the adjustable rate (calendar days per citizen year; saved with the game).
+const BABY_UNTIL        :float = 5.0;
+const ADULT_AT          :float = 18.0;
+const CHILD_EFFICIENCY  :float = 0.5;     # placeholder until schools exist: children do light general work
+# [age, work efficiency] points, linear between them: a few points lost through old age, then a steep fall
+const OLD_AGE_EFFICIENCY:Array = [[60.0, 1.0], [75.0, 0.95], [90.0, 0.4]];
+# [age, chance of dying per citizen year] points, linear between them, 0 below the first: gentler than the fall in efficiency
+const OLD_AGE_DEATH_PER_YEAR:Array = [[59.99, 0.0], [60.0, 0.02], [70.0, 0.05], [75.0, 0.10], [85.0, 0.20], [90.0, 0.35], [100.0, 0.60]];
+static var ageing_days_per_year:float = 4.0;
+
+# Schooling (decided 2026-10-23): children study 8:00 to 16:00 with a teacher present. School builds general
+# experience, which speeds up all work. Gains get harder as the value rises: a child at school for every school
+# hour from 5 to 17 ends up about 23% faster.
+const SCHOOL_START      :float = 8.0;
+const SCHOOL_END        :float = 16.0;
+const GENERAL_XP_RATE   :float = 0.0012;  # experience (as a work speed bonus) per school hour at zero
+const GENERAL_XP_HALF   :float = 0.1;     # the rate halves when experience reaches this
+
+static func general_xp_gain(xp:float, hours:float) -> float:
+    return GENERAL_XP_RATE * hours / (1.0 + xp / GENERAL_XP_HALF);
+
+# Linear interpolation through [x, y] points sorted by x, flat beyond the ends.
+static func curve(points:Array, x:float) -> float:
+    if x <= points[0][0]:
+        return points[0][1];
+    for i in range(1, points.size()):
+        if x <= points[i][0]:
+            var a:Array = points[i - 1];
+            var b:Array = points[i];
+            return lerpf(a[1], b[1], (x - a[0]) / (b[0] - a[0]));
+    return points[points.size() - 1][1];
+
+static func age_efficiency(age:float) -> float:
+    return curve(OLD_AGE_EFFICIENCY, age);
+
+# Chance per game hour that a citizen of this age dies of old age.
+static func old_age_death_per_hour(age:float) -> float:
+    var per_year:float = curve(OLD_AGE_DEATH_PER_YEAR, age);
+    if per_year <= 0.0:
+        return 0.0;
+    return 1.0 - pow(1.0 - per_year, 1.0 / (ageing_days_per_year * GameClock.HOURS_PER_DAY));
 
 const HEATING_BELOW      :float = 15.0;   # C: houses burn firewood below this
 const FIREWOOD_PER_DAY_AT_0C:float = 2.0;   # burn rate at 0 C; scales linearly with how far below HEATING_BELOW it is

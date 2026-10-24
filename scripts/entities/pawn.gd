@@ -23,7 +23,8 @@ const FEMALE_NAMES      :Array[String] = ["Aelwen", "Bryony", "Cerys", "Edith", 
 var look_seed   :int = 0;       # seeds the cosmetic randomness (shirt, skin) so a loaded citizen looks the same
 var first_name  :String;
 var is_male     :bool;
-var age         :int;
+var general_xp  :float = 0.0;     # general experience from school, as a work speed bonus (0.1 = 10% faster)
+var age         :float;         # in citizen years (see Defs.ageing_days_per_year)
 var profession  :int = JobManager.Profession.LABORER;
 var home        :Building = null;
 
@@ -65,7 +66,7 @@ func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[
     if names.is_empty():
         names = MALE_NAMES if is_male else FEMALE_NAMES;
     first_name = names[rng.randi() % names.size()];
-    age = rng.randi_range(18, 40);
+    age = rng.randi_range(18, 40) + rng.randf();
     position = w.terrain.cell_center(cell);
     name = "Pawn_%s" % first_name;
     look_seed = rng.randi();
@@ -81,7 +82,7 @@ func to_dict() -> Dictionary:
     return {
         "name": first_name, "is_male": is_male, "age": age, "profession": profession, "look_seed": look_seed,
         "hunger": hunger, "thirst": thirst, "energy": energy, "warmth": warmth, "health": health,
-        "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
+        "general_xp": general_xp, "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
         "position": position, "home": world.buildings.find(home) if home != null else -1,
     };
 
@@ -92,7 +93,7 @@ func restore(w:World, d:Dictionary) -> void:
     world = w;
     first_name = d["name"];
     is_male = d["is_male"];
-    age = d["age"];
+    age = float(d["age"]);
     profession = d["profession"];
     look_seed = d["look_seed"];
     hunger = d["hunger"];
@@ -100,6 +101,7 @@ func restore(w:World, d:Dictionary) -> void:
     energy = d["energy"];
     warmth = d["warmth"];
     health = d["health"];
+    general_xp = d.get("general_xp", 0.0);
     carry_item = d["carry_item"];
     carry_amount = d["carry_amount"];
     tool = d["tool"];
@@ -115,6 +117,8 @@ func _process(delta:float) -> void:
     if dh <= 0.0:
         return;
     _update_needs(dh);
+    if removed:
+        return;
     if health <= 0.0:
         world.kill_pawn(self, _death_cause());
         return;
@@ -152,7 +156,42 @@ func cell() -> Vector2i:
 # --------------------------------
 # Needs
 
+# --------------------------------
+# Life stages
+
+func is_baby() -> bool:
+    return age < Defs.BABY_UNTIL;
+
+func is_child() -> bool:
+    return not is_baby() and not is_adult();
+
+func is_adult() -> bool:
+    return age >= Defs.ADULT_AT;
+
+func stage_name() -> String:
+    return "baby" if is_baby() else "child" if not is_adult() else "elder" if age >= Defs.OLD_AGE_EFFICIENCY[0][0] else "adult";
+
+# How fast this citizen works compared with a prime-age adult.
+func work_efficiency() -> float:
+    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp);
+
+# Studies for dh game hours.
+func learn(dh:float) -> void:
+    general_xp += Defs.general_xp_gain(general_xp, dh);
+
+# Don't pick this target again for a while (as when a task on it failed).
+func avoid(target:Variant, hours:float) -> void:
+    _failed[target] = GameClock.total_hours + hours;
+
+func _age_tick(dh:float) -> void:
+    age += dh / (Defs.ageing_days_per_year * GameClock.HOURS_PER_DAY);
+    if world.rng.randf() < Defs.old_age_death_per_hour(age) * dh:
+        world.kill_pawn(self, "old age", true);
+
 func _update_needs(dh:float) -> void:
+    _age_tick(dh);
+    if removed or is_baby():
+        return;     # babies are looked after by their household: their needs hold steady
     hunger = maxf(0.0, hunger - dh / HUNGER_HOURS);
     thirst = maxf(0.0, thirst - dh / THIRST_HOURS);
     if sleeping:
@@ -288,7 +327,7 @@ func _run_task(move_dt:float, dh:float) -> void:
                 task.index += 1;
         Task.Step.WORK:
             var working:bool = not NON_WORK_KINDS.has(task.kind);
-            var speed:float = 1.0 + tool_bonus() if working else 1.0;
+            var speed:float = (1.0 + tool_bonus()) * work_efficiency() if working else 1.0;
             if working:
                 _wear_tool(dh);
             if (step["tick"] as Callable).call(self, dh * speed):
@@ -351,8 +390,10 @@ func profession_name() -> String:
     return JobManager.PROFESSION_NAMES[profession];
 
 func info_text() -> String:
-    var s:String = "%s, %s, age %d\n" % [profession_name(), "male" if is_male else "female", age];
+    var s:String = "%s, %s, age %d (%s)\n" % [profession_name(), "male" if is_male else "female", int(age), stage_name()];
     s += "Doing: %s\n" % status;
+    if general_xp > 0.0:
+        s += "Schooling: +%d%% work speed\n" % roundi(general_xp * 100.0);
     if tool != &"":
         s += "Tool: %s (%d%% left)\n" % [Defs.item_name(tool), roundi(100.0 * tool_uses / Defs.ITEMS[tool]["tool"]["uses"])];
     else:
