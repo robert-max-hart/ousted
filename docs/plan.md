@@ -79,11 +79,11 @@ for harvest and stocking up, and winter is the test.
   a family in a house can have children. Death from old age.
 - **Death (decided 2026-10-23):** carried goods drop as a pile, the tool is lost, old-age deaths happen at home in bed, and bodies vanish for now. A Banished-style Graveyard (a building with openings that "stores" bodies and reduces the happiness penalty) comes with M3's happiness work. Professions are player *targets* that the game keeps filled from the laborer pool.
 - **Policies panel (idea, 2026-10-23, not built):** a global panel of colony-wide rules the player turns on or off, saved with the game. The child labor allow/forbid rule from §7 lives there. A forbidden rule sends children with no school home to idle.
-- **Teacher quality (direction, 2026-10-23, not built):** a teacher's own experience should raise how fast pupils gain general experience (proposed: teaching-job experience only, a veteran about 1.5x). Needs job experience from M3 step 3.
+- **Teacher quality (decided 2026-10-25, built):** a teacher's teaching-job experience plus their own general experience raises how fast pupils gain general experience, up to 1.5x for a veteran.
 - **Decisions:** each pawn picks its next task from: urgent needs → hand off carried goods →
   sleep at night → profession work → general labor → idle.
 
-- **Experience (idea, M3; not built):** each pawn has a general experience value that speeds up all
+- **Experience (M3; built 2026-10-25 as general experience from school and per-job experience):** each pawn has a general experience value that speeds up all
   work, plus a per-job experience (one per job type or job building) that speeds up that job only.
   Doing a job raises its experience and school raises the general value. Pawns have an age and
   nothing else of this kind today. Work speed is currently the same for everyone.
@@ -221,7 +221,7 @@ Decisions and why:
 |---|---|---|
 | **M1** | **Core loop prototype** *(built: first pass)* | Terrain gen and editing, camera, clock/seasons/day-night, weather, trees/rocks/bushes, harvest designation, roads, construction with hauling, pawns with needs, professions, basic farming (wheat/beans, fertility, moisture, frost), HUD |
 | M2 | Logistics & economy *(done)* | Per-storage inventories and capacity, granary/spoilage, woodcutter/quarry/mine buildings, firewood and warmth, tools, field drag-sizing |
-| M3 | Population *(in progress: death handling, profession targets, life stages, school and teacher done; next is job experience)* | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
+| M3 | Population *(in progress: death handling, profession targets, life stages, school and teacher, job experience done; next is the Policies panel)* | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
 | M4 | Agriculture depth | More crops, sowing calendars, seeds, pests, irrigation channels, fertility overlay, orchards, livestock and manure |
 | M5 | Terrain as labor | Terraforming as worker jobs, dirt and stone moved, nicer terrain shader (texture splat, snow) |
 | M6 | Trade | Trading post, merchants, barter UI, luxury goods |

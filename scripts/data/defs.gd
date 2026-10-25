@@ -230,6 +230,22 @@ const GENERAL_XP_HALF   :float = 0.1;     # the rate halves when experience reac
 static func general_xp_gain(xp:float, hours:float) -> float:
     return GENERAL_XP_RATE * hours / (1.0 + xp / GENERAL_XP_HALF);
 
+# Job experience (decided 2026-10-23): per citizen per job, never decays, earned at any age, speeds up that job
+# only. Same curve shape and starting constants as general experience (a starting point to tune).
+const JOB_XP_RATE       :float = 0.0012;  # experience (as a work speed bonus) per work hour at zero
+const JOB_XP_HALF       :float = 0.1;     # the rate halves when experience reaches this
+
+static func job_xp_gain(xp:float, hours:float) -> float:
+    return JOB_XP_RATE * hours / (1.0 + xp / JOB_XP_HALF);
+
+# Teacher quality (decided 2026-10-25): the teacher's teaching experience plus their own general experience
+# multiplies how fast pupils gain general experience, up to 1.5x for a veteran.
+const TEACHER_MAX_BONUS :float = 0.5;
+const TEACHER_VETERAN_XP:float = 0.4;     # teaching + general experience at which the bonus is full
+
+static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
+    return 1.0 + TEACHER_MAX_BONUS * minf(1.0, (teaching_xp + general_xp) / TEACHER_VETERAN_XP);
+
 # Linear interpolation through [x, y] points sorted by x, flat beyond the ends.
 static func curve(points:Array, x:float) -> float:
     if x <= points[0][0]:

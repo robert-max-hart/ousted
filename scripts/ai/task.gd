@@ -15,6 +15,7 @@ var label           :String;
 var interruptible   :bool = true;
 var target          :Variant = null;     # what to avoid retrying if it fails
 var workplace       :Variant = null;     # job building this task serves; ends if it is demolished
+var job             :int = -1;           # profession whose experience this work earns and uses (-1: none)
 var steps           :Array[Dictionary] = [];
 var index           :int = 0;
 var on_cancel       :Callable;

@@ -35,6 +35,7 @@ var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (whi
 var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
 var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
 var teaching     :bool = false;      # a teacher is at this school right now
+var teaching_mult:float = 1.0;       # how much faster pupils learn under the teacher present (Defs.teacher_multiplier)
 var attendees    :int = 0;           # children who have a seat here (school)
 var workers     :int = 0;           # citizens currently working here (job buildings)
 var _spoil_acc  :Dictionary = {};
@@ -457,7 +458,7 @@ func info_text() -> String:
             s += "Food keeps %s here.\n" % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
     if def.has("school_capacity") and state == State.COMPLETE:
         s += "Pupils: %d / %d\n" % [attendees, def["school_capacity"]];
-        s += "Teacher: %s\n" % ("teaching now" if teaching else "none present");
+        s += "Teacher: %s\n" % ("teaching now (pupils learn %.2fx)" % teaching_mult if teaching else "none present");
     if def_id == &"town_hall" and not world.death_log.is_empty():
         s += "Recent deaths:\n";
         for entry in world.death_log.slice(-5):

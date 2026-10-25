@@ -24,6 +24,7 @@ var look_seed   :int = 0;       # seeds the cosmetic randomness (shirt, skin) so
 var first_name  :String;
 var is_male     :bool;
 var general_xp  :float = 0.0;     # general experience from school, as a work speed bonus (0.1 = 10% faster)
+var job_xp      :Dictionary = {};   # profession -> experience in that job, as a work speed bonus for that job only
 var age         :float;         # in citizen years (see Defs.ageing_days_per_year)
 var profession  :int = JobManager.Profession.LABORER;
 var home        :Building = null;
@@ -82,7 +83,7 @@ func to_dict() -> Dictionary:
     return {
         "name": first_name, "is_male": is_male, "age": age, "profession": profession, "look_seed": look_seed,
         "hunger": hunger, "thirst": thirst, "energy": energy, "warmth": warmth, "health": health,
-        "general_xp": general_xp, "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
+        "general_xp": general_xp, "job_xp": job_xp.duplicate(), "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
         "position": position, "home": world.buildings.find(home) if home != null else -1,
     };
 
@@ -102,6 +103,7 @@ func restore(w:World, d:Dictionary) -> void:
     warmth = d["warmth"];
     health = d["health"];
     general_xp = d.get("general_xp", 0.0);
+    job_xp = (d.get("job_xp", {}) as Dictionary).duplicate();
     carry_item = d["carry_item"];
     carry_amount = d["carry_amount"];
     tool = d["tool"];
@@ -176,8 +178,15 @@ func work_efficiency() -> float:
     return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp);
 
 # Studies for dh game hours.
-func learn(dh:float) -> void:
-    general_xp += Defs.general_xp_gain(general_xp, dh);
+func learn(dh:float, mult:float = 1.0) -> void:
+    general_xp += Defs.general_xp_gain(general_xp, dh) * mult;
+
+func experience(job:int) -> float:
+    return job_xp.get(job, 0.0);
+
+# Practises a job for dh game hours (real time at work, not sped up by the bonuses).
+func practise(job:int, dh:float) -> void:
+    job_xp[job] = experience(job) + Defs.job_xp_gain(experience(job), dh);
 
 # Don't pick this target again for a while (as when a task on it failed).
 func avoid(target:Variant, hours:float) -> void:
@@ -330,6 +339,9 @@ func _run_task(move_dt:float, dh:float) -> void:
             var speed:float = (1.0 + tool_bonus()) * work_efficiency() if working else 1.0;
             if working:
                 _wear_tool(dh);
+                if task.job >= 0:
+                    speed *= 1.0 + experience(task.job);
+                    practise(task.job, dh);
             if (step["tick"] as Callable).call(self, dh * speed):
                 task.index += 1;
         Task.Step.ACT:
@@ -394,6 +406,9 @@ func info_text() -> String:
     s += "Doing: %s\n" % status;
     if general_xp > 0.0:
         s += "Schooling: +%d%% work speed\n" % roundi(general_xp * 100.0);
+    for job in job_xp:
+        if roundi(job_xp[job] * 100.0) > 0:
+            s += "%s experience: +%d%%\n" % [JobManager.PROFESSION_NAMES[job], roundi(job_xp[job] * 100.0)];
     if tool != &"":
         s += "Tool: %s (%d%% left)\n" % [Defs.item_name(tool), roundi(100.0 * tool_uses / Defs.ITEMS[tool]["tool"]["uses"])];
     else:
