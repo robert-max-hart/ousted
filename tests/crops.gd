@@ -12,6 +12,7 @@ func _ready() -> void:
     Defs.difficulty = &"easy";
     var world:World = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
+    world.seeds.unlock_all();       # this test is about the crops, not finding their seeds
     GameClock.set_speed(0);
     var ok:bool = true;
     for id in Defs.CROPS:

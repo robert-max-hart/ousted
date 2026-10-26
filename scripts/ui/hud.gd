@@ -16,6 +16,9 @@ var _weather    :Label;
 var _stock      :Label;
 var _speed_btns :Array[Button] = [];
 var _tool_btns  :Dictionary = {};       # key -> Button
+var _cat_btns   :Array[Button] = [];     # build categories (Housing, Storage, ...)
+var _build_row  :HFlowContainer;         # the buildings of the open category
+var _open_cat   :int = -1;               # index into Defs.BUILD_CATEGORIES, or -1 when none is open
 var _jobs_rows  :Array[Label] = [];
 var _jobs_flags :Array[Label] = [];     # a red ! on professions whose buildings have empty positions
 var _log_panel  :PanelContainer;
@@ -126,7 +129,7 @@ func _refresh_all() -> void:
     _policies_btn.tooltip_text = "Colony-wide rules" if governed else "Needs the Town Hall's Governance upgrade";
     if not governed and _policies_btn.button_pressed:
         _policies_btn.button_pressed = false;
-    (_tool_btns["town_hall"] as Button).visible = not _town_hall_exists(w);
+    _apply_category();
     parts.append("Pop %d" % w.pawns.size());
     var homeless:int = w.families.homeless_count();
     if homeless > 0:
@@ -369,6 +372,11 @@ func _on_mode_changed(mode:int) -> void:
     var key:String = World.instance.tools.build_id if mode == PlayerTools.Mode.BUILD else str(mode);
     for k in _tool_btns:
         (_tool_btns[k] as Button).set_pressed_no_signal(k == key);
+    if mode == PlayerTools.Mode.BUILD:       # picking a building any other way opens its category
+        for ci in Defs.BUILD_CATEGORIES.size():
+            if (Defs.BUILD_CATEGORIES[ci][1] as Array).has(StringName(key)):
+                _open_cat = ci;
+        _apply_category();
 
 func _on_selection_changed(_obj:Variant) -> void:
     _crop_list.visible = false;
@@ -395,8 +403,10 @@ func _on_info_button() -> void:
         for id in Defs.CROPS:
             var c:Dictionary = Defs.CROPS[id];
             var btn:Button = Button.new();
-            btn.text = "%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)];
-            btn.tooltip_text = c["desc"];
+            var known:bool = World.instance.seeds.has(id);
+            btn.text = "%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)] if known else "%s: no seeds yet" % c["name"];
+            btn.tooltip_text = c["desc"] if known else "Foragers and gatherers may find its seeds while picking wild food.";
+            btn.disabled = not known;
             btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
             btn.focus_mode = Control.FOCUS_NONE;
             btn.pressed.connect(func() -> void:
@@ -473,12 +483,38 @@ func _build_toolbar(root:Control) -> void:
         b.pressed.connect(tools.set_mode.bind(m[0], &""));
         _tool_btns[str(m[0])] = b;
     row.add_child(VSeparator.new());
-    for id in Defs.BUILD_MENU:
-        var def:Dictionary = Defs.BUILDINGS[id];
-        var b:Button = _tool_button(row, group, def["name"], "%s\nCost: %s" % [def["desc"], Defs.cost_string(def["cost"])]);
-        b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
-        _tool_btns[String(id)] = b;
+    # buildings are grouped: a button per category opens that category's buildings on a second line
+    _build_row = HFlowContainer.new();
+    col.add_child(_build_row);
+    var cat_group:ButtonGroup = ButtonGroup.new();
+    cat_group.allow_unpress = true;
+    for ci in Defs.BUILD_CATEGORIES.size():
+        var cb:Button = _tool_button(row, cat_group, Defs.BUILD_CATEGORIES[ci][0] + " >", "Show the %s buildings" % Defs.BUILD_CATEGORIES[ci][0].to_lower());
+        cb.pressed.connect(_on_category_pressed.bind(ci));
+        _cat_btns.append(cb);
+        for id in Defs.BUILD_CATEGORIES[ci][1]:
+            var def:Dictionary = Defs.BUILDINGS[id];
+            var b:Button = _tool_button(_build_row, group, def["name"], "%s\nCost: %s" % [def["desc"], Defs.cost_string(def["cost"])]);
+            b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
+            _tool_btns[String(id)] = b;
     (_tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
+    _apply_category();
+
+func _on_category_pressed(index:int) -> void:
+    _open_cat = -1 if _open_cat == index else index;
+    _apply_category();
+
+# Shows the buildings of the open category (the Town Hall's button also hides while one stands) and the matching
+# category button as pressed.
+func _apply_category() -> void:
+    _build_row.visible = _open_cat >= 0;
+    for ci in _cat_btns.size():
+        _cat_btns[ci].set_pressed_no_signal(ci == _open_cat);
+        for id in Defs.BUILD_CATEGORIES[ci][1]:
+            var shown:bool = ci == _open_cat;
+            if id == &"town_hall":
+                shown = shown and not _town_hall_exists(World.instance);
+            (_tool_btns[String(id)] as Button).visible = shown;
 
 func _build_jobs_panel(root:Control) -> void:
     var panel:PanelContainer = _panel(root, &"jobs");

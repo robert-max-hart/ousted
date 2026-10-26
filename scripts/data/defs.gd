@@ -147,6 +147,7 @@ const BUILDINGS:Dictionary = {
             {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true},
             {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true},
             {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true},
+            {"id": "forage_pref", "type": "choice", "label": "Pick first", "options": ["Nearest", "What we have least of", "Berries", "Mushrooms", "Hazelnuts"], "default": 0},
             {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 120, "step": 20},
             {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation"},
             {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation"},
@@ -158,7 +159,7 @@ const BUILDINGS:Dictionary = {
                 "desc": "Foragers with nothing to pick sow new patches of the wild foods you switch on, near the hut. Wild patches also spread by themselves, only slowly.",
             },
         },
-        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
+        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
     },
     &"mine": {
         "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
@@ -243,6 +244,15 @@ const BUILDINGS:Dictionary = {
 # about two days and ripe plots wait about a day before they are picked).
 const PLOTS_PER_FARMER:int = 64;
 
+# The build toolbar groups buildings into these categories (a name and the buildings in it, in menu order).
+const BUILD_CATEGORIES:Array = [
+    ["Housing", [&"house"]],
+    ["Storage", [&"stockpile", &"granary"]],
+    ["Food", [&"field", &"forager"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
+    ["Civic", [&"town_hall", &"well", &"school", &"graveyard"]],
+];
+
 const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
@@ -250,6 +260,7 @@ const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpi
 # frost_temp: unripe crops die below this
 # fertility:  soil fertility change per harvest (negative = depletes)
 # sow:        seasons it can be planted in (0 spring, 1 summer, 2 autumn, 3 winter), as well as being above min_temp
+# find_weight: optional. How likely its seed is to be found by foragers (default 1; rarer below)
 # harvests:   optional. A crop that keeps producing: it can be harvested this many times per sowing, regrowing in
 #             regrow_days after each harvest, and then the plot is fallow again. Without it, one harvest per sowing.
 # desc:       one line shown when picking the crop
@@ -281,7 +292,7 @@ const CROPS:Dictionary = {
     },
     &"potato": {
         "name": "Potatoes", "item": &"potato", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0, "sow": [0],
-        "yield": 6, "fertility": -0.2, "color": Color(0.7, 0.55, 0.35),
+        "yield": 6, "fertility": -0.2, "color": Color(0.7, 0.55, 0.35), "find_weight": 0.7,
         "desc": "A big harvest and very filling, but slow, frost-tender and very hard on the soil.",
     },
     &"cabbage": {
@@ -291,7 +302,7 @@ const CROPS:Dictionary = {
     },
     &"pumpkin": {
         "name": "Pumpkins", "item": &"pumpkin", "grow_days": 16.0, "min_temp": 10.0, "frost_temp": 2.0, "sow": [0],
-        "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15),
+        "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15), "find_weight": 0.5,
         "desc": "One huge, slow harvest a year, which needs a warm season.",
     },
 };
@@ -365,9 +376,9 @@ const STARVING_BIRTH_MULT:float = 0.2;    # chance multiplier with no food, and 
 # which Town Hall upgrades a colony starts with. Starting goods go into the Town Hall's store room first and the
 # rest into a supply cart that disappears when empty.
 const DIFFICULTIES:Dictionary = {
-    &"hard": {"name": "Hard", "town_hall": []},
-    &"normal": {"name": "Normal", "town_hall": [&"storage"]},
-    &"easy": {"name": "Easy", "town_hall": [&"storage", &"storage2", &"heating"]},
+    &"hard": {"name": "Hard", "town_hall": [], "seeds": [&"wheat"]},
+    &"normal": {"name": "Normal", "town_hall": [&"storage"], "seeds": [&"wheat", &"beans", &"radish"]},
+    &"easy": {"name": "Easy", "town_hall": [&"storage", &"storage2", &"heating"], "seeds": [&"wheat", &"beans", &"radish", &"lettuce", &"barley"]},
 };
 static var difficulty:StringName = &"normal";
 

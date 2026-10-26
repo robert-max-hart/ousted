@@ -672,6 +672,8 @@ func info_text() -> String:
     if def.has("school_capacity") and state == State.COMPLETE:
         s += "Pupils: %d / %d\n" % [attendees, def["school_capacity"]];
         s += "Teacher: %s\n" % ("teaching now (pupils learn %.2fx)" % teaching_mult if teaching else "none present");
+    if def_id == &"town_hall":
+        s += "Seeds: %s\n" % world.seeds.names();
     if def_id == &"town_hall" and not world.death_log.is_empty():
         s += "Recent deaths:\n";
         for entry in world.death_log.slice(-5):

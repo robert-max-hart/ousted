@@ -24,6 +24,7 @@ var terrain     :Terrain;
 var nav         :NavGrid;
 var jobs        :JobManager;
 var policies    :Policies = Policies.new();
+var seeds       :Seeds = Seeds.new();       # the crops that can be sown (starting seeds come from the difficulty)
 var ledger      :Ledger = Ledger.new();
 var families    :Families;
 var bodies      :Array[Body] = [];
@@ -319,7 +320,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "pending_roads": pending_roads.keys(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "pending_roads": pending_roads.keys(), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -384,6 +385,7 @@ func _restore_entities(save:Dictionary) -> void:
     for c in save.get("pending_roads", []):
         pending_roads[c] = true;
     policies.restore(save.get("policies", {}));
+    seeds.restore(save.get("seeds", null));
     ledger.restore(save.get("ledger", {}));
     var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
     if saved_targets != null:

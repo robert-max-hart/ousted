@@ -26,6 +26,8 @@ var _visual_dirty:bool = true;
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     super.setup(w, id, o, s);
+    if not w.seeds.has(crop_id):
+        crop_id = w.seeds.first_known();       # a new field starts with a crop the colony has seeds for
     # crops are placed in world space, so keep the node at the origin
     position = Vector3.ZERO;
     var n:int = plot_count();
@@ -68,9 +70,12 @@ func plot_cell(i:int) -> Vector2i:
 func crop() -> Dictionary:
     return Defs.CROPS[crop_id];
 
-func set_crop(id:StringName) -> void:
-    if Defs.CROPS.has(id):
-        crop_id = id;
+# Returns false (and changes nothing) for a crop the colony has no seeds for.
+func set_crop(id:StringName) -> bool:
+    if not Defs.CROPS.has(id) or not world.seeds.has(id):
+        return false;
+    crop_id = id;
+    return true;
 
 func fertility(i:int) -> float:
     return world.soil_fertility[world.terrain.index(plot_cell(i))];

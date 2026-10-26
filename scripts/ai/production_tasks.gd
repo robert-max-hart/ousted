@@ -33,8 +33,14 @@ func forager_task(p:Pawn) -> Task:
     for b in sites:
         if workers_at(b) >= b.def.get("worker_slots", 1):
             continue;
-        var t:Task = harvest_node_task(p, func(rn:ResourceNode) -> bool:
-            return rn.is_forageable() and rn.is_mature() and in_radius(b, rn.cell) and b.settings.get("forage_%s" % rn.kind, true));
+        var t:Task = null;
+        for kind in _forage_order(b):
+            var only:StringName = kind;
+            t = harvest_node_task(p, func(rn:ResourceNode) -> bool:
+                return rn.is_forageable() and rn.is_mature() and in_radius(b, rn.cell) and b.settings.get("forage_%s" % rn.kind, true) \
+                    and (only == &"" or rn.kind == only));
+            if t != null:
+                break;
         if t == null and b.has_upgrade(&"cultivation"):
             t = _sow_task(b);
         if t != null:
@@ -42,6 +48,23 @@ func forager_task(p:Pawn) -> Task:
             t.job = JobManager.Profession.FORAGER;
             return t;
     return null;
+
+const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel"];
+
+# The wild foods a hut's foragers try in turn: each is "pick only this kind", and &"" at the end means anything
+# switched on (the nearest). The hut's "Pick first" choice is Nearest, What we have least of, or one food.
+func _forage_order(b:Building) -> Array[StringName]:
+    var order:Array[StringName] = [];
+    var pref:int = b.settings.get("forage_pref", 0);
+    if pref == 1:
+        var kinds:Array[StringName] = FORAGE_KINDS.filter(func(k:StringName) -> bool: return b.settings.get("forage_%s" % k, true));
+        kinds.sort_custom(func(a:StringName, c:StringName) -> bool:
+            return Stock.amount(Defs.RESOURCE_NODES[a]["item"]) < Stock.amount(Defs.RESOURCE_NODES[c]["item"]));
+        order.append_array(kinds);
+    elif pref >= 2 and pref - 2 < FORAGE_KINDS.size():
+        order.append(FORAGE_KINDS[pref - 2]);
+    order.append(&"");
+    return order;
 
 const SOW_PER_KIND:int = 18;       # a hut sows no more of a kind than this within its radius
 

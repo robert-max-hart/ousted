@@ -79,6 +79,8 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
         return rn.amount <= 0 or pw.carry_amount >= Pawn.CARRY_CAP);
     t.on_end = func(_pw:Pawn) -> void:
         rn.reserved_by = null;
+        if rn.is_auto() or rn.is_forageable():
+            world.seeds.on_forage(world);       # a trip picking wild food may turn up a seed
         if rn.amount <= 0 and (not rn.regrows or rn.clearing) and not rn.removed:
             world.remove_node(rn);
     return t;
