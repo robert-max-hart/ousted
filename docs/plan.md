@@ -79,6 +79,32 @@ for harvest and stocking up, and winter is the test.
   a family in a house can have children. Death from old age.
 - **Death (decided 2026-10-23):** carried goods drop as a pile, the tool is lost, old-age deaths happen at home in bed, and bodies vanish for now. A Banished-style Graveyard (a building with openings that "stores" bodies and reduces the happiness penalty) comes with M3's happiness work. Professions are player *targets* that the game keeps filled from the laborer pool.
 - **Policies panel (built 2026-10-25, see CLAUDE.md):** a global panel of colony-wide rules the player turns on or off, saved with the game. The child labor allow/forbid rule from §7 lives there. A forbidden rule sends children with no school home to idle.
+- **Families and births (decided 2026-10-25, M3 step 4, built):**
+  - **Pairing:** automatic. Two unpartnered adults (18+) within 10 years of each other can pair, with a daily chance. No sex is tracked: a pair is just two citizens, and births ignore sex. A pair has a fertility window by age (exact ages to pick when building).
+  - **Housing:** a standard house holds 6 residents (2 adults and 4 children for a family, but 6 unrelated adults can share). A pair does not need its own house to form. For a **birth**, the pair's house needs at least one free slot. No hard cap on family size: housing limits it. Birth rate policies are a later idea.
+  - **Births:** per-day chance for a fertile pair, up if food is plentiful and the house is warm, down when the colony is starving. Short fixed pregnancy of a few game days, and the pregnant parent works as normal.
+  - **Babies:** have real needs, but need half the food of a child or adult. Happiness for babies is left to step 5. Parents spend some time on the baby (such as feeding): a recurring care task, not full-time. Babies stay indoors.
+  - **Orphans:** children with no living parent move into any house with a free slot. The Town Hall never houses anyone. An orphanage or boarding house for children is a later building. Homelessness rules are to be discussed later.
+  - **Widowed:** the survivor stays in the house and can pair again after a delay.
+  - **UI:** the pawn inspector shows Partner and Children, the house inspector lists residents.
+- **Happiness, grief and the Graveyard (decided 2026-10-25, M3 step 5, built):**
+  - **Happiness** is a stored value per citizen that moves slowly toward a target made of named factors the inspector lists: needs, home (and a cold house), food variety, grief, child labor, a hungry baby in the house. Babies have no happiness. Consequences: below a threshold work is a little slower, very low for a long time and the citizen leaves the colony, happy parents raise the birth chance a little.
+  - **Child labor** costs everyone happiness ("our children have to work is depressing"), adults less than children, scaled by how many children are working. It applies only while the policy is on.
+  - **Grief:** a death gives the partner, children and parents a large penalty that fades over days, siblings less, and the whole colony a small one. Orphans carry theirs. A buried body softens it.
+  - **Bodies show up** where the citizen died (in the house for old age). A family member carries it preferably (they get first call for a while), else any laborer. Burial puts a headstone in a free plot of a Graveyard. With no free plot the body lies there for some days and then vanishes, and the grief stays at full.
+  - **Graveyard:** sized by dragging like a crop field, each cell one grave. Graves decompose and free their cell after 10 calendar years (Banished took about 20, which felt too slow). A faster way to free space is to be looked at later.
+  - **Homelessness** is the next topic after this step.
+- **Homelessness (decided 2026-10-25, M3 step 6, built):**
+  - **The Town Hall shelters no one** (no beds, never a fallback). It keeps its storage and well. **PINNED, to discuss:** what the Town Hall becomes. Ideally the base version does almost nothing, and it gains upgrades later or comes with some depending on the starting difficulty.
+  - **Shacks (the Tropico idea):** a homeless citizen gets a shack, a 2x2 single-bed building that is very quick to build and cheap, and is **lost entirely when demolished (no refund)**. It carries the homeless mood penalty and warms a little, much less than a house. Shacks are placed automatically (policy "Homeless build shacks", default on) after a few hours of homelessness, an empty shack is reused first, and a shack dweller moves into a real house as soon as one has room (the shack stays until demolished).
+  - **Without any bed:** sleeping outdoors restores energy at half speed, warmth falls as for anyone outside, and the "No home" penalty grows with the days spent homeless (from 15% to 30% over 10 days), plus a small penalty for sleeping in the cold.
+  - **Homeless babies and children** get the next free house slot first, and any adult may care for a homeless baby. A HUD line shows how many are homeless.
+- **Town Hall (decided 2026-10-25, built):**
+  - **Base is only the well.** Everything else is an upgrade, built like the Mine's (materials only). An upgrade only **unlocks** a feature, not how it is reached.
+  - **Upgrades:** storage (tier 1), more storage (tier 2, after tier 1), heating (a heated place to warm up, no sleeping or housing: the Town Hall never houses anyone), and **governance**, which unlocks the Policies panel and later the ledger and history.
+  - **Starting difficulty sets what it comes with:** hard is the bare well, normal is well plus storage tier 1, easy is both storage tiers plus heating. (The difficulty setting itself is M8; the data can be written now.)
+  - **Unique, but never lost for good:** only one at a time, and if it is lost the player can build a new one. The player can also move it. A new one costs 30 wood and 10 stone and starts bare (the unlocks belong to the building). **Relocating** is on every building that can move (not fields, graveyards, shacks or carts): half the build cost and work for a new one at a chosen spot, the old one keeps working and then goes with no refund, and settings, filters, upgrades, fuel, inputs and residents carry over. Storage buildings must be emptied first.
+  - **Hard-start supply cart:** the starting goods go into the Town Hall's store room as far as it goes and the rest into a cart beside it, which takes nothing new and vanishes when emptied (as in Banished).
 - **Teacher quality (decided 2026-10-25, built):** a teacher's teaching-job experience plus their own general experience raises how fast pupils gain general experience, up to 1.5x for a veteran.
 - **Decisions:** each pawn picks its next task from: urgent needs → hand off carried goods →
   sleep at night → profession work → general labor → idle.
@@ -221,7 +247,7 @@ Decisions and why:
 |---|---|---|
 | **M1** | **Core loop prototype** *(built: first pass)* | Terrain gen and editing, camera, clock/seasons/day-night, weather, trees/rocks/bushes, harvest designation, roads, construction with hauling, pawns with needs, professions, basic farming (wheat/beans, fertility, moisture, frost), HUD |
 | M2 | Logistics & economy *(done)* | Per-storage inventories and capacity, granary/spoilage, woodcutter/quarry/mine buildings, firewood and warmth, tools, field drag-sizing |
-| M3 | Population *(in progress: death handling, profession targets, life stages, school and teacher, job experience, Policies panel done; next is families and births)* | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
+| M3 | Population *(in progress: death handling, profession targets, life stages, school and teacher, job experience, Policies panel, families and births, happiness, grief and the Graveyard, homelessness done; M3 is complete)* | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
 | M4 | Agriculture depth | More crops, sowing calendars, seeds, pests, irrigation channels, fertility overlay, orchards, livestock and manure |
 | M5 | Terrain as labor | Terraforming as worker jobs, dirt and stone moved, nicer terrain shader (texture splat, snow) |
 | M6 | Trade | Trading post, merchants, barter UI, luxury goods |

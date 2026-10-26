@@ -24,6 +24,7 @@ func _ready() -> void:
     Engine.time_scale = 4.0;
     GameClock.set_speed(3);
     _check_curves();
+    world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);     # nobody sleeps in the Town Hall
     _adult = world.pawns[0];
     _baby = world.pawns[1];
     _child = world.pawns[2];
@@ -63,11 +64,12 @@ func _check_curves() -> void:
 
 func _process(_delta:float) -> void:
     var days:float = (GameClock.total_hours - _start_hours) / 24.0;
-    if days >= 2.0 and not _early_checked:
+    if days >= 0.5 and not _early_checked:
         # the baby is only a baby until 5 (3 days from age 2 at 2 days a year), so check it first
         _early_checked = true;
         _expect("baby is indoors", World.alive(_baby) and _baby.is_baby() and _baby.indoors);
-        _expect("baby needs held steady (hunger %.2f)" % _baby.hunger, _baby.hunger > 0.99 and _baby.thirst > 0.99);
+        # half a day in: a baby's hunger falls at half speed (30 hours for anyone else, 60 for a baby), before a carer is called
+        _expect("baby needs fall at half speed (hunger %.2f, expected about 0.8)" % _baby.hunger, absf(_baby.hunger - 0.8) < 0.05);
         _expect("baby is not working", _baby.task == null or _baby.task.kind == &"stay_home");
         _expect("child was not drafted into a profession", _child.profession == JobManager.Profession.LABORER);
     if days < 8.0 or _checked:
@@ -75,7 +77,7 @@ func _process(_delta:float) -> void:
     _checked = true;
     var years:float = days / Defs.ageing_days_per_year;
     _expect("adult aged %.2f years in %.1f days at 2 days a year (expected %.2f)" % [_adult.age - _adult_start_age, days, years], absf(_adult.age - _adult_start_age - years) < 0.2);
-    _expect("child works at half speed", is_equal_approx(_child.work_efficiency(), 0.5));
+    _expect("child works at half speed", is_equal_approx(_child.work_efficiency(), 0.5 * _child.mood_efficiency()));
     _expect("elder died of old age", not World.alive(_elder) and world.death_log.size() > 0 and world.death_log[0]["cause"] == "old age");
     _expect("adult is still alive", World.alive(_adult));
     print("LIFE: elder's death record: ", world.death_log);

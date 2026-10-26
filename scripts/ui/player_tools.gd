@@ -31,6 +31,7 @@ var mode        :int = Mode.SELECT;
 var build_id    :StringName = &"";
 var build_size  :Vector2i = Vector2i.ONE;
 var selected    :Variant = null;
+var relocating  :Building = null;     # while placing a moved building: the one being moved
 var hint        :String = MODE_HINTS[Mode.SELECT];
 var error       :String = "";
 
@@ -84,11 +85,12 @@ func _ready() -> void:
 func set_mode(m:int, id:StringName = &"") -> void:
     mode = m;
     build_id = id;
+    relocating = null;
     if m == Mode.BUILD:
         build_size = Defs.BUILDINGS[id]["size"];
         hint = "%s (%s). %s" % [Defs.BUILDINGS[id]["name"], Defs.cost_string(Defs.BUILDINGS[id]["cost"]), MODE_HINTS[m]];
         if _is_field_mode():
-            hint = "%s. Drag to size it (%d to %d cells a side), or click for a default %dx%d field." % [
+            hint = "%s. Drag to size it (%d to %d cells a side), or click for a default %dx%d." % [
                 Defs.BUILDINGS[id]["name"], FIELD_MIN_SIDE, FIELD_MAX_SIDE, build_size.x, build_size.y];
     else:
         hint = MODE_HINTS[m];
@@ -96,6 +98,21 @@ func set_mode(m:int, id:StringName = &"") -> void:
     _dragging = false;
     _brushing = false;
     mode_changed.emit(mode);
+
+# Picks a new spot for an existing building (see World.relocate): same footprint, a share of the cost.
+func start_relocate(b:Building) -> void:
+    if World.instance.relocation_block_reason(b) != "":
+        return;
+    set_mode(Mode.BUILD, b.def_id);
+    relocating = b;
+    build_size = b.size;
+    hint = "Moving the %s (costs %s). Click the new spot. R rotates. Right-click to cancel." % [b.display_name(), Defs.cost_string(_relocation_cost(b))];
+
+func _relocation_cost(b:Building) -> Dictionary:
+    var c:Dictionary = {};
+    for item in b.def["cost"]:
+        c[item] = maxi(1, ceili(b.def["cost"][item] * Defs.RELOCATE_COST_MULT));
+    return c;
 
 func select(obj:Variant) -> void:
     selected = obj;
@@ -156,8 +173,13 @@ func _on_press() -> void:
                 _drag_start = _hover_cell;
                 return;
             var origin:Vector2i = _build_origin();
-            error = World.instance.can_place(build_id, origin, build_size);
-            if error == "":
+            error = World.instance.can_place(build_id, origin, build_size, relocating != null);
+            if error == "" and relocating != null:
+                var moved:Building = relocating;
+                World.instance.relocate(moved, origin, build_size);
+                set_mode(Mode.SELECT);
+                select(moved);
+            elif error == "":
                 World.instance.place_building(build_id, origin, build_size);
         Mode.HARVEST, Mode.ROAD, Mode.DEMOLISH:
             _dragging = true;
@@ -176,7 +198,7 @@ func _on_release() -> void:
         Mode.BUILD:
             # a plain click (no drag) keeps the default footprint
             var fr:Rect2i = _field_rect();
-            error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "Fields must be at least %dx%d." % [FIELD_MIN_SIDE, FIELD_MIN_SIDE];
+            error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "%s must be at least %dx%d." % [Defs.BUILDINGS[build_id]["name"], FIELD_MIN_SIDE, FIELD_MIN_SIDE];
             if error == "":
                 World.instance.place_building(build_id, fr.position, fr.size);
         Mode.HARVEST:
@@ -238,7 +260,7 @@ func _build_origin() -> Vector2i:
     return Vector2i(roundi(_hover_pt.x - build_size.x * 0.5), roundi(_hover_pt.z - build_size.y * 0.5));
 
 func _is_field_mode() -> bool:
-    return mode == Mode.BUILD and Defs.BUILDINGS[build_id].get("field", false);
+    return mode == Mode.BUILD and Defs.BUILDINGS[build_id].get("drag_size", false);
 
 # The field footprint for the current drag, or the default footprint for a click without a drag.
 func _field_rect() -> Rect2i:
@@ -317,7 +339,7 @@ func _update_ghosts() -> void:
                 _show_box(0, fr, 0.3, _mat_ok if fok else _mat_bad);
                 return;
             var origin:Vector2i = _build_origin();
-            var ok:bool = w.can_place(build_id, origin, build_size) == "";
+            var ok:bool = w.can_place(build_id, origin, build_size, relocating != null) == "";
             var h:float = maxf(0.3, Defs.BUILDINGS[build_id]["height"]);
             _show_box(0, Rect2i(origin, build_size), h, _mat_ok if ok else _mat_bad);
         Mode.HARVEST, Mode.DEMOLISH:

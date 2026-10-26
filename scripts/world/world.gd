@@ -24,6 +24,10 @@ var terrain     :Terrain;
 var nav         :NavGrid;
 var jobs        :JobManager;
 var policies    :Policies = Policies.new();
+var families    :Families;
+var bodies      :Array[Body] = [];
+var child_labor_share:float = 0.0;   # share of the children working right now (0 when the policy forbids it)
+var _next_body_id:int = 1;
 var visuals     :WorldVisuals;
 var tools       :PlayerTools;
 var hud         :HUD;
@@ -92,6 +96,7 @@ func _ready() -> void:
     renderer.name = "Nature";
     add_child(renderer);
     jobs = JobManager.new(self);
+    families = Families.new(self);
     policies.changed.connect(jobs.on_policy_changed);
 
     if loading:
@@ -101,8 +106,7 @@ func _ready() -> void:
         var start:Vector2i = _find_start_cell();
         _clear_nodes(start, 10);
         town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
-        for item in START_STOCK:
-            town_hall.store(item, START_STOCK[item]);
+        _start_colony_goods(start);
         Defs.ageing_days_per_year = 4.0;
         _spawn_settlers(start);
         jobs.sync_targets();
@@ -196,6 +200,70 @@ func _clear_nodes(c:Vector2i, radius:int) -> void:
         if Vector2(rn.cell - c).length() <= radius:
             remove_node(rn);
 
+# A citizen too unhappy to stay walks away: no body, and half the grief.
+func leave_colony(p:Pawn) -> void:
+    if p.removed:
+        return;
+    p.removed = true;
+    p.end_task(false);
+    if p.carry_amount > 0:
+        drop_pile(p.carry_item, p.carry_amount, p.cell());
+        p.clear_carry();
+    if p.home != null:
+        p.home.residents.erase(p);
+    pawns.erase(p);
+    families.on_death(p, -1);
+    jobs.reconcile();
+    notify("%s has left the colony, unhappy." % p.first_name);
+    if tools != null and tools.selected == p:
+        tools.select(null);
+    p.queue_free();
+
+func add_body(p:Pawn, cause:String, at:Vector3) -> Body:
+    var b:Body = Body.new();
+    b.setup(self, _next_body_id, {"name": p.first_name, "age": int(p.age), "cause": cause, "died_hour": GameClock.total_hours}, at);
+    _next_body_id += 1;
+    b.kin = families.kin_of(p);
+    _entities.add_child(b);
+    bodies.append(b);
+    return b;
+
+func remove_body(b:Body) -> void:
+    if b.removed:
+        return;
+    b.removed = true;
+    bodies.erase(b);
+    b.queue_free();
+
+func add_pawn(p:Pawn) -> void:
+    _entities.add_child(p);
+    pawns.append(p);
+
+# The starting upgrades of the chosen difficulty, then the starting goods: into the Town Hall's store room as far as it
+# goes, the rest in a supply cart beside it (gone once empty).
+func _start_colony_goods(start:Vector2i) -> void:
+    for id in Defs.DIFFICULTIES[Defs.difficulty]["town_hall"]:
+        town_hall.upgrades_done[id] = true;
+    var left:Dictionary = {};
+    for item in START_STOCK:
+        var rest:int = START_STOCK[item] - town_hall.store(item, START_STOCK[item]);
+        if rest > 0:
+            left[item] = rest;
+    if left.is_empty():
+        return;
+    var size:Vector2i = Defs.BUILDINGS[&"cart"]["size"];
+    for r in range(3, 14):
+        for dz in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if maxi(absi(dx), absi(dz)) != r:
+                    continue;
+                var o:Vector2i = start + Vector2i(dx, dz);
+                if can_place(&"cart", o, size) == "" and _rect_free_of_nodes(Rect2i(o, size)):
+                    var cart:Building = place_building(&"cart", o, size, true);
+                    for item in left:
+                        cart.store(item, left[item]);
+                    return;
+
 func _spawn_settlers(start:Vector2i) -> void:
     var used:Array[String] = [];
     for i in START_PAWNS:
@@ -222,6 +290,9 @@ func serialize() -> Dictionary:
     var pawn_list:Array = [];
     for p in pawns:
         pawn_list.append(p.to_dict());
+    var body_list:Array = [];
+    for b in bodies:
+        body_list.append(b.to_dict());
     var pile_list:Array = [];
     for pl in piles:
         pile_list.append(pl.to_dict());
@@ -229,7 +300,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
+        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -248,8 +319,14 @@ func _restore_entities(save:Dictionary) -> void:
     for bd in save["buildings"]:
         var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true);
         b.restore_dict(bd);
-        if bd["id"] == &"town_hall":
+        if bd["id"] == &"town_hall" and b.is_complete():
             town_hall = b;
+    for i in buildings.size():
+        var bd2:Dictionary = save["buildings"][i];
+        if bd2.get("reloc_from", -1) >= 0:
+            buildings[i].relocating_from = buildings[bd2["reloc_from"]];
+        if bd2.get("reloc_to", -1) >= 0:
+            buildings[i].relocating_to = buildings[bd2["reloc_to"]];
     for pd in save["piles"]:
         var pl:GroundPile = GroundPile.new();
         pl.setup(self, pd["item"], pd["amount"], pd["cell"]);
@@ -264,6 +341,23 @@ func _restore_entities(save:Dictionary) -> void:
         if pd["home"] >= 0 and pd["home"] < buildings.size():
             p.home = buildings[pd["home"]];
             p.home.residents.append(p);
+    for i in pawns.size():
+        var pd:Dictionary = save["pawns"][i];
+        var partner_i:int = pd.get("partner", -1);
+        if partner_i >= 0 and partner_i < pawns.size():
+            pawns[i].partner = pawns[partner_i];
+        for pi in pd.get("parents", []):
+            if pi >= 0 and pi < pawns.size():
+                pawns[i].parents.append(pawns[pi]);
+    _next_body_id = save.get("next_body_id", 1);
+    for bd in save.get("bodies", []):
+        var b:Body = Body.new();
+        b.setup(self, bd["id"], bd, bd["position"]);
+        for ki in bd["kin"]:
+            if ki >= 0 and ki < pawns.size():
+                b.kin.append(pawns[ki]);
+        _entities.add_child(b);
+        bodies.append(b);
     _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
     renderer.mark_dirty();
     rng.state = save["rng_state"];
@@ -365,8 +459,13 @@ func set_designated(rn:ResourceNode, on:bool) -> void:
 # Buildings
 
 # Returns "" when placement is allowed, otherwise a reason.
-func can_place(def_id:StringName, origin:Vector2i, size:Vector2i) -> String:
+# relocating: the building is being moved, so a unique one may be placed again.
+func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:bool = false) -> String:
     var r:Rect2i = Rect2i(origin, size);
+    if Defs.BUILDINGS[def_id].get("unique", false) and not relocating:
+        for b in buildings:
+            if b.def_id == def_id:
+                return "There is only one %s" % Defs.BUILDINGS[def_id]["name"];
     if not Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE).encloses(r):
         return "Out of bounds";
     for z in range(r.position.y, r.end.y):
@@ -377,7 +476,7 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i) -> String:
             if occupant[idx(c)] != null:
                 return "Something is already built here";
     var hr:Vector2 = terrain.rect_height_range(r);
-    var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("field", false) else 1.0);
+    var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("drag_size", false) else 1.0);
     if hr.y - hr.x > limit:
         return "Ground is too steep (flatten it first)";
     return "";
@@ -387,9 +486,9 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
-    if not is_field and not restoring:
+    if not def.get("drag_size", false) and not restoring:
         terrain.flatten_rect(r);
-    var b:Building = Field.new() if is_field else Building.new();
+    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
@@ -413,9 +512,6 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     return b;
 
 func remove_building(b:Building, refund:bool) -> void:
-    if b == town_hall:
-        notify("The Town Hall can't be demolished.");
-        return;
     if b.is_storage() and not b.is_empty():
         notify("%s can't be demolished until it is empty." % b.display_name());
         return;
@@ -424,7 +520,7 @@ func remove_building(b:Building, refund:bool) -> void:
     for item in b.inputs:
         if b.inputs[item] > 0:
             deposit(item, b.inputs[item], b.position);
-    if refund:
+    if refund and not b.def.get("no_refund", false):
         var share:float = 1.0 if not b.is_complete() else 0.5;
         var all:Dictionary = b.all_delivered();
         for item in all:
@@ -443,29 +539,96 @@ func remove_building(b:Building, refund:bool) -> void:
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.NONE);
     b.removed = true;
     buildings.erase(b);
+    if b == town_hall:
+        town_hall = null;
+        notify("The Town Hall is gone. Build a new one from the menu.");
+    if b.relocating_to != null and alive(b.relocating_to):
+        b.relocating_to.relocating_from = null;      # the new site stands on its own, still at the moving price
+    if b.relocating_from != null and alive(b.relocating_from):
+        b.relocating_from.relocating_to = null;
     _refresh_nav_rect(r);
     b.queue_free();
+    families.assign_homes();
 
 func is_site_clear(b:Building) -> bool:
-    var r:Rect2i = b.rect();
+    return _rect_free_of_nodes(b.rect());
+
+func _rect_free_of_nodes(r:Rect2i) -> bool:
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             if node_at[idx(Vector2i(x, z))] != null:
                 return false;
     return true;
 
+# --------------------------------
+# Town Hall features, relocation
+
+# Whether the Town Hall's governance upgrade is built (it unlocks the Policies panel).
+func has_governance() -> bool:
+    return alive(town_hall) and town_hall.is_complete() and town_hall.has_upgrade(&"governance");
+
+# Why this building can't be moved right now, or "" when it can.
+func relocation_block_reason(b:Building) -> String:
+    if not b.def.get("relocatable", true):
+        return "Can't be moved";
+    if not b.is_complete():
+        return "Not finished";
+    if b.upgrading != &"":
+        return "Upgrade in progress";
+    if b.relocating_to != null and alive(b.relocating_to):
+        return "Already being moved";
+    if b.relocating_from != null:
+        return "This is the new site";
+    if b.is_storage() and not b.is_empty():
+        return "Empty it first";
+    return "";
+
+# Starts building the same thing at a new spot for a share of the cost (Defs.RELOCATE_COST_MULT). The old building keeps
+# working, takes nothing new, and is replaced once the new one is finished.
+func relocate(b:Building, origin:Vector2i, size:Vector2i) -> Building:
+    if relocation_block_reason(b) != "" or can_place(b.def_id, origin, size, true) != "":
+        return null;
+    var site:Building = place_building(b.def_id, origin, size);
+    site.cost_mult = Defs.RELOCATE_COST_MULT;
+    site.relocating_from = b;
+    b.relocating_to = site;
+    notify("Moving the %s: a new one is being built." % b.display_name());
+    return site;
+
+# The new building takes over: settings, filters, upgrades, fuel, inputs, residents, what is stored, and the Town Hall role.
+func _finish_relocation(site:Building) -> void:
+    var old:Building = site.relocating_from;
+    site.relocating_from = null;
+    old.relocating_to = null;
+    site.settings = old.settings.duplicate();
+    site.forbidden = old.forbidden.duplicate();
+    site.upgrades_done = old.upgrades_done.duplicate();
+    site.dig_progress = old.dig_progress.duplicate();
+    site.fuel = old.fuel;
+    old.fuel = 0;
+    site.inputs = old.inputs.duplicate();
+    old.inputs.clear();
+    site.stored = old.stored.duplicate();
+    old.stored.clear();
+    for p in old.residents.duplicate():
+        families.move_home(p, site);
+    if old == town_hall:
+        town_hall = site;
+    old.in_reserved = 0;
+    old.out_reserved.clear();
+    remove_building(old, false);
+
 func on_building_completed(b:Building) -> void:
     if b is Field:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.TILLED);
-    if b.def.has("beds") and b != town_hall:
-        for p in pawns:
-            if b.residents.size() >= b.def["beds"]:
-                break;
-            if p.home == null:
-                p.home = b;
-                b.residents.append(p);
+    if b.def_id == &"town_hall" and town_hall == null:
+        town_hall = b;
+    if b.relocating_from != null and alive(b.relocating_from):
+        _finish_relocation(b);
+    if b.def.has("beds"):
+        families.assign_homes();
     if hud != null:
         notify("%s completed." % b.display_name());
 
@@ -513,11 +676,11 @@ func warm_shelter_for(p:Pawn) -> Building:
         return b.is_complete() and b.is_heated());
     return heated if heated != null else shelter_for(p);
 
+# Where this citizen sleeps: their own home, if it is built; otherwise nowhere (the Town Hall shelters no one).
 func shelter_for(p:Pawn) -> Building:
     if alive(p.home) and p.home.is_complete():
         return p.home;
-    return nearest_building(p.position, func(b:Building) -> bool:
-        return b.is_complete() and b.def.has("beds"));
+    return null;
 
 # --------------------------------
 # Ground piles
@@ -579,19 +742,24 @@ func set_road(c:Vector2i, on:bool) -> void:
 # Pawns
 
 # at_home: a natural death (old age) happens in bed when the citizen has a home.
+@warning_ignore("integer_division")
 func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
     if p.removed:
         return;
     p.removed = true;
     p.end_task(false);
-    var spot:Vector3 = p.home.position if at_home and alive(p.home) else p.position;
+    var spot:Vector3 = p.position;
+    if at_home and alive(p.home):
+        spot = terrain.cell_center(p.home.origin + Vector2i(p.home.size.x / 2, p.home.size.y));     # just outside the door
     if p.carry_amount > 0:
         drop_pile(p.carry_item, p.carry_amount, terrain.world_to_cell(spot));
         p.clear_carry();
     death_log.append({"name": p.first_name, "age": int(p.age), "cause": cause, "when": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "profession": p.profession_name()});
     if p.home != null:
         p.home.residents.erase(p);
+    var body:Body = add_body(p, cause, spot);
     pawns.erase(p);
+    families.on_death(p, body.id);
     jobs.reconcile();
     notify("%s has died of %s." % [p.first_name, cause]);
     if tools != null and tools.selected == p:
@@ -665,6 +833,14 @@ func _on_terrain_changed(r:Rect2i) -> void:
 
 func _on_hour(_h:int) -> void:
     jobs.reconcile();
+    families.on_hour();
+    for b in buildings.duplicate():
+        if b.def.get("temporary", false) and b.is_complete() and b.is_empty():
+            remove_building(b, false);      # the supply cart, once emptied
+    _update_child_labor();
+    for b in bodies.duplicate():
+        if b.expired():
+            remove_body(b);
     for b in buildings:
         b.on_hour();
         if b.is_storage():
@@ -690,9 +866,20 @@ func _check_storage_full() -> void:
     elif Stock.used() < cap * 0.9:
         _storage_warned = false;
 
+func _update_child_labor() -> void:
+    var kids:int = 0;
+    var working:int = 0;
+    for p in pawns:
+        if p.is_child():
+            kids += 1;
+            if p.is_laboring():
+                working += 1;
+    child_labor_share = float(working) / kids if kids > 0 and policies.is_on(&"child_labor") else 0.0;
+
 func _on_day(_d:int) -> void:
     for b in buildings:
         b.on_day();
+    families.on_day();
     if _spoiled_today >= 5:
         notify("%d units of food spoiled yesterday." % _spoiled_today);
     _spoiled_today = 0;

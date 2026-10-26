@@ -14,6 +14,7 @@ const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls be
 
 var needs:NeedsTasks;
 var school:SchoolTasks;
+var burial:BurialTasks;
 var production:ProductionTasks;
 var targets:Dictionary = {};       # profession -> how many citizens the player wants in it
 
@@ -21,10 +22,13 @@ func _init(w:World) -> void:
     world = w;
     needs = NeedsTasks.new(w);
     school = SchoolTasks.new(w);
+    burial = BurialTasks.new(w);
     production = ProductionTasks.new(w);
 
 func choose_task(p:Pawn) -> Task:
     var t:Task = null;
+    if p.is_baby():
+        return needs.stay_home_task(p);     # a carer brings a baby what it needs
     if not p.needs_blocked():
         var wants:bool = false;
         if p.thirst < 0.45:
@@ -41,9 +45,6 @@ func choose_task(p:Pawn) -> Task:
         if wants:
             p.block_needs(1.5);
 
-    if p.is_baby():
-        return needs.stay_home_task(p);
-
     var night:bool = GameClock.is_night();
     if p.carry_amount > 0:
         # no topping up the load when school is waiting for a child or the teacher
@@ -59,6 +60,14 @@ func choose_task(p:Pawn) -> Task:
 
     if night or p.energy < 0.15:
         t = needs.sleep_task(p);
+        if t != null:
+            return t;
+
+    if p.is_adult():
+        t = needs.care_task(p);
+        if t != null:
+            return t;
+        t = burial.bury_task(p);     # kin first: laborers take over after a while (see Body.can_be_taken_by)
         if t != null:
             return t;
 

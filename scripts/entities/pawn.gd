@@ -15,6 +15,7 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury"];
 const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul"];
 
 const MALE_NAMES        :Array[String] = ["Aldric", "Bram", "Cedric", "Dunstan", "Edwin", "Godric", "Hal", "Osric", "Rowan", "Wystan", "Alden", "Tobin"];
@@ -28,6 +29,16 @@ var job_xp      :Dictionary = {};   # profession -> experience in that job, as a
 var age         :float;         # in citizen years (see Defs.ageing_days_per_year)
 var profession  :int = JobManager.Profession.LABORER;
 var home        :Building = null;
+var partner     :Pawn = null;
+var parents     :Array[Pawn] = [];     # living parents (a parent who dies is removed), empty for the first settlers
+var carer       :Pawn = null;          # who is on the way to feed this baby
+var due_hour    :float = -1.0;         # game hour a baby is due (this citizen is carrying one), or -1
+var pair_ready_hour:float = 0.0;       # not before this hour can this citizen pair again (after losing a partner)
+var conceive_ready_hour:float = 0.0;   # nor conceive again before this
+var mood        :float = Defs.MOOD_BASE;   # happiness: follows the target from happiness_factors() slowly
+var grief       :Array[Dictionary] = [];   # {amount, start, until, body}: fades linearly from start to until
+var homeless_hours:float = 0.0;            # with no home at all (a shack is a home here)
+var _unhappy_hours:float = 0.0;            # in a row, below Defs.LEAVE_BELOW
 
 # needs, 0..1 (1 = fully satisfied)
 var hunger      :float = 1.0;
@@ -85,6 +96,10 @@ func to_dict() -> Dictionary:
         "hunger": hunger, "thirst": thirst, "energy": energy, "warmth": warmth, "health": health,
         "general_xp": general_xp, "job_xp": job_xp.duplicate(), "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
         "position": position, "home": world.buildings.find(home) if home != null else -1,
+        "partner": world.pawns.find(partner) if partner != null else -1,
+        "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
+        "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
+        "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
 @warning_ignore("integer_division")
@@ -108,6 +123,14 @@ func restore(w:World, d:Dictionary) -> void:
     carry_amount = d["carry_amount"];
     tool = d["tool"];
     tool_uses = d["tool_uses"];
+    due_hour = d.get("due_hour", -1.0);
+    pair_ready_hour = d.get("pair_ready_hour", 0.0);
+    conceive_ready_hour = d.get("conceive_ready_hour", 0.0);
+    mood = d.get("mood", Defs.MOOD_BASE);
+    for g in d.get("grief", []):
+        grief.append(g);
+    _unhappy_hours = d.get("unhappy_hours", 0.0);
+    homeless_hours = d.get("homeless_hours", 0.0);
     name = "Pawn_%s" % first_name;
     _build_look();
     var c:Vector2i = w.nav.nearest_walkable(w.terrain.world_to_cell(d["position"]), 8);
@@ -175,7 +198,15 @@ func stage_name() -> String:
 
 # How fast this citizen works compared with a prime-age adult.
 func work_efficiency() -> float:
-    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp);
+    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp) * mood_efficiency();
+
+# Unhappy citizens work a little slower.
+func mood_efficiency() -> float:
+    return lerpf(Defs.MOOD_SLOW_MIN, 1.0, clampf(mood / Defs.MOOD_SLOW_BELOW, 0.0, 1.0));
+
+# Working (not school, needs, sleep, care or waiting about); children doing this is what child labor means.
+func is_laboring() -> bool:
+    return task != null and not NON_LABOR_KINDS.has(task.kind);
 
 # Studies for dh game hours.
 func learn(dh:float, mult:float = 1.0) -> void:
@@ -199,17 +230,22 @@ func _age_tick(dh:float) -> void:
 
 func _update_needs(dh:float) -> void:
     _age_tick(dh);
-    if removed or is_baby():
-        return;     # babies are looked after by their household: their needs hold steady
-    hunger = maxf(0.0, hunger - dh / HUNGER_HOURS);
-    thirst = maxf(0.0, thirst - dh / THIRST_HOURS);
-    if sleeping:
-        energy = minf(1.0, energy + dh * SLEEP_RESTORE);
+    if removed:
+        return;
+    var need_mult:float = Defs.BABY_NEED_MULT if is_baby() else 1.0;      # a carer feeds a baby (see Families)
+    hunger = maxf(0.0, hunger - dh * need_mult / HUNGER_HOURS);
+    thirst = maxf(0.0, thirst - dh * need_mult / THIRST_HOURS);
+    if is_baby():
+        energy = 1.0;
+    elif sleeping:
+        energy = minf(1.0, energy + dh * SLEEP_RESTORE * (1.0 if indoors else Defs.OUTDOOR_SLEEP_MULT));
     else:
         energy = maxf(0.0, energy - dh / ENERGY_HOURS);
     var temp:float = Weather.temperature;
     if indoors and (shelter == null or not World.alive(shelter) or shelter.is_heated()):
         warmth = minf(1.0, warmth + dh * 0.25);
+    elif indoors and shelter.def.get("shack", false):
+        warmth = clampf(warmth + dh * (Defs.SHACK_WARMTH_RATE - maxf(0.0, 8.0 - temp) * Defs.SHACK_COLD_DRAIN), 0.0, 1.0);
     elif indoors and temp < 8.0:
         # a cold house keeps the wind off, but nobody warms up in it
         warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.004);
@@ -219,6 +255,9 @@ func _update_needs(dh:float) -> void:
         warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.006);
     else:
         warmth = minf(1.0, warmth + dh * 0.1);
+    _update_mood(dh);
+    if removed:
+        return;
     var damage:float = 0.0;
     if hunger <= 0.0:
         damage += 1.0 / 36.0;
@@ -256,7 +295,84 @@ func _death_cause() -> String:
     return "poor health";
 
 func happiness() -> float:
-    return clampf((hunger + thirst + energy + warmth + health) / 5.0 + (0.1 if home != null else -0.1), 0.0, 1.0);
+    return mood;
+
+# --------------------------------
+# Happiness
+
+# The named reasons behind the target: [label, value] pairs added to Defs.MOOD_BASE. Babies have none.
+func happiness_factors() -> Array:
+    var f:Array = [];
+    if is_baby():
+        return f;
+    for n in [["Hungry", hunger, 0.3], ["Thirsty", thirst, 0.3], ["Cold", warmth, 0.3], ["Unwell", health, 0.2], ["Tired", energy, 0.15]]:
+        var short:float = clampf((0.5 - n[1]) / 0.5, 0.0, 1.0);
+        if short > 0.0:
+            f.append([n[0], -n[2] * short]);
+    if home == null:
+        f.append(["No home", -lerpf(Defs.HOMELESS_MOOD.x, Defs.HOMELESS_MOOD.y, clampf(homeless_hours / (Defs.HOMELESS_MOOD_DAYS * GameClock.HOURS_PER_DAY), 0.0, 1.0))]);
+        if Weather.temperature < Defs.HEATING_BELOW:
+            f.append(["Sleeping in the cold", -Defs.COLD_SLEEP_MOOD]);
+    elif home.def.get("shack", false):
+        f.append(["Lives in a shack", -Defs.SHACK_MOOD]);
+    else:
+        f.append(["Has a home", 0.1]);
+        if Weather.temperature < Defs.HEATING_BELOW and World.alive(home) and not home.is_heated():
+            f.append(["Cold house", -0.1]);
+    var kinds:int = 0;
+    for item in Defs.ITEMS:
+        if Defs.is_food(item) and Stock.amount(item) > 0:
+            kinds += 1;
+    if kinds >= 2:
+        f.append(["Varied diet", 0.05 if kinds == 2 else 0.1]);
+    var sorrow:float = grief_now();
+    if sorrow > 0.0:
+        f.append(["Grieving", -sorrow]);
+    if world.child_labor_share > 0.0:
+        f.append(["Children are working", -world.child_labor_share * (Defs.CHILD_LABOR_MOOD_CHILD if is_child() else Defs.CHILD_LABOR_MOOD_ADULT)]);
+    if World.alive(home):
+        for b in home.residents:
+            if b.is_baby() and (b.hunger < 0.3 or b.thirst < 0.3):
+                f.append(["A baby is going hungry", -0.15]);
+                break;
+    return f;
+
+func target_mood() -> float:
+    var t:float = Defs.MOOD_BASE;
+    for f in happiness_factors():
+        t += f[1];
+    return clampf(t, 0.0, 1.0);
+
+func grief_now() -> float:
+    var total:float = 0.0;
+    for g in grief:
+        var span:float = g["until"] - g["start"];
+        total += g["amount"] * clampf(1.0 - (GameClock.total_hours - g["start"]) / span, 0.0, 1.0);
+    return total;
+
+func add_grief(amount:float, days:float, body_id:int) -> void:
+    grief.append({"amount": amount, "start": GameClock.total_hours, "until": GameClock.total_hours + days * GameClock.HOURS_PER_DAY, "body": body_id});
+
+# A buried body softens the grief felt for it.
+func soften_grief(body_id:int) -> void:
+    for g in grief:
+        if g["body"] == body_id:
+            g["amount"] *= Defs.GRAVE_SOFTEN;
+
+func _update_mood(dh:float) -> void:
+    if is_baby():
+        return;
+    homeless_hours = homeless_hours + dh if home == null else 0.0;
+    for i in range(grief.size() - 1, -1, -1):
+        if grief[i]["until"] <= GameClock.total_hours:
+            grief.remove_at(i);
+    mood += (target_mood() - mood) * (1.0 - exp(-dh / Defs.MOOD_HOURS));
+    if mood < Defs.LEAVE_BELOW:
+        _unhappy_hours += dh;
+        if _unhappy_hours >= Defs.LEAVE_AFTER_DAYS * GameClock.HOURS_PER_DAY:
+            world.leave_colony(self);
+    elif mood > Defs.LEAVE_RECOVER:
+        _unhappy_hours = 0.0;
 
 # --------------------------------
 # Carrying
@@ -415,13 +531,34 @@ func info_text() -> String:
         s += "Tool: none\n";
     if carry_amount > 0:
         s += "Carrying: %d %s\n" % [carry_amount, Defs.item_name(carry_item)];
-    s += "Home: %s\n\n" % (home.display_name() if home != null else "none");
+    s += "Home: %s\n" % (home.display_name() if home != null else "none");
+    if World.alive(partner):
+        s += "Partner: %s%s\n" % [partner.first_name, " (expecting)" if partner.due_hour >= 0.0 else ""];
+    if due_hour >= 0.0:
+        s += "Expecting a baby\n";
+    var kids:PackedStringArray = [];
+    for k in world.pawns:
+        if k.parents.has(self):
+            kids.append(k.first_name);
+    if not kids.is_empty():
+        s += "Children: %s\n" % ", ".join(kids);
+    var par:PackedStringArray = [];
+    for k in parents:
+        par.append(k.first_name);
+    if not par.is_empty():
+        s += "Parents: %s\n" % ", ".join(par);
+    elif not is_adult():
+        s += "Parents: none (orphan)\n";
+    s += "\n";
     s += "Hunger  %s\n" % _bar(hunger);
     s += "Thirst  %s\n" % _bar(thirst);
     s += "Energy  %s\n" % _bar(energy);
     s += "Warmth  %s\n" % _bar(warmth);
     s += "Health  %s\n" % _bar(health);
-    s += "Happy   %s\n" % _bar(happiness());
+    if not is_baby():
+        s += "Happy   %s\n" % _bar(happiness());
+        for f in happiness_factors():
+            s += "  %s%d%% %s\n" % ["+" if f[1] >= 0.0 else "", roundi(f[1] * 100.0), f[0]];
     return s;
 
 func _bar(v:float) -> String:

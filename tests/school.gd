@@ -41,6 +41,8 @@ func _ready() -> void:
         if world.can_place(&"school", o, Vector2i(4, 4)) == "":
             school = world.place_building(&"school", o, Vector2i(4, 4), true);
             break;
+    for hz in 3:
+        world.place_building(&"house", th.origin + Vector2i(-8, -10 + hz * 4), Vector2i(3, 3), true);     # beds for the children: nobody sleeps in the Town Hall
     for p in world.pawns:
         p.profession = JobManager.Profession.LABORER;
     for i in KIDS:
@@ -51,6 +53,7 @@ func _ready() -> void:
         world._entities.add_child(k);
         world.pawns.append(k);
         kids.append(k);
+    world.families.assign_homes();
     world.jobs.sync_targets();
     world.jobs.change_profession(JobManager.Profession.TEACHER, 1);
     for p in world.pawns:
@@ -107,7 +110,7 @@ func _process(_delta:float) -> void:
         if p.is_adult() and p.general_xp > 0.0:
             adults_with_xp += 1;
     _expect("adults gained no schooling", adults_with_xp == 0);
-    _expect("a child's work speed includes schooling", is_equal_approx(kids[0].work_efficiency(), Defs.CHILD_EFFICIENCY * (1.0 + kids[0].general_xp)));
+    _expect("a child's work speed includes schooling", is_equal_approx(kids[0].work_efficiency(), Defs.CHILD_EFFICIENCY * (1.0 + kids[0].general_xp) * kids[0].mood_efficiency()));
     get_tree().quit();
 
 func _expect(what:String, ok:bool) -> void:

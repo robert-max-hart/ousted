@@ -55,15 +55,39 @@ const ITEMS:Dictionary = {
 # walkable: pawns can walk through the footprint
 const BUILDINGS:Dictionary = {
     &"town_hall": {
-        "name": "Town Hall", "size": Vector2i(4, 4), "cost": {}, "work": 0.0,
+        "name": "Town Hall", "size": Vector2i(4, 4), "cost": {&"wood": 30, &"stone": 10}, "work": 20.0,
         "shape": "house", "height": 3.0, "color": Color(0.62, 0.48, 0.34), "roof": Color(0.42, 0.22, 0.16),
-        "storage": true, "capacity": 300, "water": true, "beds": 10,
-        "desc": "The heart of the colony. Stores goods, has a well and shelters the homeless.",
+        "water": true, "unique": true, "heated_by": &"heating",
+        "upgrades": {
+            &"storage": {
+                "name": "Storage", "cost": {&"wood": 20, &"stone": 5}, "work": 10.0, "capacity": 100,
+                "desc": "A store room: the Town Hall holds 100 goods.",
+            },
+            &"storage2": {
+                "name": "More storage", "cost": {&"wood": 40, &"stone": 15}, "work": 20.0, "capacity": 200, "requires": [&"storage"],
+                "desc": "A bigger store room: 200 more goods (300 in all).",
+            },
+            &"heating": {
+                "name": "Hearth", "cost": {&"wood": 10, &"stone": 15}, "work": 10.0,
+                "desc": "A fire that costs nothing to keep. Anyone can warm up here, but nobody sleeps here.",
+            },
+            &"governance": {
+                "name": "Governance", "cost": {&"wood": 30, &"stone": 10}, "work": 15.0,
+                "desc": "Unlocks the Policies panel (and later the ledger and history).",
+            },
+        },
+        "desc": "The heart of the colony: a well, and nothing else until it is upgraded. It shelters no one. There is only one, but a new one can be built if it is lost, and it can be moved.",
+    },
+    &"cart": {
+        "name": "Supply Cart", "size": Vector2i(2, 1), "cost": {}, "work": 0.0,
+        "shape": "cart", "height": 0.7, "color": Color(0.55, 0.4, 0.25),
+        "storage": true, "capacity": 250, "temporary": true, "relocatable": false,
+        "desc": "The settlers' starting goods. It takes nothing new and is gone once it is empty.",
     },
     &"house": {
         "name": "Wooden House", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 4}, "work": 24.0,
         "shape": "house", "height": 2.2, "color": Color(0.6, 0.45, 0.3), "roof": Color(0.5, 0.3, 0.18),
-        "beds": 5, "fuel_capacity": 40,
+        "beds": 6, "fuel_capacity": 40,
         "controls": [
             {"id": "heating", "type": "toggle", "label": "Heating", "default": true},
             {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
@@ -156,15 +180,27 @@ const BUILDINGS:Dictionary = {
         "worker_slots": 1, "profession": "TEACHER", "school_capacity": 12,
         "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",
     },
+    &"shack": {
+        "name": "Shack", "size": Vector2i(2, 2), "cost": {&"wood": 3}, "work": 3.0,
+        "shape": "house", "height": 1.3, "color": Color(0.5, 0.42, 0.32), "roof": Color(0.36, 0.3, 0.22),
+        "beds": 1, "shack": true, "no_refund": true, "relocatable": false,
+        "desc": "A bare shelter for one, put up by the homeless. It keeps a little warmth in, counts as being homeless for happiness, and demolishing it returns nothing.",
+    },
     &"field": {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
         "shape": "field", "height": 0.0, "color": Color(0.4, 0.28, 0.18),
-        "field": true, "walkable": true,
+        "field": true, "drag_size": true, "walkable": true, "relocatable": false,
         "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector.",
+    },
+    &"graveyard": {
+        "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
+        "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
+        "graveyard": true, "drag_size": true, "walkable": true, "relocatable": false,
+        "desc": "One grave per square. Citizens bury the dead here, which softens the grief. A grave frees its square after 10 years.",
     },
 };
 
-const BUILD_MENU:Array[StringName] = [&"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"school", &"field"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions
 # min_temp:   no growth below this; also the planting threshold
@@ -219,6 +255,68 @@ const OLD_AGE_EFFICIENCY:Array = [[60.0, 1.0], [75.0, 0.95], [90.0, 0.4]];
 const OLD_AGE_DEATH_PER_YEAR:Array = [[59.99, 0.0], [60.0, 0.02], [70.0, 0.05], [75.0, 0.10], [85.0, 0.20], [90.0, 0.35], [100.0, 0.60]];
 static var ageing_days_per_year:float = 4.0;
 
+# Families (decided 2026-10-25): adults within PAIR_MAX_AGE_GAP years pair up automatically, with no sex tracked. A
+# pair has a baby only while it lives in a house with a free slot. The chances are per calendar day; the exact
+# numbers are my picks to tune. Babies need half the food and water of anyone else, supplied by a carer.
+const PAIR_MAX_AGE_GAP  :float = 10.0;
+const PAIR_CHANCE_PER_DAY:float = 0.3;
+const WIDOW_WAIT_DAYS   :float = 4.0;     # before a widowed citizen can pair again
+const FERTILE_FROM      :float = 18.0;
+const FERTILE_TO        :float = 40.0;
+const BIRTH_CHANCE_PER_DAY:float = 0.12;  # at full food and a warm house
+const PREGNANCY_DAYS    :float = 3.0;
+const POSTPARTUM_DAYS   :float = 8.0;     # before the pair can conceive again
+const BABY_NEED_MULT    :float = 0.5;     # hunger and thirst fall this much as fast for a baby
+const BABY_CARE_BELOW   :float = 0.7;     # a carer comes once a baby's hunger or thirst is under this
+const FOOD_PER_PAWN_PLENTY:float = 30.0;  # food per citizen at which births are at full chance
+const STARVING_BIRTH_MULT:float = 0.2;    # chance multiplier with no food, and with a cold house
+
+# Difficulty (decided 2026-10-25; the setting itself comes with the menus in M8, so a new game uses `difficulty`):
+# which Town Hall upgrades a colony starts with. Starting goods go into the Town Hall's store room first and the
+# rest into a supply cart that disappears when empty.
+const DIFFICULTIES:Dictionary = {
+    &"hard": {"name": "Hard", "town_hall": []},
+    &"normal": {"name": "Normal", "town_hall": [&"storage"]},
+    &"easy": {"name": "Easy", "town_hall": [&"storage", &"storage2", &"heating"]},
+};
+static var difficulty:StringName = &"normal";
+
+# Relocating a building (any one that can move) costs this share of its build cost and work; the old one goes with no refund.
+const RELOCATE_COST_MULT:float = 0.5;
+
+# Happiness, grief and burial (decided 2026-10-25). Happiness is a stored value that moves toward a target made of
+# named factors (Pawn.happiness_factors); the numbers are my picks to tune.
+const MOOD_BASE         :float = 0.65;
+const MOOD_HOURS        :float = 12.0;    # how quickly happiness follows its target (a time constant)
+const MOOD_SLOW_BELOW   :float = 0.4;     # under this, work gets slower, down to MOOD_SLOW_MIN at zero
+const MOOD_SLOW_MIN     :float = 0.85;
+const LEAVE_BELOW       :float = 0.15;    # this unhappy for LEAVE_AFTER_DAYS in a row and a citizen leaves
+const LEAVE_RECOVER     :float = 0.25;    # the count starts over once happiness is back over this
+const LEAVE_AFTER_DAYS  :float = 5.0;
+const CHILD_LABOR_MOOD_CHILD:float = 0.25;   # penalty for a child at full child labor, and for an adult
+const CHILD_LABOR_MOOD_ADULT:float = 0.1;
+const BIRTH_MOOD_RANGE  :Vector2 = Vector2(0.6, 1.2);   # birth chance multiplier from unhappy to happy parents
+# [amount, days it fades over] for the partner, a parent or child, a sibling, and everyone else
+const GRIEF_PARTNER     :Vector2 = Vector2(0.4, 12.0);
+const GRIEF_FAMILY      :Vector2 = Vector2(0.3, 12.0);
+const GRIEF_SIBLING     :Vector2 = Vector2(0.1, 6.0);
+const GRIEF_COLONY      :Vector2 = Vector2(0.04, 3.0);
+const GRIEF_LEFT_MULT   :float = 0.5;     # someone leaving hurts half as much as a death
+const GRAVE_SOFTEN      :float = 0.5;     # grief left once the body is buried
+const BODY_FAMILY_FIRST_HOURS:float = 6.0; # only kin may carry a body in this time
+const BODY_LINGER_DAYS  :float = 6.0;     # an unburied body vanishes after this
+const GRAVE_DECAY_YEARS :float = 10.0;    # calendar years before a grave frees its square
+
+# Homelessness (decided 2026-10-25): no bed means sleeping outside; a shack is a poor bed.
+const SHACK_AFTER_HOURS :float = 6.0;     # homeless this long before a shack is put up
+const OUTDOOR_SLEEP_MULT:float = 0.5;     # energy recovered sleeping outside, against in a bed
+const SHACK_WARMTH_RATE :float = 0.06;    # warmth per hour gained in a shack (a heated house gives 0.25)
+const SHACK_COLD_DRAIN  :float = 0.004;   # per hour per degree under 8 C, in a shack (outside it is 0.006)
+const HOMELESS_MOOD     :Vector2 = Vector2(0.15, 0.30);   # penalty at once, and after HOMELESS_MOOD_DAYS
+const HOMELESS_MOOD_DAYS:float = 10.0;
+const SHACK_MOOD        :float = 0.1;
+const COLD_SLEEP_MOOD   :float = 0.1;
+
 # Schooling (decided 2026-10-23): children study 8:00 to 16:00 with a teacher present. School builds general
 # experience, which speeds up all work. Gains get harder as the value rises: a child at school for every school
 # hour from 5 to 17 ends up about 23% faster.
@@ -250,6 +348,10 @@ static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
 # Policies (decided 2026-10-23): colony-wide on/off rules the player sets in the HUD, saved with the game.
 # Each is id -> {name, desc, default}. Add a rule here, then read it with World.instance.policies.is_on(id).
 const POLICIES:Dictionary = {
+    &"build_shacks": {
+        "name": "Homeless build shacks", "default": true,
+        "desc": "A citizen with no home for a few hours gets a shack (3 wood, lost if demolished). Off, they sleep outside until a house has room.",
+    },
     &"child_labor": {
         "name": "Child labor", "default": true,
         "desc": "Children (5 to 17) with no school to attend work as laborers at half speed. Forbidden, they stay home instead.",

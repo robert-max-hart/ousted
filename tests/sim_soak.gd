@@ -12,6 +12,7 @@ var world:World;
 var _last_day:int = -1;
 
 func _ready() -> void:
+    Defs.difficulty = &"easy";        # the whole starting stock fits in the Town Hall
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     Engine.time_scale = 4.0;

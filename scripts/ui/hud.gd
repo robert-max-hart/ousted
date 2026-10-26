@@ -22,6 +22,8 @@ var _info       :PanelContainer;
 var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
+var _move_btn   :Button;
+var _policies_btn:Button;
 var _filter_box :VBoxContainer;
 var _controls_box:VBoxContainer;
 var _info_scroll:ScrollContainer;
@@ -84,7 +86,16 @@ func _refresh_all() -> void:
     for item in SHOWN_ITEMS:
         parts.append("%s %d" % [Defs.item_name(item), Stock.amount(item)]);
     parts.append("Food %d" % Stock.food_total());
+    var governed:bool = w.has_governance();
+    _policies_btn.disabled = not governed;
+    _policies_btn.tooltip_text = "Colony-wide rules" if governed else "Needs the Town Hall's Governance upgrade";
+    if not governed and _policies_btn.button_pressed:
+        _policies_btn.button_pressed = false;
+    (_tool_btns["town_hall"] as Button).visible = not _town_hall_exists(w);
     parts.append("Pop %d" % w.pawns.size());
+    var homeless:int = w.families.homeless_count();
+    if homeless > 0:
+        parts.append("Homeless %d" % homeless);
     _stock.text = "   ".join(parts);
     var food_tip:PackedStringArray = ["Storage: %d / %d" % [Stock.used(), Stock.capacity()]];
     for item in Defs.ITEMS:
@@ -112,6 +123,7 @@ func _refresh_info() -> void:
         _info_title.text = obj.display_name();
     _info_body.text = obj.info_text();
     _info_btn.visible = obj is Field;
+    _refresh_relocate(obj);
     _refresh_filters(obj);
     _refresh_controls(obj);
     _refresh_upgrades(obj);
@@ -120,6 +132,17 @@ func _refresh_info() -> void:
     const TOP_BAR:float = 48.0;
     const BOTTOM_BAR:float = 70.0;
     _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, get_viewport().get_visible_rect().size.y - TOP_BAR - BOTTOM_BAR);
+
+# The Relocate button for a finished building: disabled with the reason when it can't be moved now.
+func _refresh_relocate(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    var show:bool = b != null and b.def.get("relocatable", true) and b.is_complete();
+    _move_btn.visible = show;
+    if not show:
+        return;
+    var why:String = World.instance.relocation_block_reason(b);
+    _move_btn.disabled = why != "";
+    _move_btn.text = "Relocate (%s)" % why.to_lower() if why != "" else "Relocate (half the build cost)";
 
 # Per-building settings (see the "controls" schema in Defs): a cycling choice, a toggle, or a
 # production cap with - and + buttons.
@@ -274,6 +297,12 @@ func _on_speed_changed(index:int) -> void:
     for i in _speed_btns.size():
         _speed_btns[i].set_pressed_no_signal(i == index);
 
+func _town_hall_exists(w:World) -> bool:
+    for b in w.buildings:
+        if b.def_id == &"town_hall":
+            return true;
+    return false;
+
 func _on_info_button() -> void:
     var obj:Variant = World.instance.tools.selected;
     if obj is Field:
@@ -397,6 +426,7 @@ func _build_policies(col:VBoxContainer) -> void:
     toggle.toggle_mode = true;
     toggle.focus_mode = Control.FOCUS_NONE;
     toggle.toggled.connect(func(on:bool) -> void: box.visible = on);
+    _policies_btn = toggle;
     col.add_child(toggle);
     col.add_child(box);
     var policies:Policies = World.instance.policies;
@@ -437,6 +467,14 @@ func _build_info_panel(root:Control) -> void:
     _info_btn.focus_mode = Control.FOCUS_NONE;
     _info_btn.pressed.connect(_on_info_button);
     col.add_child(_info_btn);
+    _move_btn = Button.new();
+    _move_btn.focus_mode = Control.FOCUS_NONE;
+    _move_btn.visible = false;
+    _move_btn.pressed.connect(func() -> void:
+        var sel:Variant = World.instance.tools.selected;
+        if sel is Building and World.alive(sel):
+            World.instance.tools.start_relocate(sel));
+    col.add_child(_move_btn);
     _upgrade_box = VBoxContainer.new();
     _upgrade_box.visible = false;
     col.add_child(_upgrade_box);

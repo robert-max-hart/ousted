@@ -34,6 +34,9 @@ var upgrades_done:Dictionary = {};   # upgrade id -> true
 var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (while set, delivered/incoming/work_done belong to it)
 var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
 var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
+var cost_mult   :float = 1.0;       # share of the build cost and work (a relocation costs Defs.RELOCATE_COST_MULT)
+var relocating_from:Building = null;    # on a relocation site: the building it replaces
+var relocating_to:Building = null;      # on the old building: the site being built for it
 var teaching     :bool = false;      # a teacher is at this school right now
 var teaching_mult:float = 1.0;       # how much faster pupils learn under the teacher present (Defs.teacher_multiplier)
 var attendees    :int = 0;           # children who have a seat here (school)
@@ -75,10 +78,14 @@ func is_walkable() -> bool:
 # Storage
 
 func is_storage() -> bool:
-    return state == State.COMPLETE and def.get("storage", false);
+    return state == State.COMPLETE and capacity() > 0;
 
+# Built-in capacity plus what its finished upgrades add (the Town Hall's store rooms).
 func capacity() -> int:
-    return def.get("capacity", 0);
+    var n:int = def.get("capacity", 0) if def.get("storage", false) else 0;
+    for id in upgrades_done:
+        n += def.get("upgrades", {}).get(id, {}).get("capacity", 0);
+    return n;
 
 func used() -> int:
     var n:int = 0;
@@ -92,8 +99,8 @@ func free_space() -> int:
 
 # Whether this building would take the item at all (type rules and the player's filter).
 func accepts(item:StringName) -> bool:
-    if not is_storage() or forbidden.has(item):
-        return false;
+    if not is_storage() or forbidden.has(item) or def.get("temporary", false) or relocating_to != null:
+        return false;       # a supply cart only gives, and a building being moved takes nothing new
     if def.has("accepts_items"):
         return (def["accepts_items"] as Array).has(item);
     return Defs.is_food(item) or not def.get("food_only", false);
@@ -236,7 +243,14 @@ func set_forbidden(item:StringName, forbid:bool) -> void:
 # Construction
 
 func cost() -> Dictionary:
-    return def["upgrades"][upgrading]["cost"] if upgrading != &"" else def["cost"];
+    if upgrading != &"":
+        return def["upgrades"][upgrading]["cost"];
+    if cost_mult == 1.0:
+        return def["cost"];
+    var c:Dictionary = {};
+    for item in def["cost"]:
+        c[item] = maxi(1, ceili(def["cost"][item] * cost_mult));
+    return c;
 
 # True while the building is being constructed or upgraded: materials and labor are still wanted.
 func is_site() -> bool:
@@ -253,7 +267,7 @@ func has_all_materials() -> bool:
     return true;
 
 func work_required() -> float:
-    return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"];
+    return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"] * cost_mult;
 
 func progress() -> float:
     if work_required() <= 0.0:
@@ -378,7 +392,9 @@ func on_terrain_changed() -> void:
 
 # Whether occupants stay warm here. Buildings with no fuel need (the Town Hall) are always warm.
 func is_heated() -> bool:
-    if not def.has("beds"):
+    if def.has("heated_by"):
+        return is_complete() and has_upgrade(def["heated_by"]);
+    if not def.has("beds") or def.get("shack", false):
         return false;
     if not def.has("fuel_capacity"):
         return true;
@@ -413,6 +429,8 @@ func to_dict() -> Dictionary:
         "settings": settings.duplicate(), "fuel": fuel, "inputs": inputs.duplicate(),
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
+        "cost_mult": cost_mult, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
+        "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1,
     };
 
 func restore_dict(d:Dictionary) -> void:
@@ -432,6 +450,7 @@ func restore_dict(d:Dictionary) -> void:
     dig_progress = d["dig_progress"];
     _spoil_acc = d["spoil_acc"];
     _burn_acc = d["burn_acc"];
+    cost_mult = d.get("cost_mult", 1.0);
     _update_visual();
 
 # --------------------------------
@@ -450,7 +469,7 @@ func info_text() -> String:
         s += "Builders: %d\n" % builders;
     else:
         s += def.get("desc", "") + "\n";
-    if def.get("storage", false) and state == State.COMPLETE:
+    if capacity() > 0 and state == State.COMPLETE:
         s += "Stored %d / %d\n" % [used(), capacity()];
         for item in stored:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
@@ -533,6 +552,24 @@ func _build_visual() -> void:
             var heap:BoxMesh = BoxMesh.new();
             heap.size = Vector3(1.2, 0.6, 1.2);
             _add_mesh(heap, _flat_mat(Color(0.6, 0.6, 0.6)), Vector3(size.x * 0.25, 0.4, size.y * 0.2));
+        "graveyard":
+            var ground:BoxMesh = BoxMesh.new();
+            ground.size = Vector3(size.x - 0.1, h, size.y - 0.1);
+            _body = _add_mesh(ground, _body_mat, Vector3(0, h * 0.5, 0));
+        "cart":
+            var bed:BoxMesh = BoxMesh.new();
+            bed.size = Vector3(size.x - 0.3, h * 0.5, size.y * 0.8);
+            _body = _add_mesh(bed, _body_mat, Vector3(0, h * 0.55, 0));
+            var load_mesh:BoxMesh = BoxMesh.new();
+            load_mesh.size = Vector3(size.x - 0.7, h * 0.35, size.y * 0.55);
+            _roof = _add_mesh(load_mesh, _flat_mat(Color(0.75, 0.65, 0.4)), Vector3(0, h * 0.95, 0));
+            var wheel:CylinderMesh = CylinderMesh.new();
+            wheel.top_radius = 0.28;
+            wheel.bottom_radius = 0.28;
+            wheel.height = 0.1;
+            for sx in [-0.55, 0.55]:
+                var w:MeshInstance3D = _add_mesh(wheel, _flat_mat(Color(0.25, 0.18, 0.12)), Vector3(sx, 0.28, size.y * 0.42));
+                w.rotation.z = PI * 0.5;
         "pile":
             var pad:BoxMesh = BoxMesh.new();
             pad.size = Vector3(size.x - 0.3, h, size.y - 0.3);
