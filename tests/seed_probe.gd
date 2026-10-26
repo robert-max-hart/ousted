@@ -10,6 +10,7 @@ extends Node;
 var world:World;
 var _days:int = 64;
 var _known:int = 1;
+var _start_known:int = 1;
 var _last_day:int = -1;
 var _log:PackedStringArray = [];
 
@@ -41,6 +42,7 @@ func _ready() -> void:
     world.jobs.sync_targets();
     world.jobs.reconcile();
     _known = world.seeds.known.size();
+    _start_known = _known;
     Engine.time_scale = 12.0;
     GameClock.set_speed(3);
 
@@ -56,5 +58,5 @@ func _process(_delta:float) -> void:
                 kinds.append("%s:%s" % [p.profession_name().substr(0, 3), p.task.kind if p.task != null else "-"]);
             print("day %d trips %d berries %d | %s" % [_last_day, world.seeds.trips, Stock.amount(&"berries"), " ".join(kinds)]);
     if GameClock.day_index() >= _days:
-        print("SEEDS found %d of %d in %d days, %d trips: %s" % [_known - 1, Defs.CROPS.size() - 1, _days, world.seeds.trips, "; ".join(_log)]);
+        print("SEEDS found %d of %d in %d days, %d trips: %s" % [_known - _start_known, Defs.CROPS.size() - _start_known, _days, world.seeds.trips, "; ".join(_log)]);
         get_tree().quit();
