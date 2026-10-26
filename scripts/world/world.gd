@@ -555,6 +555,8 @@ func remove_building(b:Building, refund:bool) -> void:
             if b is Field:
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.NONE);
     b.removed = true;
+    if tools != null and tools.selected == b:
+        tools.select(null);       # the inspector must not be left holding a freed building
     buildings.erase(b);
     if b == town_hall:
         town_hall = null;
