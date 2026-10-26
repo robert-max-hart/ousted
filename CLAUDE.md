@@ -134,6 +134,7 @@ Run the soak test after any simulation change, and the screenshot test after vis
 ## Gotchas learned so far
 - **Screenshot test with no Wayland session** (an ssh or tty shell): run it as `DISPLAY=:1 godot --display-driver x11 --path . res://tests/screenshot.tscn -- <out_dir>` (an X server was on `:1` on this workstation). It now places a finished Mine and Blacksmith and shows their inspectors at the noon and dusk shots.
 - The inspector panel scrolls when it is taller than the screen (`_info_scroll` in `hud.gd`).
+- **`godot --import` also rewrites `scripts/ui/player_tools.gd` with tab indentation** (the editor's indent setting; reproducible, only that file). After an import run `git checkout scripts/ui/player_tools.gd` if you did not change it, or set the editor's Text Editor > Behavior > Indent > Type to Spaces.
 - **`godot --import` rewrites `project.godot`** and strips the `renderer/rendering_method="gl_compatibility"` line. Check `git diff project.godot` after any import and restore it with `git checkout project.godot` before committing.
 - The soak test (`tests/sim_soak.gd`) runs only `DAYS = 6` by default, not a full year. Raise it for a year-long check.
 - Git identity is set per repo (`robert-max-hart`). The history was rewritten once on 2026-10-23 to fix the old author on the first commits, so any older hashes are gone. There is no remote.
