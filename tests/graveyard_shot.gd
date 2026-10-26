@@ -26,6 +26,9 @@ func _ready() -> void:
     for i in [0, 1, 2, 7, 8, 13]:
         yard.graves[i] = {"name": "Test", "age": 40, "cause": "old age", "buried_hour": 0.0};
     yard._visual_dirty = true;
+    yard.upgrades_done[&"crematorium"] = true;
+    yard.add_input(&"coal", 2);
+    yard.settings["keep_free"] = 3;
     world.kill_pawn(world.pawns[5], "old age");
     world.bodies[0].position = world.terrain.cell_center(th.origin + Vector2i(4, 2));
     world.pawns[0].add_grief(0.3, 12.0, 99);

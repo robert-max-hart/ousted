@@ -13,6 +13,7 @@ func _init(w:World) -> void:
 
 func on_hour() -> void:
     _build_shacks();
+    _clear_shacks();
 
 func on_day() -> void:
     _pair_up();
@@ -213,6 +214,14 @@ func homeless_count() -> int:
         if p.home == null:
             n += 1;
     return n;
+
+# Policy "clear_shacks" (off by default): finished shacks nobody lives in are pulled down.
+func _clear_shacks() -> void:
+    if not world.policies.is_on(&"clear_shacks"):
+        return;
+    for b in world.buildings.duplicate():
+        if b.def.get("shack", false) and b.is_complete() and b.residents.is_empty():
+            world.remove_building(b, false);
 
 # Beds in houses that are still being built (shacks don't count), for the shack rule below.
 func _beds_under_construction() -> int:

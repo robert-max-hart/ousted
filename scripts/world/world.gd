@@ -515,6 +515,9 @@ func remove_building(b:Building, refund:bool) -> void:
     if b.is_storage() and not b.is_empty():
         notify("%s can't be demolished until it is empty." % b.display_name());
         return;
+    if b is Graveyard and (b as Graveyard).used_slots() > 0:
+        notify("%s can't be demolished while it has graves in it." % b.display_name());
+        return;
     if b.fuel > 0:
         deposit(&"firewood", b.fuel, b.position);
     for item in b.inputs:

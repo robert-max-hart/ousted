@@ -243,7 +243,7 @@ func _make_control(b:Building, c:Dictionary) -> Control:
             value.custom_minimum_size.x = 64;
             value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
             var show_value:Callable = func() -> void:
-                value.text = "No cap" if b.settings[id] <= 0 else str(b.settings[id]);
+                value.text = c.get("zero_label", "No cap") if b.settings[id] <= 0 else str(b.settings[id]);
             show_value.call();
             var step:int = c.get("step", 10);
             var minus:Button = Button.new();

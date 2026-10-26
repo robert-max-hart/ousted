@@ -96,7 +96,7 @@ func _check_unique() -> void:
         th.take(item, th.amount(item));
     world.remove_building(th, true);
     _expect("empty, it can be demolished and the colony has none", world.town_hall == null);
-    _expect("a new one may be built now", world.can_place(&"town_hall", Vector2i(60, 60), Vector2i(4, 4)) == "");
+    _expect("a new one may be built now", _free_spot(&"town_hall", Vector2i(4, 4), Vector2i(60, 60)) != Vector2i(-1, -1));
     var site:Building = world.place_building(&"town_hall", Vector2i(60, 60), Vector2i(4, 4));
     _expect("the new one is a site that costs 30 wood and 10 stone", site.cost() == {&"wood": 30, &"stone": 10} and not site.is_complete());
     site.complete();
@@ -106,16 +106,16 @@ func _check_unique() -> void:
 func _check_relocation() -> void:
     _make_world(&"easy");
     var th:Building = world.town_hall;
-    var house:Building = world.place_building(&"house", th.origin + Vector2i(-8, 2), Vector2i(3, 3), true);
-    var field:Building = world.place_building(&"field", th.origin + Vector2i(10, 10), Vector2i(4, 4), true);
+    var house:Building = _place(&"house", th.origin + Vector2i(-8, 2), Vector2i(3, 3));
+    var field:Building = _place(&"field", th.origin + Vector2i(10, 10), Vector2i(4, 4));
     _expect("fields can't be moved", world.relocation_block_reason(field) == "Can't be moved");
-    var yard:Building = world.place_building(&"graveyard", th.origin + Vector2i(10, -10), Vector2i(4, 3), true);
+    var yard:Building = _place(&"graveyard", th.origin + Vector2i(10, -10), Vector2i(4, 3));
     _expect("graveyards can't be moved", world.relocation_block_reason(yard) != "");
     _expect("a full store room must be emptied first", world.relocation_block_reason(th) == "Empty it first");
     var residents:Array = house.residents.duplicate();
     house.settings["heating"] = false;
     house.fuel = 7;
-    var spot:Vector2i = th.origin + Vector2i(-8, 8);
+    var spot:Vector2i = _free_spot(&"house", house.size, th.origin + Vector2i(-8, 8));
     _expect("a house can be moved", world.relocation_block_reason(house) == "");
     var site:Building = world.relocate(house, spot, house.size);
     _expect("a relocation makes a site at half the cost", site != null and not site.is_complete() and site.cost() == {&"wood": 8, &"stone": 2} and is_equal_approx(site.work_required(), 12.0));
@@ -137,11 +137,23 @@ func _check_relocation() -> void:
     for item in th.stored.keys():
         th.take(item, th.amount(item));
     _expect("an emptied Town Hall can be moved", world.relocation_block_reason(th) == "");
-    var hall_site:Building = world.relocate(th, th.origin + Vector2i(0, 12), th.size);
+    var hall_site:Building = world.relocate(th, _free_spot(&"stockpile", th.size, th.origin + Vector2i(0, 12)), th.size);
     _expect("a second Town Hall is allowed for the move", hall_site != null and world.town_hall == th);
     hall_site.complete();
     _expect("the moved Town Hall keeps its upgrades and the role", world.town_hall == hall_site and hall_site.has_upgrade(&"storage2") and world.has_governance() and not World.alive(th));
     _expect("only one Town Hall remains", world.buildings.filter(func(b:Building) -> bool: return b.def_id == &"town_hall").size() == 1);
+
+# A spot where the building can go near the wanted one: the random terrain may put water or trees on a fixed one.
+func _free_spot(id:StringName, size:Vector2i, near:Vector2i) -> Vector2i:
+    for r in range(0, 20):
+        for dz in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if maxi(absi(dx), absi(dz)) == r and world.can_place(id, near + Vector2i(dx, dz), size) == "":
+                    return near + Vector2i(dx, dz);
+    return Vector2i(-1, -1);
+
+func _place(id:StringName, near:Vector2i, size:Vector2i) -> Building:
+    return world.place_building(id, _free_spot(id, size, near), size, true);
 
 func _expect(what:String, ok:bool) -> void:
     print("%s: %s" % ["PASS" if ok else "FAIL", what]);

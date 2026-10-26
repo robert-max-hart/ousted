@@ -45,7 +45,7 @@ const ITEMS:Dictionary = {
 # radius:   work radius in cells (shown when placing and selecting)
 # worker_slots, profession: how many citizens of that profession work here
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
-#           A "cap" control is a production cap on an output item: 0 means no cap
+#           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
 # fuel_capacity: housing that burns firewood to stay warm; this is how much it can hold
 # spoil_mult: multiplies how fast stored food spoils here (default 1.0; lower is better)
 # capacity: total units a storage building holds
@@ -196,7 +196,17 @@ const BUILDINGS:Dictionary = {
         "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
         "graveyard": true, "drag_size": true, "walkable": true, "relocatable": false,
-        "desc": "One grave per square. Citizens bury the dead here, which softens the grief. A grave frees its square after 10 years.",
+        "inputs": {&"coal": 4},
+        "upgrades": {
+            &"crematorium": {
+                "name": "Crematorium", "cost": {&"wood": 40, &"stone": 60, &"iron": 10}, "work": 60.0,
+                "desc": "Burns the oldest graves to free their squares, one coal per body. Set how many squares to keep free.",
+            },
+        },
+        "controls": [
+            {"id": "keep_free", "type": "cap", "label": "Cremate to keep free", "default": 0, "step": 1, "zero_label": "Off", "requires_upgrade": &"crematorium"},
+        ],
+        "desc": "One grave per square. Citizens bury the dead here, which softens the grief. A grave frees its square after 10 years. It can't be demolished while any grave is in use.",
     },
 };
 
@@ -352,6 +362,10 @@ const POLICIES:Dictionary = {
     &"build_shacks": {
         "name": "Homeless build shacks", "default": true,
         "desc": "A citizen with no home for a few hours gets a shack (3 wood, lost if demolished). Off, they sleep outside until a house has room.",
+    },
+    &"clear_shacks": {
+        "name": "Clear empty shacks", "default": false,
+        "desc": "Pull down shacks that nobody lives in any more (nothing is refunded). Off, they stay until you demolish them: shacks are a nuisance for not having built enough houses.",
     },
     &"child_labor": {
         "name": "Child labor", "default": true,

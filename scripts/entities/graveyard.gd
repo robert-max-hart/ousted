@@ -41,9 +41,11 @@ func plot_count() -> int:
 func plot_cell(i:int) -> Vector2i:
     return origin + Vector2i(i % size.x, i / size.x);
 
-# The def's work value is for 36 squares, like a field.
+# The def's work value is for 36 squares, like a field (an upgrade's is fixed).
 func work_required() -> float:
-    return def["work"] * plot_count() / 36.0;
+    if upgrading != &"":
+        return super.work_required();
+    return def["work"] * plot_count() / 36.0 * cost_mult;
 
 func free_slots() -> int:
     var n:int = 0;
@@ -94,6 +96,37 @@ func on_day() -> void:
         if g != null and GameClock.total_hours - g["buried_hour"] >= decay_hours():
             graves[i] = null;
             _visual_dirty = true;
+    _cremate();
+
+# Coal is only fetched once the crematorium is built and a number of free squares is asked for.
+func inputs_wanted() -> Dictionary:
+    var want:Dictionary = {};
+    if not is_complete() or not has_upgrade(&"crematorium") or settings.get("keep_free", 0) <= 0:
+        return want;
+    var n:int = def["inputs"][&"coal"] - input_amount(&"coal") - input_incoming.get(&"coal", 0);
+    if n > 0:
+        want[&"coal"] = n;
+    return want;
+
+# With the crematorium, the oldest graves are burned (one coal each) until `keep_free` squares are free.
+func _cremate() -> void:
+    if not is_complete() or not has_upgrade(&"crematorium"):
+        return;
+    var keep:int = settings.get("keep_free", 0);
+    var burned:int = 0;
+    while free_slots() < keep and input_amount(&"coal") > 0:
+        var oldest:int = -1;
+        for i in plot_count():
+            if graves[i] != null and (oldest < 0 or graves[i]["buried_hour"] < graves[oldest]["buried_hour"]):
+                oldest = i;
+        if oldest < 0:
+            break;
+        graves[oldest] = null;
+        take_input(&"coal", 1);
+        burned += 1;
+    if burned > 0:
+        _visual_dirty = true;
+        world.notify("%d old %s cremated to free graves." % [burned, "grave was" if burned == 1 else "graves were"]);
 
 func on_terrain_changed() -> void:
     _visual_dirty = true;
@@ -121,6 +154,10 @@ func info_text() -> String:
         var days:float = (oldest + decay_hours() - GameClock.total_hours) / GameClock.HOURS_PER_DAY;
         s += "The oldest grave is freed in %d days.\n" % maxi(0, ceili(days));
     s += "Graves are freed after %d years.\n" % roundi(Defs.GRAVE_DECAY_YEARS);
+    if has_upgrade(&"crematorium"):
+        s += "Coal for cremation: %d / %d\n" % [input_amount(&"coal"), def["inputs"][&"coal"]];
+    if used_slots() > 0:
+        s += "Can't be demolished while graves are in use.\n";
     return s;
 
 func _rebuild_stones() -> void:
