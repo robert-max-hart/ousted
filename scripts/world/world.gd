@@ -590,12 +590,6 @@ func remove_building(b:Building, refund:bool) -> void:
     b.queue_free();
     families.assign_homes();
 
-# Marks everything standing in the rect for clearing.
-func mark_for_clearing_rect(r:Rect2i) -> void:
-    for rn in nodes:
-        if r.has_point(rn.cell):
-            mark_for_clearing(rn);
-
 # Ends every citizen's task aimed at (or working for) b: cancelled hauls hand their goods back, builders walk off.
 func release_site_workers(b:Building) -> void:
     for p in pawns:

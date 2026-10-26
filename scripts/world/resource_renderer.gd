@@ -42,13 +42,13 @@ func _ready() -> void:
     trunk.bottom_radius = 0.16;
     trunk.height = 1.4;
     trunk.radial_segments = 6;
-    _add_part(tree, trunk, Transform3D(Basis(), Vector3(0, 0.7, 0)), trunk_mat);
+    add_part(tree, trunk, Transform3D(Basis(), Vector3(0, 0.7, 0)), trunk_mat);
     var canopy:CylinderMesh = CylinderMesh.new();
     canopy.top_radius = 0.0;
     canopy.bottom_radius = 0.95;
     canopy.height = 2.8;
     canopy.radial_segments = 7;
-    _add_part(tree, canopy, Transform3D(Basis(), Vector3(0, 2.4, 0)), _canopy_mat);
+    add_part(tree, canopy, Transform3D(Basis(), Vector3(0, 2.4, 0)), _canopy_mat);
 
     var oak:ArrayMesh = ArrayMesh.new();
     var oak_trunk:CylinderMesh = CylinderMesh.new();
@@ -56,7 +56,7 @@ func _ready() -> void:
     oak_trunk.bottom_radius = 0.22;
     oak_trunk.height = 1.5;
     oak_trunk.radial_segments = 6;
-    _add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), trunk_mat);
+    add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), trunk_mat);
     for i in 3:                                  # bare boughs, all that shows in winter
         var bough:CylinderMesh = CylinderMesh.new();
         bough.top_radius = 0.03;
@@ -65,23 +65,23 @@ func _ready() -> void:
         bough.radial_segments = 4;
         var yaw:float = i * TAU / 3.0;
         var lean:Basis = Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, 0.6);
-        _add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), trunk_mat);
+        add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), trunk_mat);
     var oak_canopy:ArrayMesh = ArrayMesh.new();
     var crown:SphereMesh = SphereMesh.new();
     crown.radius = 1.15;
     crown.height = 2.1;
     crown.radial_segments = 8;
     crown.rings = 4;
-    _add_part(oak_canopy, crown, Transform3D(Basis(), Vector3(0, 2.5, 0)), _oak_leaf_mat);
+    add_part(oak_canopy, crown, Transform3D(Basis(), Vector3(0, 2.5, 0)), _oak_leaf_mat);
     var rock_shape:SphereMesh = SphereMesh.new();
     rock_shape.radius = 0.7;
     rock_shape.height = 1.0;
     rock_shape.radial_segments = 6;
     rock_shape.rings = 3;
     var rock:ArrayMesh = ArrayMesh.new();
-    _add_part(rock, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.55, 0.54, 0.52)));
+    add_part(rock, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.55, 0.54, 0.52)));
     var ore:ArrayMesh = ArrayMesh.new();
-    _add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.58, 0.36, 0.3)));
+    add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.58, 0.36, 0.3)));
 
     var bush_shape:SphereMesh = SphereMesh.new();
     bush_shape.radius = 0.45;
@@ -89,7 +89,7 @@ func _ready() -> void:
     bush_shape.radial_segments = 8;
     bush_shape.rings = 4;
     var bush:ArrayMesh = ArrayMesh.new();
-    _add_part(bush, bush_shape, Transform3D(Basis(), Vector3(0, 0.3, 0)), _bush_mat);
+    add_part(bush, bush_shape, Transform3D(Basis(), Vector3(0, 0.3, 0)), _bush_mat);
 
     var cap_shape:SphereMesh = SphereMesh.new();
     cap_shape.radius = 0.22;
@@ -97,16 +97,16 @@ func _ready() -> void:
     cap_shape.radial_segments = 6;
     cap_shape.rings = 3;
     var mushroom:ArrayMesh = ArrayMesh.new();
-    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(-0.2, 0.1, 0.1)), _make_material(Color(0.72, 0.5, 0.3)));
-    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.15, 0.1, -0.1)), _make_material(Color(0.8, 0.35, 0.25)));
-    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.05, 0.1, 0.25)), _make_material(Color(0.72, 0.5, 0.3)));
+    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(-0.2, 0.1, 0.1)), _make_material(Color(0.72, 0.5, 0.3)));
+    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.15, 0.1, -0.1)), _make_material(Color(0.8, 0.35, 0.25)));
+    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.05, 0.1, 0.25)), _make_material(Color(0.72, 0.5, 0.3)));
     var hazel_shape:SphereMesh = SphereMesh.new();
     hazel_shape.radius = 0.6;
     hazel_shape.height = 1.1;
     hazel_shape.radial_segments = 8;
     hazel_shape.rings = 4;
     var hazel:ArrayMesh = ArrayMesh.new();
-    _add_part(hazel, hazel_shape, Transform3D(Basis(), Vector3(0, 0.5, 0)), _make_material(Color(0.5, 0.52, 0.2)));
+    add_part(hazel, hazel_shape, Transform3D(Basis(), Vector3(0, 0.5, 0)), _make_material(Color(0.5, 0.52, 0.2)));
 
     var berry_shape:SphereMesh = SphereMesh.new();
     berry_shape.radius = 0.075;
@@ -118,7 +118,7 @@ func _ready() -> void:
     for k in 7:
         var a:float = k * 2.399;
         var e:float = 0.25 + 0.2 * (k % 3);
-        _add_part(berries, berry_shape, Transform3D(Basis(), Vector3(cos(a) * cos(e) * 0.47, 0.3 + sin(e) * 0.36, sin(a) * cos(e) * 0.47)), berry_mat);
+        add_part(berries, berry_shape, Transform3D(Basis(), Vector3(cos(a) * cos(e) * 0.47, 0.3 + sin(e) * 0.36, sin(a) * cos(e) * 0.47)), berry_mat);
     _berries = _make_layer(berries);
     _layers[&"tree"] = _make_layer(tree);
     _layers[&"oak"] = _make_layer(oak);
@@ -138,7 +138,7 @@ func _ready() -> void:
     marker_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
     marker_mat.albedo_color = Color(1.0, 0.6, 0.1);
     var marker:ArrayMesh = ArrayMesh.new();
-    _add_part(marker, marker_shape, Transform3D(), marker_mat);
+    add_part(marker, marker_shape, Transform3D(), marker_mat);
     _markers = _make_layer(marker);
     _markers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
 
@@ -256,7 +256,7 @@ func _make_layer(mesh:Mesh) -> MultiMeshInstance3D:
     return mmi;
 
 # Bakes a primitive into target as a new surface, offset by xf.
-static func _add_part(target:ArrayMesh, prim:PrimitiveMesh, xf:Transform3D, mat:Material) -> void:
+static func add_part(target:ArrayMesh, prim:PrimitiveMesh, xf:Transform3D, mat:Material) -> void:
     var arrays:Array = prim.get_mesh_arrays();
     var verts:PackedVector3Array = arrays[Mesh.ARRAY_VERTEX];
     var normals:PackedVector3Array = arrays[Mesh.ARRAY_NORMAL];

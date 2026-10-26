@@ -58,7 +58,7 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
         return null;
     var rn:ResourceNode = best;
     rn.reserved_by = p;
-    var st:Dictionary = {"acc": 0.0};
+    var st:Dictionary = {"acc": 0.0, "picked": false};
     var verb:String = rn.def.get("verb", "Gathering");
     var t:Task = Task.new(&"harvest", "%s (%s)" % [verb, rn.display_name()]);
     t.job = _node_job(rn);
@@ -75,12 +75,13 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
             st["acc"] -= rn.work_per_unit;
             rn.amount -= 1;
             pw.add_carry(rn.item, 1);
+            st["picked"] = true;
             world.node_changed(rn);
         return rn.amount <= 0 or pw.carry_amount >= Pawn.CARRY_CAP);
     t.on_end = func(_pw:Pawn) -> void:
         rn.reserved_by = null;
-        if rn.is_auto() or rn.is_forageable():
-            world.seeds.on_forage(world);       # a trip picking wild food may turn up a seed
+        if st["picked"] and not rn.clearing and (rn.is_auto() or rn.is_forageable()):
+            world.seeds.on_forage(world);       # a trip that picked wild food may turn up a seed
         if rn.amount <= 0 and (not rn.regrows or rn.clearing) and not rn.removed:
             world.remove_node(rn);
     return t;

@@ -51,13 +51,13 @@ static func _build(shape:StringName) -> ArrayMesh:
                 stalk.height = 0.9 + 0.1 * (i % 3) * 0.5;
                 stalk.radial_segments = 3;
                 stalk.rings = 1;
-                ResourceRenderer._add_part(mesh, stalk, Transform3D(lean, base + lean * Vector3(0, stalk.height * 0.5, 0)), mat);
+                ResourceRenderer.add_part(mesh, stalk, Transform3D(lean, base + lean * Vector3(0, stalk.height * 0.5, 0)), mat);
                 var ear:SphereMesh = SphereMesh.new();
                 ear.radius = 0.035;
                 ear.height = 0.22;
                 ear.radial_segments = 4;
                 ear.rings = 2;
-                ResourceRenderer._add_part(mesh, ear, Transform3D(lean, base + lean * Vector3(0, stalk.height - 0.05, 0)), mat);
+                ResourceRenderer.add_part(mesh, ear, Transform3D(lean, base + lean * Vector3(0, stalk.height - 0.05, 0)), mat);
         &"bush":
             # a low clump of leaf blobs on short stems
             for i in 5:
@@ -68,7 +68,7 @@ static func _build(shape:StringName) -> ArrayMesh:
                 leaf.height = 0.34;
                 leaf.radial_segments = 6;
                 leaf.rings = 3;
-                ResourceRenderer._add_part(mesh, leaf, Transform3D(Basis(), Vector3(cos(a) * r, 0.2 + 0.14 * (i % 2), sin(a) * r)), mat);
+                ResourceRenderer.add_part(mesh, leaf, Transform3D(Basis(), Vector3(cos(a) * r, 0.2 + 0.14 * (i % 2), sin(a) * r)), mat);
         &"leafy":
             # a rosette of flat leaves around a heart
             for i in 6:
@@ -79,13 +79,13 @@ static func _build(shape:StringName) -> ArrayMesh:
                 leaf.radial_segments = 6;
                 leaf.rings = 2;
                 var tilt:Basis = Basis(Vector3.UP, a) * Basis(Vector3.FORWARD, 0.5);
-                ResourceRenderer._add_part(mesh, leaf, Transform3D(tilt, Vector3(cos(a) * 0.2, 0.22, sin(a) * 0.2)), mat);
+                ResourceRenderer.add_part(mesh, leaf, Transform3D(tilt, Vector3(cos(a) * 0.2, 0.22, sin(a) * 0.2)), mat);
             var heart:SphereMesh = SphereMesh.new();
             heart.radius = 0.17;
             heart.height = 0.3;
             heart.radial_segments = 6;
             heart.rings = 3;
-            ResourceRenderer._add_part(mesh, heart, Transform3D(Basis(), Vector3(0, 0.2, 0)), mat);
+            ResourceRenderer.add_part(mesh, heart, Transform3D(Basis(), Vector3(0, 0.2, 0)), mat);
         _:
             # vine: a couple of broad leaves and the fruit
             for i in 3:
@@ -95,11 +95,11 @@ static func _build(shape:StringName) -> ArrayMesh:
                 leaf.height = 0.12;
                 leaf.radial_segments = 6;
                 leaf.rings = 2;
-                ResourceRenderer._add_part(mesh, leaf, Transform3D(Basis(), Vector3(cos(a) * 0.28, 0.3, sin(a) * 0.28)), mat);
+                ResourceRenderer.add_part(mesh, leaf, Transform3D(Basis(), Vector3(cos(a) * 0.28, 0.3, sin(a) * 0.28)), mat);
             var fruit:SphereMesh = SphereMesh.new();
             fruit.radius = 0.2;
             fruit.height = 0.32;
             fruit.radial_segments = 8;
             fruit.rings = 4;
-            ResourceRenderer._add_part(mesh, fruit, Transform3D(Basis(), Vector3(0.05, 0.16, -0.05)), mat);
+            ResourceRenderer.add_part(mesh, fruit, Transform3D(Basis(), Vector3(0.05, 0.16, -0.05)), mat);
     return mesh;

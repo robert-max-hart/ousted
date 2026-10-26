@@ -58,7 +58,6 @@ func _ready() -> void:
     for item in _site.cost():
         _site.delivered[item] = _site.cost()[item];
     var pawn:Pawn = world.pawns[0];
-    world.mark_for_clearing_rect(_site.rect());
     for rn in world.nodes.duplicate():
         if _site.rect().has_point(rn.cell):
             world.remove_node(rn);
