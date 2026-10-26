@@ -73,7 +73,7 @@ const BUILDINGS:Dictionary = {
             },
             &"governance": {
                 "name": "Governance", "cost": {&"wood": 30, &"stone": 10}, "work": 15.0,
-                "desc": "Unlocks the Policies panel (and later the ledger and history).",
+                "desc": "Unlocks the Policies panel and the Ledger (graphs and the history of the colony). The record is kept from the first day.",
             },
         },
         "desc": "The heart of the colony: a well, and nothing else until it is upgraded. It shelters no one. There is only one, but a new one can be built if it is lost, and it can be moved.",
@@ -93,7 +93,7 @@ const BUILDINGS:Dictionary = {
             {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
             {"id": "fuel_target", "type": "cap", "label": "Keep fuel stocked", "default": 20, "step": 5},
         ],
-        "desc": "Shelter for up to 5 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5.",
+        "desc": "Shelter for up to 6 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5.",
     },
     &"well": {
         "name": "Well", "size": Vector2i(2, 2), "cost": {&"stone": 10, &"wood": 2}, "work": 12.0,
@@ -272,7 +272,7 @@ const PAIR_MAX_AGE_GAP  :float = 10.0;
 const PAIR_CHANCE_PER_DAY:float = 0.3;
 const WIDOW_WAIT_DAYS   :float = 4.0;     # before a widowed citizen can pair again
 const FERTILE_FROM      :float = 18.0;
-const FERTILE_TO        :float = 40.0;
+const FERTILE_TO        :float = 45.0;
 const HOUSE_CROWD_COST  :float = 10.0;    # a house with room counts this many cells farther away per resident when choosing one
 const BIRTH_CHANCE_PER_DAY:float = 0.12;  # at full food and a warm house
 const PREGNANCY_DAYS    :float = 3.0;

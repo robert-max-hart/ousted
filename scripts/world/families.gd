@@ -137,6 +137,7 @@ func _give_birth(carrier:Pawn) -> void:
     baby.profession = JobManager.Profession.LABORER;
     baby.parents = parents;
     world.add_pawn(baby);
+    world.ledger.births_today += 1;
     move_home(baby, home);
     baby.go_inside(home, false);
     world.notify("A baby, %s, was born to %s." % [baby.first_name, " and ".join(PackedStringArray(parents.map(func(x:Pawn) -> String: return x.first_name)))]);

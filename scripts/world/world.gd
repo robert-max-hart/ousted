@@ -24,6 +24,7 @@ var terrain     :Terrain;
 var nav         :NavGrid;
 var jobs        :JobManager;
 var policies    :Policies = Policies.new();
+var ledger      :Ledger = Ledger.new();
 var families    :Families;
 var bodies      :Array[Body] = [];
 var child_labor_share:float = 0.0;   # share of the children working right now (0 when the policy forbids it)
@@ -137,6 +138,7 @@ func idx(c:Vector2i) -> int:
     return c.y * Terrain.SIZE + c.x;
 
 func notify(msg:String) -> void:
+    ledger.record_event(msg);
     if hud != null:
         hud.notify(msg);
     else:
@@ -300,7 +302,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -363,6 +365,7 @@ func _restore_entities(save:Dictionary) -> void:
     rng.state = save["rng_state"];
     death_log = save.get("deaths", []);
     policies.restore(save.get("policies", {}));
+    ledger.restore(save.get("ledger", {}));
     var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
     if saved_targets != null:
         jobs.targets = saved_targets;
@@ -757,6 +760,7 @@ func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
     if p.carry_amount > 0:
         drop_pile(p.carry_item, p.carry_amount, terrain.world_to_cell(spot));
         p.clear_carry();
+    ledger.deaths_today += 1;
     death_log.append({"name": p.first_name, "age": int(p.age), "cause": cause, "when": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "profession": p.profession_name()});
     if p.home != null:
         p.home.residents.erase(p);
@@ -880,6 +884,7 @@ func _update_child_labor() -> void:
     child_labor_share = float(working) / kids if kids > 0 and policies.is_on(&"child_labor") else 0.0;
 
 func _on_day(_d:int) -> void:
+    ledger.on_day(self);
     for b in buildings:
         b.on_day();
     families.on_day();

@@ -23,6 +23,8 @@ var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
 var _move_btn   :Button;
+var _ledger_btn :Button;
+var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
 var _filter_box :VBoxContainer;
 var _controls_box:VBoxContainer;
@@ -45,6 +47,9 @@ func _ready() -> void:
     _build_jobs_panel(root);
     _build_info_panel(root);
     _build_log(root);
+    _ledger_panel = LedgerPanel.new();
+    root.add_child(_ledger_panel);
+    _ledger_panel.setup(World.instance.ledger);
 
     var tools:PlayerTools = World.instance.tools;
     tools.mode_changed.connect(_on_mode_changed);
@@ -124,6 +129,7 @@ func _refresh_info() -> void:
     _info_body.text = obj.info_text();
     _info_btn.visible = obj is Field;
     _refresh_relocate(obj);
+    _refresh_ledger_button(obj);
     _refresh_filters(obj);
     _refresh_controls(obj);
     _refresh_upgrades(obj);
@@ -134,6 +140,16 @@ func _refresh_info() -> void:
     # the toolbar grows a line when the window is narrow, so measure it
     var room:float = get_viewport().get_visible_rect().size.y - TOP_BAR - _toolbar.size.y - PANEL_PADDING;
     _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, room);
+
+# The Town Hall's Ledger button: enabled once it has the Governance upgrade (the record is kept regardless).
+func _refresh_ledger_button(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    _ledger_btn.visible = b != null and b.def_id == &"town_hall" and b.is_complete();
+    var governed:bool = World.instance.has_governance();
+    _ledger_btn.disabled = not governed;
+    _ledger_btn.tooltip_text = "Graphs and the history of the colony" if governed else "Needs the Town Hall's Governance upgrade";
+    if not governed:
+        _ledger_panel.visible = false;
 
 # The Relocate button for a finished building: disabled with the reason when it can't be moved now.
 func _refresh_relocate(obj:Variant) -> void:
@@ -479,6 +495,12 @@ func _build_info_panel(root:Control) -> void:
         if sel is Building and World.alive(sel):
             World.instance.tools.start_relocate(sel));
     col.add_child(_move_btn);
+    _ledger_btn = Button.new();
+    _ledger_btn.text = "Ledger";
+    _ledger_btn.focus_mode = Control.FOCUS_NONE;
+    _ledger_btn.visible = false;
+    _ledger_btn.pressed.connect(func() -> void: _ledger_panel.open());
+    col.add_child(_ledger_btn);
     _upgrade_box = VBoxContainer.new();
     _upgrade_box.visible = false;
     col.add_child(_upgrade_box);
@@ -503,7 +525,7 @@ func _build_log(root:Control) -> void:
     _log = VBoxContainer.new();
     _log.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT);
     _log.grow_vertical = Control.GROW_DIRECTION_BEGIN;
-    _log.offset_left = 10;
+    _log.offset_left = 252;                 # right of the jobs panel, which grows downward when Policies is open
     _log.offset_top = -96;
     _log.offset_bottom = -96;
     _log.mouse_filter = Control.MOUSE_FILTER_IGNORE;
