@@ -18,6 +18,7 @@ func on_day() -> void:
     _pair_up();
     _births();
     assign_homes();
+    _rehouse_couples();
 
 # --------------------------------
 # Pairing
@@ -154,11 +155,44 @@ func assign_homes() -> void:
     homeless.sort_custom(func(a:Pawn, b:Pawn) -> bool:
         return a.age < b.age);
     for p in homeless:
-        var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-            return house_has_room(x));
+        var b:Building = _roomiest_house_near(p.position, 1);
         if b == null:
             return;
         move_home(p, b);
+
+# The house with at least `beds` free that is nearest, counting each resident as HOUSE_CROWD_COST cells farther
+# away, so people spread out instead of filling the closest house first.
+func _roomiest_house_near(pos:Vector3, beds:int) -> Building:
+    var best:Building = null;
+    var best_score:float = INF;
+    for b in world.buildings:
+        if not house_has_room(b) or b.def["beds"] - b.residents.size() < beds:
+            continue;
+        var c:Vector2 = Vector2(b.origin) + Vector2(b.size) * 0.5;
+        var score:float = c.distance_to(Vector2(pos.x, pos.z)) + b.residents.size() * Defs.HOUSE_CROWD_COST;
+        if score < best_score:
+            best = b;
+            best_score = score;
+    return best;
+
+# A couple sharing a full house moves out together to a house with two free beds, leaving room for a baby. They
+# stay put while a child of theirs still lives there, so no one is left without an adult.
+func _rehouse_couples() -> void:
+    for a in world.pawns:
+        var b:Pawn = a.partner;
+        if b == null or world.pawns.find(b) < world.pawns.find(a):
+            continue;
+        if a.home == null or a.home != b.home or lives_in_shack(a) or house_has_room(a.home):
+            continue;
+        var has_child:bool = a.home.residents.any(func(r:Pawn) -> bool:
+            return not r.is_adult() and (r.parents.has(a) or r.parents.has(b)));
+        if has_child:
+            continue;
+        var to:Building = _roomiest_house_near(a.position, 2);
+        if to == null or to.residents.size() >= a.home.residents.size():
+            continue;
+        move_home(a, to);
+        move_home(b, to);
 
 # Those closest to a citizen: their partner, parents, children and siblings who are adults and alive.
 func kin_of(c:Pawn) -> Array[Pawn]:
@@ -180,8 +214,25 @@ func homeless_count() -> int:
             n += 1;
     return n;
 
-# An adult with no home for a few hours gets a house with room, else an empty shack, else a new shack site next
-# to them (the usual builders put it up).
+# Beds in houses that are still being built (shacks don't count), for the shack rule below.
+func _beds_under_construction() -> int:
+    var n:int = 0;
+    for b in world.buildings:
+        if World.alive(b) and b.def.has("beds") and not b.def.get("shack", false) and not b.is_complete():
+            n += b.def["beds"];
+    return n;
+
+# Free beds in finished houses.
+func _free_house_beds() -> int:
+    var n:int = 0;
+    for b in world.buildings:
+        if house_has_room(b):
+            n += b.def["beds"] - b.residents.size();
+    return n;
+
+# An adult with no home for a few hours gets a house with room, else a shack with room (two share one), else
+# waits if the houses being built will hold everyone still homeless, else a new shack site next to them (the
+# usual builders put it up).
 func _build_shacks() -> void:
     if not world.policies.is_on(&"build_shacks"):
         return;
@@ -194,8 +245,10 @@ func _build_shacks() -> void:
             move_home(p, house);
             continue;
         var shack:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-            return x.def.get("shack", false) and x.residents.is_empty());
+            return x.def.get("shack", false) and x.residents.size() < x.def["beds"]);
         if shack == null:
+            if _beds_under_construction() >= homeless_count() - _free_house_beds():
+                continue;
             shack = _place_shack(p);
             if shack != null:
                 world.notify("%s has no home and is putting up a shack." % p.first_name);

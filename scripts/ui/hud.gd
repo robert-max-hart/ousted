@@ -130,8 +130,10 @@ func _refresh_info() -> void:
     if obj is Field:
         _info_btn.text = "Change crop (%s)" % (obj as Field).crop()["name"];
     const TOP_BAR:float = 48.0;
-    const BOTTOM_BAR:float = 70.0;
-    _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, get_viewport().get_visible_rect().size.y - TOP_BAR - BOTTOM_BAR);
+    const PANEL_PADDING:float = 40.0;      # panel margins, title and the gap above the toolbar
+    # the toolbar grows a line when the window is narrow, so measure it
+    var room:float = get_viewport().get_visible_rect().size.y - TOP_BAR - _toolbar.size.y - PANEL_PADDING;
+    _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, room);
 
 # The Relocate button for a finished building: disabled with the reason when it can't be moved now.
 func _refresh_relocate(obj:Variant) -> void:
@@ -316,16 +318,18 @@ func _build_top_bar(root:Control) -> void:
     var panel:PanelContainer = _panel(root);
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);
     var row:HBoxContainer = HBoxContainer.new();
-    row.add_theme_constant_override("separation", 18);
+    row.add_theme_constant_override("separation", 12);
     panel.add_child(row);
     _date = Label.new();
-    _date.custom_minimum_size.x = 230;
+    _date.custom_minimum_size.x = 175;
     row.add_child(_date);
     _weather = Label.new();
-    _weather.custom_minimum_size.x = 110;
+    _weather.custom_minimum_size.x = 90;
     row.add_child(_weather);
     _stock = Label.new();
     _stock.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    _stock.clip_text = true;               # a long stock line shrinks instead of pushing the speed buttons off-screen
+    _stock.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS;
     _stock.mouse_filter = Control.MOUSE_FILTER_PASS;
     row.add_child(_stock);
     var labels:Array[String] = ["||", "1x", "2x", "5x"];

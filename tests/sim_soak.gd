@@ -6,12 +6,26 @@
 # ----------------------------------------------------------------
 extends Node;
 
-const DAYS:int = 6;
+var DAYS:int = 6;               # a year is 32 days; pass a number after -- to change it
 
 var world:World;
 var _last_day:int = -1;
+var _min_pop:int = 99;
+
+# One citizen dies on purpose (_exercise_death), so a healthy colony keeps at least this many to the end.
+const MIN_SURVIVORS:int = 4;
+
+# Pass or fail: the colony must still be alive and above MIN_SURVIVORS, and the run exits with code 1 if not.
+func _verdict() -> void:
+    var pop:int = world.pawns.size();
+    var ok:bool = pop >= MIN_SURVIVORS;
+    print("\n%s: %d citizens at the end (lowest %d, need %d)" % ["SOAK PASS" if ok else "SOAK FAIL", pop, _min_pop, MIN_SURVIVORS]);
+    get_tree().quit(0 if ok else 1);
 
 func _ready() -> void:
+    var args:PackedStringArray = OS.get_cmdline_user_args();
+    if args.size() > 0:
+        DAYS = args[0].to_int();
     Defs.difficulty = &"easy";        # the whole starting stock fits in the Town Hall
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
@@ -88,8 +102,9 @@ func _process(_delta:float) -> void:
         return;
     _last_day = d;
     _report();
+    _min_pop = mini(_min_pop, world.pawns.size());
     if d >= DAYS:
-        get_tree().quit();
+        _verdict();
 
 var _upgrade_step:int = 0;
 

@@ -20,6 +20,7 @@ var _start:float;
 
 func _ready() -> void:
     SaveGame.autosave_enabled = false;
+    Defs.difficulty = &"easy";        # room to store what the laborers clear: full storage would leave the child idle
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     Engine.time_scale = 4.0;
@@ -32,17 +33,19 @@ func _ready() -> void:
     world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);     # the child needs a bed: nobody sleeps in the Town Hall
     _child = world.pawns[2];
     _child.age = 10.0;
-    var near:Array = world.nodes.duplicate();
-    near.sort_custom(func(a:ResourceNode, b:ResourceNode) -> bool:
-        return Vector2(a.cell - world.town_hall.origin).length() < Vector2(b.cell - world.town_hall.origin).length());
-    for i in 40:
-        world.set_designated(near[i], true);       # something for laborers to clear
+    _designate_work();
     _expect("child labor is allowed by default", world.policies.is_on(&"child_labor"));
     _start = GameClock.total_hours;
     _phase_start = _start;
 
-func _day_work() -> bool:
-    return not GameClock.is_night() and _child.task != null;
+# Marks the 40 nearest untouched nodes for clearing, so laborers always have something to do. Adults clear them
+# quickly, so this runs again at the start of each phase.
+func _designate_work() -> void:
+    var near:Array = world.nodes.filter(func(n:ResourceNode) -> bool: return not n.designated and not n.is_auto());
+    near.sort_custom(func(a:ResourceNode, b:ResourceNode) -> bool:
+        return Vector2(a.cell - world.town_hall.origin).length() < Vector2(b.cell - world.town_hall.origin).length());
+    for i in mini(40, near.size()):
+        world.set_designated(near[i], true);
 
 func _process(_delta:float) -> void:
     if not World.alive(_child):
@@ -58,6 +61,7 @@ func _process(_delta:float) -> void:
             _expect("allowed: the child worked (%d frames)" % _work_frames, _work_frames > 0);
             world.policies.set_on(&"child_labor", false);
             _expect("forbidding ends a running work task", not WORK_KINDS.has(_child.task.kind) if _child.task != null else true);
+            _designate_work();
             _phase = 1;
             _phase_start = GameClock.total_hours;
             _work_frames = 0;
@@ -79,6 +83,7 @@ func _process(_delta:float) -> void:
             p.restore({});
             _expect("an old save keeps the default", p.is_on(&"child_labor"));
             world.policies.set_on(&"child_labor", true);
+            _designate_work();
             _phase = 2;
             _phase_start = GameClock.total_hours;
             _work_frames = 0;

@@ -256,7 +256,20 @@ func _haul_task(p:Pawn) -> Task:
             b.cancel_incoming(item, n);
     return t;
 
-# Carries firewood from storage to the house that is lowest on it.
+# Carries fuel from storage to the house that is lowest on it. Raw wood is the last resort: only in the cold,
+# for a house under half its target, and never when it is set to burn coal only.
+func _fuel_items(house:Building) -> Array[StringName]:
+    var items:Array[StringName] = [&"firewood", &"coal"];
+    match house.settings.get("fuel_type", 0):
+        0: items = [&"firewood"];
+        1: items = [&"coal"];
+    var target:float = house.settings.get("fuel_target", 1);
+    var short:bool = float(house.fuel + house.fuel_incoming) < target * Defs.WOOD_FUEL_BELOW_SHARE;
+    if house.settings.get("fuel_type", 0) != 1 and short and Weather.temperature < Defs.HEATING_BELOW:
+        items.append(&"wood");
+    return items;
+
+# Carries fuel from storage to the house that is lowest on it.
 func _fuel_task(p:Pawn) -> Task:
     var best:Building = null;
     var best_ratio:float = INF;
@@ -270,13 +283,9 @@ func _fuel_task(p:Pawn) -> Task:
     if best == null:
         return null;
     var house:Building = best;
-    var fuel_items:Array[StringName] = [&"firewood", &"coal"];
-    match house.settings.get("fuel_type", 0):
-        0: fuel_items = [&"firewood"];
-        1: fuel_items = [&"coal"];
     var item:StringName = &"";
     var src:Building = null;
-    for candidate in fuel_items:
+    for candidate in _fuel_items(house):
         src = world.nearest_storage_with(candidate, p.position);
         if src != null:
             item = candidate;

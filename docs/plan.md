@@ -83,6 +83,7 @@ for harvest and stocking up, and winter is the test.
   - **Pairing:** automatic. Two unpartnered adults (18+) within 10 years of each other can pair, with a daily chance. No sex is tracked: a pair is just two citizens, and births ignore sex. A pair has a fertility window by age (exact ages to pick when building).
   - **Housing:** a standard house holds 6 residents (2 adults and 4 children for a family, but 6 unrelated adults can share). A pair does not need its own house to form. For a **birth**, the pair's house needs at least one free slot. No hard cap on family size: housing limits it. Birth rate policies are a later idea.
   - **Births:** per-day chance for a fertile pair, up if food is plentiful and the house is warm, down when the colony is starving. Short fixed pregnancy of a few game days, and the pregnant parent works as normal.
+  - **Spreading out (2026-10-26):** the homeless take the house with room that is nearest after counting each resident as 10 cells farther away (`HOUSE_CROWD_COST`), so houses fill evenly. A couple in a full house moves together to a house with two free beds, unless a child of theirs lives there. Without this, six settlers fill one house and no baby is ever born. Starting settlers are 18 to 32 (not 40) so their fertile years last. Job experience rate halved (`JOB_XP_RATE` 0.0006): about +10% in the first game year and +30% over a 5-year career.
   - **Babies:** have real needs, but need half the food of a child or adult. Happiness for babies is left to step 5. Parents spend some time on the baby (such as feeding): a recurring care task, not full-time. Babies stay indoors.
   - **Orphans:** children with no living parent move into any house with a free slot. The Town Hall never houses anyone. An orphanage or boarding house for children is a later building. Homelessness rules are to be discussed later.
   - **Widowed:** the survivor stays in the house and can pair again after a delay.
@@ -96,7 +97,7 @@ for harvest and stocking up, and winter is the test.
   - **Homelessness** is the next topic after this step.
 - **Homelessness (decided 2026-10-25, M3 step 6, built):**
   - **The Town Hall shelters no one** (no beds, never a fallback). It keeps its storage and well. **PINNED, to discuss:** what the Town Hall becomes. Ideally the base version does almost nothing, and it gains upgrades later or comes with some depending on the starting difficulty.
-  - **Shacks (the Tropico idea):** a homeless citizen gets a shack, a 2x2 single-bed building that is very quick to build and cheap, and is **lost entirely when demolished (no refund)**. It carries the homeless mood penalty and warms a little, much less than a house. Shacks are placed automatically (policy "Homeless build shacks", default on) after a few hours of homelessness, an empty shack is reused first, and a shack dweller moves into a real house as soon as one has room (the shack stays until demolished).
+  - **Shacks (the Tropico idea):** a homeless citizen gets a shack, a 2x2 two-bed building that is very quick to build (1 work-hour, 3 wood), and is **lost entirely when demolished (no refund)**. It carries the homeless mood penalty and warms a little, much less than a house. Shacks are placed automatically (policy "Homeless build shacks", default on) after a few hours of homelessness, a shack with room is reused first (two share one), and no new shack goes up while the houses under construction have enough beds for everyone still homeless (otherwise one does), and a shack dweller moves into a real house as soon as one has room (the shack stays until demolished).
   - **Without any bed:** sleeping outdoors restores energy at half speed, warmth falls as for anyone outside, and the "No home" penalty grows with the days spent homeless (from 15% to 30% over 10 days), plus a small penalty for sleeping in the cold.
   - **Homeless babies and children** get the next free house slot first, and any adult may care for a homeless baby. A HUD line shows how many are homeless.
 - **Town Hall (decided 2026-10-25, built):**
@@ -152,6 +153,10 @@ for harvest and stocking up, and winter is the test.
   get no warmth recovery and still lose warmth slowly, and health starts to drop once warmth falls under
   0.2. The Town Hall needs no firewood and is always warm. Heating can be switched off per house, and the
   stock target is adjustable per house.
+  **Raw wood as fallback fuel (decided and built 2026-10-26):** 1 wood heats like 3 firewood (`heat` 3 in
+  `Defs.ITEMS`), worse than the 5 that splitting gives. A house takes wood only when it is cold out, the house is
+  under half its fuel target (`WOOD_FUEL_BELOW_SHARE`) and storage has no firewood (or coal, when allowed), so
+  construction wood isn't drained in summer. A house set to burn coal only never takes wood.
   **Any building that produces something should have a production cap setting.**
   Firewood only spoils when it is lying outside on the ground, at the same 10x penalty food gets.
 - General rule going forward: tools raise work efficiency, they are not required to work.

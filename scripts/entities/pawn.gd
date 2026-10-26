@@ -78,7 +78,7 @@ func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[
     if names.is_empty():
         names = MALE_NAMES if is_male else FEMALE_NAMES;
     first_name = names[rng.randi() % names.size()];
-    age = rng.randi_range(18, 40) + rng.randf();
+    age = rng.randi_range(18, 32) + rng.randf();
     position = w.terrain.cell_center(cell);
     name = "Pawn_%s" % first_name;
     look_seed = rng.randi();

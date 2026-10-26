@@ -14,7 +14,7 @@ class_name Defs extends RefCounted;
 #             many days at the reference temperature (10 C) in ordinary storage about 63% is gone.
 #             The temperature and the storage building scale it (see Defs.spoil_temp_factor).
 const ITEMS:Dictionary = {
-    &"wood":    {"name": "Wood",    "color": Color(0.55, 0.38, 0.22)},
+    &"wood":    {"name": "Wood",    "color": Color(0.55, 0.38, 0.22), "heat": 3, "fuel_fallback": true},
     &"stone":   {"name": "Stone",   "color": Color(0.6, 0.6, 0.6)},
     &"iron":    {"name": "Iron",    "color": Color(0.55, 0.35, 0.3)},
     &"berries": {"name": "Berries", "color": Color(0.7, 0.15, 0.25), "food": true, "nutrition": 0.3, "spoil_days": 8.0},
@@ -81,7 +81,7 @@ const BUILDINGS:Dictionary = {
     &"cart": {
         "name": "Supply Cart", "size": Vector2i(2, 1), "cost": {}, "work": 0.0,
         "shape": "cart", "height": 0.7, "color": Color(0.55, 0.4, 0.25),
-        "storage": true, "capacity": 250, "temporary": true, "relocatable": false,
+        "storage": true, "capacity": 300, "temporary": true, "relocatable": false,
         "desc": "The settlers' starting goods. It takes nothing new and is gone once it is empty.",
     },
     &"house": {
@@ -93,7 +93,7 @@ const BUILDINGS:Dictionary = {
             {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
             {"id": "fuel_target", "type": "cap", "label": "Keep fuel stocked", "default": 20, "step": 5},
         ],
-        "desc": "Shelter for up to 5 citizens. Burns firewood to keep them warm when it is cold.",
+        "desc": "Shelter for up to 5 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5.",
     },
     &"well": {
         "name": "Well", "size": Vector2i(2, 2), "cost": {&"stone": 10, &"wood": 2}, "work": 12.0,
@@ -181,10 +181,10 @@ const BUILDINGS:Dictionary = {
         "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",
     },
     &"shack": {
-        "name": "Shack", "size": Vector2i(2, 2), "cost": {&"wood": 3}, "work": 3.0,
+        "name": "Shack", "size": Vector2i(2, 2), "cost": {&"wood": 3}, "work": 1.0,
         "shape": "house", "height": 1.3, "color": Color(0.5, 0.42, 0.32), "roof": Color(0.36, 0.3, 0.22),
-        "beds": 1, "shack": true, "no_refund": true, "relocatable": false,
-        "desc": "A bare shelter for one, put up by the homeless. It keeps a little warmth in, counts as being homeless for happiness, and demolishing it returns nothing.",
+        "beds": 2, "shack": true, "no_refund": true, "relocatable": false,
+        "desc": "A bare shelter for two, put up by the homeless. It keeps a little warmth in, counts as being homeless for happiness, and demolishing it returns nothing.",
     },
     &"field": {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
@@ -263,6 +263,7 @@ const PAIR_CHANCE_PER_DAY:float = 0.3;
 const WIDOW_WAIT_DAYS   :float = 4.0;     # before a widowed citizen can pair again
 const FERTILE_FROM      :float = 18.0;
 const FERTILE_TO        :float = 40.0;
+const HOUSE_CROWD_COST  :float = 10.0;    # a house with room counts this many cells farther away per resident when choosing one
 const BIRTH_CHANCE_PER_DAY:float = 0.12;  # at full food and a warm house
 const PREGNANCY_DAYS    :float = 3.0;
 const POSTPARTUM_DAYS   :float = 8.0;     # before the pair can conceive again
@@ -330,7 +331,7 @@ static func general_xp_gain(xp:float, hours:float) -> float:
 
 # Job experience (decided 2026-10-23): per citizen per job, never decays, earned at any age, speeds up that job
 # only. Same curve shape and starting constants as general experience (a starting point to tune).
-const JOB_XP_RATE       :float = 0.0012;  # experience (as a work speed bonus) per work hour at zero
+const JOB_XP_RATE       :float = 0.0006;  # experience (as a work speed bonus) per work hour at zero
 const JOB_XP_HALF       :float = 0.1;     # the rate halves when experience reaches this
 
 static func job_xp_gain(xp:float, hours:float) -> float:
@@ -379,6 +380,7 @@ static func old_age_death_per_hour(age:float) -> float:
         return 0.0;
     return 1.0 - pow(1.0 - per_year, 1.0 / (ageing_days_per_year * GameClock.HOURS_PER_DAY));
 
+const WOOD_FUEL_BELOW_SHARE:float = 0.5;   # a house burns raw wood only while its fuel is under this share of its target
 const HEATING_BELOW      :float = 15.0;   # C: houses burn firewood below this
 const FIREWOOD_PER_DAY_AT_0C:float = 2.0;   # burn rate at 0 C; scales linearly with how far below HEATING_BELOW it is
 const TOOL_PRIORITY:Array[StringName] = [&"tool_steel", &"tool_iron", &"tool_wood"];   # best first, for equipping

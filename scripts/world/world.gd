@@ -10,7 +10,7 @@ static var instance:World = null;
 static var pending_load:Dictionary = {};     # set by SaveGame before a World is created from a save
 
 const START_PAWNS       :int = 6;
-const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 90, &"berries": 30, &"firewood": 30};
+const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 130, &"berries": 30, &"firewood": 30};
 const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
     JobManager.Profession.FARMER, JobManager.Profession.GATHERER,

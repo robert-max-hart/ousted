@@ -44,19 +44,24 @@ func _ready() -> void:
     world.families._build_shacks();
     _expect("a homeless citizen gets a shack", a.home != null and a.home.def.get("shack", false) and a.home.residents == [a]);
     shack = a.home;
-    _expect("it is a 2x2 shack costing 3 wood and 3 work-hours", shack.size == Vector2i(2, 2) and shack.cost() == {&"wood": 3} and is_equal_approx(shack.work_required(), 3.0));
+    _expect("it is a 2x2 shack costing 3 wood and 1 work-hour", shack.size == Vector2i(2, 2) and shack.cost() == {&"wood": 3} and is_equal_approx(shack.work_required(), 1.0));
     _expect("it is under construction", not shack.is_complete());
-    _expect("one bed, so one shack per citizen", shack.def["beds"] == 1);
+    _expect("two beds", shack.def["beds"] == 2);
     b.homeless_hours = 100.0;
     world.families._build_shacks();
-    _expect("the next citizen gets their own", b.home != null and b.home != shack and b.home.def.get("shack", false));
-    # an empty shack is reused before a new one is put up
-    world.families.move_home(a, null);
-    a.homeless_hours = 0.0;
+    _expect("the next citizen shares it", b.home == shack and shack.residents.size() == 2);
+    # a third needs a new shack, and a shack with room is reused before a new one is put up
     c.homeless_hours = 100.0;
+    world.families._build_shacks();
+    _expect("the third gets a new shack", c.home != null and c.home != shack and c.home.def.get("shack", false));
+    world.families.move_home(a, null);
+    a.homeless_hours = 100.0;
     var count:int = world.buildings.size();
     world.families._build_shacks();
-    _expect("an empty shack is reused", c.home == shack and world.buildings.size() == count);
+    _expect("a shack with room is reused", a.home != null and a.home.residents.size() == 2 and world.buildings.size() == count);
+    world.families.move_home(a, null);
+    a.homeless_hours = 0.0;
+    c.homeless_hours = 0.0;
     # a house with room beats a shack
     var th:Building = world.town_hall;
     var house:Building = world.place_building(&"house", th.origin + Vector2i(-8, 2), Vector2i(3, 3), true);
