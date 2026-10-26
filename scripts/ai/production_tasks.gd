@@ -21,6 +21,26 @@ func woodcutter_task(p:Pawn) -> Task:
                 return t;
     return null;
 
+# A Forager's Hut: pick the nearest wild food in its radius that the hut is set to pick, while the food stock is
+# under the hut's cap. Experience counts as Forager experience.
+func forager_task(p:Pawn) -> Task:
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b.is_complete() and b.def.get("profession", "") == "FORAGER" and b.production_allowed(&"food"):
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    for b in sites:
+        if workers_at(b) >= b.def.get("worker_slots", 1):
+            continue;
+        var t:Task = harvest_node_task(p, func(rn:ResourceNode) -> bool:
+            return rn.is_forageable() and rn.is_mature() and in_radius(b, rn.cell) and b.settings.get("forage_%s" % rn.kind, true));
+        if t != null:
+            t.workplace = b;
+            t.job = JobManager.Profession.FORAGER;
+            return t;
+    return null;
+
 # --------------------------------
 # Tools
 

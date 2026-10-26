@@ -71,14 +71,22 @@ func set_growth(g:float) -> void:
 func is_auto() -> bool:
     return def.get("auto", false);
 
+# A wild food (berries, mushrooms, nuts) the Forage tool and the Forager's Hut can pick.
+func is_forageable() -> bool:
+    return def.get("forage", false);
+
 func info_text() -> String:
     var s:String = "%s: %d / %d\n" % [Defs.item_name(item), amount, max_amount];
     if not is_mature():
         s += "Growing: %d%%\n" % roundi(growth * 100.0);
+    if is_forageable():
+        s += "Fruits in: %s\n" % ", ".join((def["fruit_seasons"] as Array).map(func(i:int) -> String: return GameClock.SEASON_NAMES[i]));
     if designated:
-        s += "Marked for harvest\n";
+        s += "Marked for foraging\n" if is_forageable() else "Marked for harvest\n";
     elif is_auto():
         s += "Foraged by gatherers\n";
+    elif is_forageable():
+        s += "Use the Forage tool to mark it, or a Forager's Hut picks it\n";
     else:
         s += "Use the Harvest tool to mark it\n";
     if reserved_by != null:

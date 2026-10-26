@@ -23,6 +23,7 @@ var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
 var _move_btn   :Button;
+var _crop_menu  :PopupMenu;
 var _ledger_btn :Button;
 var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
@@ -47,6 +48,13 @@ func _ready() -> void:
     _build_jobs_panel(root);
     _build_info_panel(root);
     _build_log(root);
+    _crop_menu = PopupMenu.new();
+    _crop_menu.id_pressed.connect(func(index:int) -> void:
+        var sel:Variant = World.instance.tools.selected;
+        if sel is Field and World.alive(sel):
+            (sel as Field).set_crop(Defs.CROPS.keys()[index]);
+            _refresh_info());
+    add_child(_crop_menu);
     _ledger_panel = LedgerPanel.new();
     root.add_child(_ledger_panel);
     _ledger_panel.setup(World.instance.ledger);
@@ -324,8 +332,13 @@ func _town_hall_exists(w:World) -> bool:
 func _on_info_button() -> void:
     var obj:Variant = World.instance.tools.selected;
     if obj is Field:
-        (obj as Field).cycle_crop();
-        _refresh_info();
+        _crop_menu.clear();
+        for id in Defs.CROPS:
+            var c:Dictionary = Defs.CROPS[id];
+            _crop_menu.add_item("%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)]);
+            _crop_menu.set_item_tooltip(_crop_menu.item_count - 1, c["desc"]);
+        _crop_menu.position = Vector2i(get_viewport().get_mouse_position()) + get_window().position;
+        _crop_menu.popup();
 
 # --------------------------------
 # Construction
@@ -383,7 +396,7 @@ func _build_toolbar(root:Control) -> void:
     var group:ButtonGroup = ButtonGroup.new();
     group.allow_unpress = false;
     var modes:Array = [
-        [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"],
+        [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"],
         [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.DEMOLISH, "Demolish"],
         [PlayerTools.Mode.RAISE, "Raise"], [PlayerTools.Mode.LOWER, "Lower"], [PlayerTools.Mode.FLATTEN, "Flatten"],
     ];

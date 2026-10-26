@@ -9,12 +9,13 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
     Mode.BUILD:    "Click to place. R rotates. Right-click to stop building.",
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
+    Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
     Mode.ROAD:     "Drag to lay a road. Roads speed up walking.",
     Mode.DEMOLISH: "Drag to remove buildings and roads and to cancel harvest marks.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
@@ -181,7 +182,7 @@ func _on_press() -> void:
                 select(moved);
             elif error == "":
                 World.instance.place_building(build_id, origin, build_size);
-        Mode.HARVEST, Mode.ROAD, Mode.DEMOLISH:
+        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.DEMOLISH:
             _dragging = true;
             _drag_start = _hover_cell;
         Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
@@ -204,10 +205,17 @@ func _on_release() -> void:
         Mode.HARVEST:
             var n:int = 0;
             for rn in w.nodes:
-                if _drag_rect().has_point(rn.cell) and not rn.is_auto() and not rn.designated:
+                if _drag_rect().has_point(rn.cell) and not rn.is_auto() and not rn.is_forageable() and not rn.designated:
                     w.set_designated(rn, true);
                     n += 1;
             error = "" if n > 0 else "No trees or rocks there.";
+        Mode.FORAGE:
+            var picked:int = 0;
+            for rn in w.nodes:
+                if _drag_rect().has_point(rn.cell) and rn.is_forageable() and not rn.designated:
+                    w.set_designated(rn, true);
+                    picked += 1;
+            error = "" if picked > 0 else "Nothing to forage there.";
         Mode.ROAD:
             for c in _road_cells():
                 w.set_road(c, true);
@@ -342,9 +350,9 @@ func _update_ghosts() -> void:
             var ok:bool = w.can_place(build_id, origin, build_size, relocating != null) == "";
             var h:float = maxf(0.3, Defs.BUILDINGS[build_id]["height"]);
             _show_box(0, Rect2i(origin, build_size), h, _mat_ok if ok else _mat_bad);
-        Mode.HARVEST, Mode.DEMOLISH:
+        Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH:
             var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
-            _show_box(0, r, 0.4, _mat_area if mode == Mode.HARVEST else _mat_bad);
+            _show_box(0, r, 0.4, _mat_bad if mode == Mode.DEMOLISH else _mat_area);
         Mode.ROAD:
             if _dragging:
                 var cells:Array[Vector2i] = _road_cells();

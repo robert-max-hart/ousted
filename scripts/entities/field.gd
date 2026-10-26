@@ -9,6 +9,7 @@ class_name Field extends Building;
 enum Plot { FALLOW, PLANTED, RIPE, DEAD };
 
 const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25};
+const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"plant": 2};     # ripe crops are gathered before anything is sown
 const NEAR_WATER_RANGE  :int = 4;
 const FALLOW_RECOVERY   :float = 0.01;     # fertility per day when unplanted
 
@@ -16,6 +17,7 @@ var crop_id     :StringName = &"wheat";
 var plot_state  :PackedByteArray;
 var plot_crop   :Array[StringName] = [];    # what was planted (crop may change mid-season)
 var growth      :PackedFloat32Array;
+var cuts        :PackedByteArray;           # harvests taken from the current sowing (multi-harvest crops)
 var moisture    :PackedFloat32Array;
 var near_water  :PackedByteArray;
 var reserved    :Array = [];                # Pawn or null per plot
@@ -29,6 +31,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     var n:int = plot_count();
     plot_state.resize(n);
     growth.resize(n);
+    cuts.resize(n);
     moisture.resize(n);
     near_water.resize(n);
     reserved.resize(n);
@@ -70,9 +73,9 @@ func plot_cell(i:int) -> Vector2i:
 func crop() -> Dictionary:
     return Defs.CROPS[crop_id];
 
-func cycle_crop() -> void:
-    var keys:Array = Defs.CROPS.keys();
-    crop_id = keys[(keys.find(crop_id) + 1) % keys.size()];
+func set_crop(id:StringName) -> void:
+    if Defs.CROPS.has(id):
+        crop_id = id;
 
 func fertility(i:int) -> float:
     return world.soil_fertility[world.terrain.index(plot_cell(i))];
@@ -81,8 +84,7 @@ func _set_fertility(i:int, v:float) -> void:
     world.soil_fertility[world.terrain.index(plot_cell(i))] = clampf(v, 0.0, 1.0);
 
 func can_plant() -> bool:
-    var s:int = GameClock.season();
-    if s != GameClock.Season.SPRING and s != GameClock.Season.SUMMER:
+    if not crop()["sow"].has(GameClock.season()):
         return false;
     return Weather.mean_temperature() >= crop()["min_temp"];
 
@@ -92,6 +94,7 @@ func to_dict() -> Dictionary:
     d["plot_state"] = plot_state;
     d["plot_crop"] = Array(plot_crop);
     d["growth"] = growth;
+    d["cuts"] = cuts;
     d["moisture"] = moisture;
     return d;
 
@@ -102,13 +105,16 @@ func restore_dict(d:Dictionary) -> void:
     for i in plot_count():
         plot_crop[i] = d["plot_crop"][i];
     growth = d["growth"];
+    cuts = d.get("cuts", PackedByteArray());
+    cuts.resize(plot_count());
     moisture = d["moisture"];
     _visual_dirty = true;
 
 # --------------------------------
 # Work for farmers
 
-# Returns {"index": int, "action": StringName} for the closest open plot, or {}.
+# Returns {"index": int, "action": StringName, "rank": float} for the most urgent open plot (harvest, then clearing,
+# then planting, the closest first within each), or {}. A lower rank is more urgent, across fields too.
 # has_room(item) -> bool, when given, stops harvesting crops that nothing could store.
 func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable()) -> Dictionary:
     if state != State.COMPLETE:
@@ -133,14 +139,14 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
                     action = &"plant";
         if action == &"" or (only_action != &"" and action != only_action):
             continue;
-        var d:float = Vector2(plot_cell(i) - from).length_squared();
+        var d:float = ACTION_PRIORITY[action] * 1.0e6 + Vector2(plot_cell(i) - from).length_squared();
         if d < best_d:
             best_d = d;
             best = i;
             best_action = action;
     if best < 0:
         return {};
-    return {"index": best, "action": best_action};
+    return {"index": best, "action": best_action, "rank": best_d};
 
 # Carries out a farming action; harvest output goes into the pawn's hands.
 func apply(i:int, action:StringName, pawn:Pawn) -> void:
@@ -150,14 +156,21 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
                 plot_state[i] = Plot.PLANTED;
                 plot_crop[i] = crop_id;
                 growth[i] = 0.0;
+                cuts[i] = 0;
         &"harvest":
             if plot_state[i] == Plot.RIPE:
                 var c:Dictionary = Defs.CROPS[plot_crop[i]];
                 var amount:int = maxi(1, roundi(c["yield"] * lerpf(0.4, 1.3, fertility(i))));
                 pawn.add_carry(c["item"], amount);
                 _set_fertility(i, fertility(i) + c["fertility"]);
-                plot_state[i] = Plot.FALLOW;
-                growth[i] = 0.0;
+                cuts[i] += 1;
+                if cuts[i] < c.get("harvests", 1):
+                    plot_state[i] = Plot.PLANTED;       # keeps producing: ripe again after regrow_days
+                    growth[i] = 1.0 - c["regrow_days"] / c["grow_days"];
+                else:
+                    plot_state[i] = Plot.FALLOW;
+                    growth[i] = 0.0;
+                    cuts[i] = 0;
         &"clear":
             plot_state[i] = Plot.FALLOW;
             growth[i] = 0.0;
@@ -242,9 +255,11 @@ func info_text() -> String:
     s += "Fallow %d, Growing %d, Ripe %d, Dead %d\n" % counts;
     s += "Soil fertility: %d%%\n" % roundi(fert / n * 100.0);
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
-    s += "Plants above %d C in spring/summer; frost below %d C kills it.\n" % [c["min_temp"], c["frost_temp"]];
+    s += "Sow in %s above %d C; frost below %d C kills it.\n" % [Defs.sow_text(crop_id), c["min_temp"], c["frost_temp"]];
+    if c.has("harvests"):
+        s += "Gives up to %d cuttings from one sowing.\n" % c["harvests"];
     if not can_plant() and counts[Plot.FALLOW] > 0:
-        s += "Not planting season or too cold.\n";
+        s += "Not the sowing season for this crop, or too cold.\n";
     return s;
 
 func _rebuild_crops() -> void:

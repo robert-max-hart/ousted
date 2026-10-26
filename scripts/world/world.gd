@@ -176,6 +176,10 @@ func _spawn_nature() -> void:
                 add_node(&"bush", c);
             elif slope < 1.0 and r < 0.004:
                 add_node(&"rock", c);
+            elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
+                add_node(&"mushroom", c);         # damp patches among the trees
+            elif slope < 1.0 and f > -0.3 and f <= -0.1 and r > 0.6 and r < 0.64:
+                add_node(&"hazel", c);            # groves on the open ground beside the woods
     renderer.mark_dirty();
 
 # Picks the flattest dry spot nearest the map center.
@@ -219,7 +223,14 @@ func leave_colony(p:Pawn) -> void:
     notify("%s has left the colony, unhappy." % p.first_name);
     if tools != null and tools.selected == p:
         tools.select(null);
+    _end_tasks_aimed_at(p);
     p.queue_free();
+
+# Stops what others are doing for a citizen who is about to be freed (a carer's callbacks still hold the baby).
+func _end_tasks_aimed_at(p:Pawn) -> void:
+    for q in pawns:
+        if q.task != null and is_same(q.task.target, p):
+            q.end_task(false);
 
 func add_body(p:Pawn, cause:String, at:Vector3) -> Body:
     var b:Body = Body.new();
@@ -771,6 +782,7 @@ func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
     notify("%s has died of %s." % [p.first_name, cause]);
     if tools != null and tools.selected == p:
         tools.select(null);
+    _end_tasks_aimed_at(p);
     p.queue_free();
 
 # --------------------------------
@@ -892,10 +904,13 @@ func _on_day(_d:int) -> void:
         notify("%d units of food spoiled yesterday." % _spoiled_today);
     _spoiled_today = 0;
     var s:int = GameClock.season();
-    if s == GameClock.Season.SPRING or s == GameClock.Season.SUMMER:
-        for rn in nodes:
-            if rn.regrows and rn.amount < rn.max_amount:
-                rn.amount += 1;
+    var day:int = GameClock.day_index();
+    var regrown:bool = false;
+    for rn in nodes:
+        if rn.regrows and rn.amount < rn.max_amount and (rn.def["fruit_seasons"] as Array).has(s) and day % rn.def["regrow_days"] == 0:
+            rn.amount += 1;
+            regrown = true;
+    if regrown:
         renderer.mark_dirty();
 
 func _apply_season(s:int) -> void:

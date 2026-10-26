@@ -56,10 +56,29 @@ func _ready() -> void:
     var bush:ArrayMesh = ArrayMesh.new();
     _add_part(bush, bush_shape, Transform3D(Basis(), Vector3(0, 0.3, 0)), _bush_mat);
 
+    var cap_shape:SphereMesh = SphereMesh.new();
+    cap_shape.radius = 0.22;
+    cap_shape.height = 0.3;
+    cap_shape.radial_segments = 6;
+    cap_shape.rings = 3;
+    var mushroom:ArrayMesh = ArrayMesh.new();
+    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(-0.2, 0.1, 0.1)), _make_material(Color(0.72, 0.5, 0.3)));
+    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.15, 0.1, -0.1)), _make_material(Color(0.8, 0.35, 0.25)));
+    _add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.05, 0.1, 0.25)), _make_material(Color(0.72, 0.5, 0.3)));
+    var hazel_shape:SphereMesh = SphereMesh.new();
+    hazel_shape.radius = 0.6;
+    hazel_shape.height = 1.1;
+    hazel_shape.radial_segments = 8;
+    hazel_shape.rings = 4;
+    var hazel:ArrayMesh = ArrayMesh.new();
+    _add_part(hazel, hazel_shape, Transform3D(Basis(), Vector3(0, 0.5, 0)), _make_material(Color(0.5, 0.52, 0.2)));
+
     _layers[&"tree"] = _make_layer(tree);
     _layers[&"rock"] = _make_layer(rock);
     _layers[&"ore"] = _make_layer(ore);
     _layers[&"bush"] = _make_layer(bush);
+    _layers[&"mushroom"] = _make_layer(mushroom);
+    _layers[&"hazel"] = _make_layer(hazel);
 
     var marker_shape:SphereMesh = SphereMesh.new();
     marker_shape.radius = 0.18;

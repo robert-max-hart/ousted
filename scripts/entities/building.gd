@@ -187,7 +187,8 @@ func production_cap(item:StringName) -> int:
 
 func production_allowed(item:StringName) -> bool:
     var cap:int = production_cap(item);
-    return cap <= 0 or Stock.amount(item) < cap;
+    var have:int = Stock.food_total() if item == &"food" else Stock.amount(item);     # "food" caps the whole food stock
+    return cap <= 0 or have < cap;
 
 # --------------------------------
 # Input inventory (production buildings: see "inputs" and "recipes" in Defs)

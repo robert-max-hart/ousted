@@ -33,10 +33,43 @@ func _ready() -> void:
     GameClock.set_speed(3);
     _issue_orders();
 
+# Share of the field's cells within reach of water (see Field.NEAR_WATER_RANGE). Plots out of reach dry out
+# and grow at about a third of the speed, so a player puts fields right beside the lake.
+func _watered_share(o:Vector2i, size:Vector2i) -> float:
+    var wet:int = 0;
+    for z in range(o.y, o.y + size.y):
+        for x in range(o.x, o.x + size.x):
+            if world.near_water(Vector2i(x, z), Field.NEAR_WATER_RANGE):
+                wet += 1;
+    return float(wet) / (size.x * size.y);
+
+# Puts up `count` fields on open ground, the best watered spots first (ties go to the nearest).
+func _place_fields(count:int) -> void:
+    var th:Building = world.town_hall;
+    var size:Vector2i = Defs.BUILDINGS[&"field"]["size"];
+    var spots:Array = [];
+    for dz in range(-28, 29, 2):
+        for dx in range(-28, 29, 2):
+            var o:Vector2i = th.origin + Vector2i(dx, dz);
+            if world.can_place(&"field", o, size) == "" and world._rect_free_of_nodes(Rect2i(o, size)):
+                spots.append([_watered_share(o, size), Vector2(dx, dz).length(), o]);
+    spots.sort_custom(func(a:Array, b:Array) -> bool:
+        return a[0] > b[0] + 0.05 or (absf(a[0] - b[0]) <= 0.05 and a[1] < b[1]));
+    var placed:int = 0;
+    for spot in spots:
+        if placed >= count:
+            break;
+        if world.can_place(&"field", spot[2], size) == "":
+            world.place_building(&"field", spot[2], size);
+            print("placed field at %s (%d%% watered)" % [spot[2], roundi(spot[0] * 100)]);
+            placed += 1;
+
 func _issue_orders() -> void:
     var th:Building = world.town_hall;
     var placed:int = 0;
-    var wanted:Array[StringName] = [&"house", &"field", &"well", &"house", &"field", &"mine", &"blacksmith", &"woodcutter"];
+    _place_fields(3);
+    var wanted:Array[StringName] = [&"house", &"well", &"house", &"woodcutter", &"blacksmith", &"mine"];
+    var industry:Array[StringName] = [&"woodcutter", &"blacksmith", &"mine"];       # put up finished: a builder would need weeks for everything
     for r in range(4, 24):
         for dz in range(-r, r + 1, 3):
             for dx in range(-r, r + 1, 3):
@@ -45,10 +78,14 @@ func _issue_orders() -> void:
                 var id:StringName = wanted[placed];
                 var size:Vector2i = Defs.BUILDINGS[id]["size"];
                 var o:Vector2i = th.origin + Vector2i(dx, dz);
-                if world.can_place(id, o, size) == "":
-                    world.place_building(id, o, size);
+                if world.can_place(id, o, size) == "" and world._rect_free_of_nodes(Rect2i(o, size)):       # open ground, like a player would pick
+                    world.place_building(id, o, size, industry.has(id));
                     print("placed %s at %s" % [id, o]);
                     placed += 1;
+    var fields:Array = world.buildings.filter(func(b:Building) -> bool: return b is Field);
+    var crops:Array[StringName] = [&"radish", &"wheat", &"barley"];      # quick spring food, the staple, and a hardy second grain (potatoes are too frost-tender to rely on here)
+    for i in mini(fields.size(), crops.size()):
+        (fields[i] as Field).set_crop(crops[i]);
     for pw in world.pawns:
         if pw.profession == JobManager.Profession.LABORER:
             pw.profession = JobManager.Profession.MINER;
@@ -56,10 +93,6 @@ func _issue_orders() -> void:
     for pw in world.pawns:
         if pw.profession == JobManager.Profession.LABORER:
             pw.profession = JobManager.Profession.BLACKSMITH;
-            break;
-    for pw in world.pawns:
-        if pw.profession == JobManager.Profession.BUILDER:
-            pw.profession = JobManager.Profession.WOODCUTTER;
             break;
     th.store(&"stone", 40);    # keeps the mine from starving for stone when the random world is unlucky
     th.store(&"coal", 6);       # no coal source yet, so seed some to exercise steel tools
@@ -154,7 +187,7 @@ func _exercise_death() -> void:
             victim = p;
     if victim == null:
         return;
-    world.jobs.change_profession(JobManager.Profession.WOODCUTTER, -1);     # frees a laborer to take the farmer's place
+    world.jobs.change_profession(JobManager.Profession.MINER, -1);     # frees a laborer to take the farmer's place
     victim.set_carry(&"wheat", 4);
     var piles_before:int = world.piles.size();
     var farmers_before:int = world.jobs.count(JobManager.Profession.FARMER);

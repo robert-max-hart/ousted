@@ -21,6 +21,14 @@ const ITEMS:Dictionary = {
     &"wheat":   {"name": "Wheat",   "color": Color(0.9, 0.78, 0.35), "food": true, "nutrition": 0.45, "spoil_days": 120.0},
     &"firewood": {"name": "Firewood", "color": Color(0.72, 0.5, 0.26), "spoil_days": 60.0, "outside_only": true, "heat": 1},
     &"beans":   {"name": "Beans",   "color": Color(0.45, 0.6, 0.3),  "food": true, "nutrition": 0.4, "spoil_days": 90.0},
+    &"mushrooms": {"name": "Mushrooms", "color": Color(0.7, 0.55, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 4.0},
+    &"hazelnuts": {"name": "Hazelnuts", "color": Color(0.65, 0.5, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 150.0},
+    &"radish":  {"name": "Radishes", "color": Color(0.85, 0.25, 0.3),  "food": true, "nutrition": 0.18, "spoil_days": 20.0},
+    &"lettuce": {"name": "Lettuce", "color": Color(0.5, 0.8, 0.35),   "food": true, "nutrition": 0.12, "spoil_days": 6.0},
+    &"barley":  {"name": "Barley",  "color": Color(0.8, 0.7, 0.4),    "food": true, "nutrition": 0.4,  "spoil_days": 120.0},
+    &"potato":  {"name": "Potatoes", "color": Color(0.7, 0.55, 0.35), "food": true, "nutrition": 0.5,  "spoil_days": 60.0},
+    &"cabbage": {"name": "Cabbages", "color": Color(0.55, 0.75, 0.45), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
+    &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 50.0},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
     &"tool_wood":  {"name": "Wooden Tool", "color": Color(0.7, 0.55, 0.35), "tool": {"bonus": 0.10, "uses": 100.0}},
     &"tool_iron":  {"name": "Iron Tool",   "color": Color(0.6, 0.6, 0.65),  "tool": {"bonus": 0.25, "uses": 200.0}},
@@ -131,6 +139,18 @@ const BUILDINGS:Dictionary = {
         ],
         "desc": "Fells and plants trees in a radius, and splits wood fetched from storage into firewood (1 wood makes 5). Stores the firewood.",
     },
+    &"forager": {
+        "name": "Forager's Hut", "size": Vector2i(3, 3), "cost": {&"wood": 12}, "work": 8.0,
+        "shape": "house", "height": 1.6, "color": Color(0.42, 0.45, 0.28), "roof": Color(0.3, 0.38, 0.2),
+        "radius": 16.0, "worker_slots": 2, "profession": "FORAGER",
+        "controls": [
+            {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true},
+            {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true},
+            {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true},
+            {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 120, "step": 20},
+        ],
+        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
+    },
     &"mine": {
         "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
         "shape": "mine", "height": 1.6, "color": Color(0.5, 0.48, 0.45), "roof": Color(0.36, 0.28, 0.2),
@@ -210,31 +230,74 @@ const BUILDINGS:Dictionary = {
     },
 };
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
 
-# grow_days:  days to ripen at ideal conditions
+# grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
 # frost_temp: unripe crops die below this
 # fertility:  soil fertility change per harvest (negative = depletes)
+# sow:        seasons it can be planted in (0 spring, 1 summer, 2 autumn, 3 winter), as well as being above min_temp
+# harvests:   optional. A crop that keeps producing: it can be harvested this many times per sowing, regrowing in
+#             regrow_days after each harvest, and then the plot is fallow again. Without it, one harvest per sowing.
+# desc:       one line shown when picking the crop
 const CROPS:Dictionary = {
     &"wheat": {
-        "name": "Wheat", "item": &"wheat", "grow_days": 9.0, "min_temp": 4.0, "frost_temp": -2.0,
+        "name": "Wheat", "item": &"wheat", "grow_days": 9.0, "min_temp": 4.0, "frost_temp": -2.0, "sow": [0, 1],
         "yield": 3, "fertility": -0.15, "color": Color(0.88, 0.75, 0.3),
+        "desc": "The staple grain. Slow, and a heavy feeder.",
     },
     &"beans": {
-        "name": "Beans", "item": &"beans", "grow_days": 7.0, "min_temp": 8.0, "frost_temp": 0.5,
+        "name": "Beans", "item": &"beans", "grow_days": 7.0, "min_temp": 8.0, "frost_temp": 0.5, "sow": [0, 1],
         "yield": 2, "fertility": 0.1, "color": Color(0.35, 0.55, 0.25),
+        "desc": "Puts nitrogen back into the soil. Wants warm weather.",
+    },
+    &"radish": {
+        "name": "Radishes", "item": &"radish", "grow_days": 4.0, "min_temp": 1.0, "frost_temp": -4.0, "sow": [0, 1, 2],
+        "yield": 3, "fertility": -0.04, "color": Color(0.85, 0.25, 0.3),
+        "desc": "Very quick and hardy, so the first food of spring, but small and not filling.",
+    },
+    &"lettuce": {
+        "name": "Lettuce", "item": &"lettuce", "grow_days": 5.0, "min_temp": 3.0, "frost_temp": -2.0, "sow": [0, 1, 2],
+        "yield": 2, "fertility": -0.04, "color": Color(0.5, 0.8, 0.35), "harvests": 4, "regrow_days": 3.0,
+        "desc": "Cuts four times from one sowing. Spoils quickly.",
+    },
+    &"barley": {
+        "name": "Barley", "item": &"barley", "grow_days": 8.0, "min_temp": 2.0, "frost_temp": -5.0, "sow": [0],
+        "yield": 3, "fertility": -0.12, "color": Color(0.8, 0.7, 0.4),
+        "desc": "A hardy grain that starts in the cold and shrugs off frost. Spring only.",
+    },
+    &"potato": {
+        "name": "Potatoes", "item": &"potato", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0, "sow": [0],
+        "yield": 6, "fertility": -0.2, "color": Color(0.7, 0.55, 0.35),
+        "desc": "A big harvest and very filling, but slow, frost-tender and very hard on the soil.",
+    },
+    &"cabbage": {
+        "name": "Cabbage", "item": &"cabbage", "grow_days": 10.0, "min_temp": 3.0, "frost_temp": -4.0, "sow": [0, 1],
+        "yield": 3, "fertility": -0.15, "color": Color(0.55, 0.75, 0.45),
+        "desc": "Cool-season, keeps well, adds variety to the diet.",
+    },
+    &"pumpkin": {
+        "name": "Pumpkins", "item": &"pumpkin", "grow_days": 16.0, "min_temp": 10.0, "frost_temp": 2.0, "sow": [0],
+        "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15),
+        "desc": "One huge, slow harvest a year, which needs a warm season.",
     },
 };
 
 # solid:    blocks walking (pawns work from an adjacent cell)
 # auto:     gathered without player designation (foraging)
-# regrows:  not removed when empty; refills in the growing season
+# regrows:  not removed when empty; refills while it is in season
+# forage:   a wild food the Forage tool and the Forager's Hut can pick (berry bushes are also picked by gatherers on their own)
+# fruit_seasons, regrow_days: it gains one unit every regrow_days days, only in these seasons (0 spring to 3 winter)
 const RESOURCE_NODES:Dictionary = {
     &"tree": {"name": "Pine Tree",    "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0},
     &"rock": {"name": "Rock",         "item": &"stone",   "amount": 8,  "work": 0.6,  "solid": true,  "verb": "Quarrying"},
     &"ore":  {"name": "Iron Deposit", "item": &"iron",    "amount": 6,  "work": 1.2,  "solid": true,  "verb": "Mining"},
-    &"bush": {"name": "Berry Bush",   "item": &"berries", "amount": 5,  "work": 0.3,  "solid": false, "verb": "Foraging", "auto": true, "regrows": true},
+    &"bush": {"name": "Berry Bush",   "item": &"berries", "amount": 5,  "work": 0.3,  "solid": false, "verb": "Foraging", "auto": true, "regrows": true,
+              "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1},
+    &"mushroom": {"name": "Mushrooms", "item": &"mushrooms", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking", "regrows": true,
+              "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2},
+    &"hazel": {"name": "Hazel Grove", "item": &"hazelnuts", "amount": 6, "work": 0.5, "solid": false, "verb": "Gathering nuts", "regrows": true,
+              "forage": true, "fruit_seasons": [2], "regrow_days": 1},
 };
 
 # How much faster or slower things spoil at an air temperature (1.0 at 10 C). Doubles for every
@@ -400,6 +463,14 @@ const FIREWOOD_PER_DAY_AT_0C:float = 2.0;   # burn rate at 0 C; scales linearly 
 const TOOL_PRIORITY:Array[StringName] = [&"tool_steel", &"tool_iron", &"tool_wood"];   # best first, for equipping
 const HARD_ORE_UNTOOLED_SPEED:float = 0.25;
 const MINE_BATCH        :int = 4;       # units dug per task
+
+# A crop's season window as words, such as "Spring to Autumn" or "Spring".
+static func sow_text(crop_id:StringName) -> String:
+    var seasons:Array = CROPS[crop_id]["sow"];
+    var names:Array[String] = ["Spring", "Summer", "Autumn", "Winter"];
+    if seasons.size() == 1:
+        return names[seasons[0]];
+    return "%s to %s" % [names[seasons[0]], names[seasons[seasons.size() - 1]]];
 
 static func is_food(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].get("food", false);

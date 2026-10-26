@@ -6,9 +6,9 @@
 # ----------------------------------------------------------------
 class_name JobManager extends TaskBase;
 
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager"];
 const MAX_BUILDERS_PER_SITE :int = 4;
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
 
@@ -99,6 +99,8 @@ func _job_order(prof:int) -> Array[Callable]:
             return [_forage_task, _clear_task, _haul_task, _fuel_task, _collect_task];
         Profession.WOODCUTTER:
             return [production.woodcutter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.FORAGER:
+            return [production.forager_task, _forage_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.TEACHER:
             return [school.teach_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.BLACKSMITH:
@@ -431,11 +433,10 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
         var w:Dictionary = (b as Field).find_work(pc, only_action, Stock.has_room_for);
         if w.is_empty():
             continue;
-        var d:float = Vector2((b as Field).plot_cell(w["index"]) - pc).length_squared();
-        if d < best_d:
+        if w["rank"] < best_d:
             best = b as Field;
             best_work = w;
-            best_d = d;
+            best_d = w["rank"];
     if best == null:
         return null;
     var f:Field = best;
