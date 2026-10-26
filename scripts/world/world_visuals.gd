@@ -60,16 +60,13 @@ func setup_environment() -> void:
 const WATER_SHALLOW :Color = Color(0.36, 0.62, 0.68);
 const WATER_DEEP    :Color = Color(0.18, 0.38, 0.55);
 const WATER_FADE    :float = 0.6;       # depth (m) at which water becomes fully opaque
-const WATER_MARGIN  :float = 100.0;     # flat skirt past the map edge
 
 func rebuild_water() -> void:
     if _water == null:
         return;
     var xs:PackedFloat32Array = PackedFloat32Array();
-    xs.append(-WATER_MARGIN);
     for i in Terrain.SIZE + 1:
         xs.append(float(i));
-    xs.append(Terrain.SIZE + WATER_MARGIN);
     var n:int = xs.size();
     var verts:PackedVector3Array = PackedVector3Array();
     var colors:PackedColorArray = PackedColorArray();
@@ -228,6 +225,8 @@ func _update_precip() -> void:
         return;
     var wet:float = Weather.intensity;
     var snow_f:float = Weather.snow_fraction();
+    _rain.speed_scale = GameClock.speed();       # rain and snow stop when the game is paused and run faster when it is sped up
+    _snow.speed_scale = GameClock.speed();
     _rain.emitting = wet > 0.01 and snow_f < 1.0;
     _snow.emitting = wet > 0.01 and snow_f > 0.0;
     var rain_mat:StandardMaterial3D = (_rain.mesh as BoxMesh).material as StandardMaterial3D;

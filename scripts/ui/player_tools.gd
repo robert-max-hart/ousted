@@ -16,7 +16,7 @@ const MODE_HINTS:Dictionary = {
 	Mode.BUILD:    "Click to place. R rotates. Right-click to stop building.",
 	Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
 	Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
-	Mode.ROAD:     "Drag to lay a road. Roads speed up walking.",
+	Mode.ROAD:     "Drag to lay a road. Roads speed up walking. Trees and rocks in the way are marked for clearing, and the road goes in once they are gone.",
 	Mode.DEMOLISH: "Drag to remove buildings and roads and to cancel harvest marks.",
 	Mode.RAISE:    "Hold the left mouse button to raise the ground.",
 	Mode.LOWER:    "Hold the left mouse button to lower the ground.",
@@ -25,7 +25,6 @@ const MODE_HINTS:Dictionary = {
 const BRUSH_RADIUS  :float = 2.5;
 const BRUSH_RATE    :float = 3.0;      # metres per second
 const PICK_PIXELS   :float = 22.0;
-const FIELD_MIN_SIDE:int = 2;
 const FIELD_MAX_SIDE:int = 16;
 
 var mode        :int = Mode.SELECT;
@@ -51,6 +50,7 @@ var _mat_ok     :StandardMaterial3D;
 var _mat_bad    :StandardMaterial3D;
 var _mat_area   :StandardMaterial3D;
 var _ring       :MeshInstance3D;
+var _frame      :Array[MeshInstance3D] = [];       # four bars outlining a selected building's footprint
 
 func _ready() -> void:
 	_mat_ok = _ghost_material(Color(0.3, 0.9, 0.4, 0.4));
@@ -68,7 +68,18 @@ func _ready() -> void:
 	torus.inner_radius = 0.45;
 	torus.outer_radius = 0.6;
 	_ring.mesh = torus;
-	_ring.material_override = _ghost_material(Color(1.0, 0.95, 0.5, 0.9));
+	torus.inner_radius = 0.5;
+	torus.outer_radius = 0.58;
+	var frame_mat:StandardMaterial3D = _ghost_material(Color(1.0, 0.95, 0.5, 0.8));
+	_ring.material_override = frame_mat;
+	for i in 4:
+		var bar:MeshInstance3D = MeshInstance3D.new();
+		bar.mesh = BoxMesh.new();
+		bar.material_override = frame_mat;
+		bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+		bar.visible = false;
+		add_child(bar);
+		_frame.append(bar);
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
 	_ring.visible = false;
 	add_child(_ring);
@@ -89,10 +100,12 @@ func set_mode(m:int, id:StringName = &"") -> void:
 	relocating = null;
 	if m == Mode.BUILD:
 		build_size = Defs.BUILDINGS[id]["size"];
+		if _is_field_mode():
+			build_size = Vector2i(_min_side(), _min_side());       # a click places the smallest size; drag to make it bigger
 		hint = "%s (%s). %s" % [Defs.BUILDINGS[id]["name"], Defs.cost_string(Defs.BUILDINGS[id]["cost"]), MODE_HINTS[m]];
 		if _is_field_mode():
-			hint = "%s. Drag to size it (%d to %d cells a side), or click for a default %dx%d." % [
-				Defs.BUILDINGS[id]["name"], FIELD_MIN_SIDE, FIELD_MAX_SIDE, build_size.x, build_size.y];
+			hint = "%s. Click for the smallest size (%dx%d), or press and drag to size it (up to %d cells a side)." % [
+				Defs.BUILDINGS[id]["name"], _min_side(), _min_side(), FIELD_MAX_SIDE];
 	else:
 		hint = MODE_HINTS[m];
 	error = "";
@@ -199,7 +212,7 @@ func _on_release() -> void:
 		Mode.BUILD:
 			# a plain click (no drag) keeps the default footprint
 			var fr:Rect2i = _field_rect();
-			error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "%s must be at least %dx%d." % [Defs.BUILDINGS[build_id]["name"], FIELD_MIN_SIDE, FIELD_MIN_SIDE];
+			error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "%s must be at least %dx%d." % [Defs.BUILDINGS[build_id]["name"], _min_side(), _min_side()];
 			if error == "":
 				World.instance.place_building(build_id, fr.position, fr.size);
 		Mode.HARVEST:
@@ -218,7 +231,7 @@ func _on_release() -> void:
 			error = "" if picked > 0 else "Nothing to forage there.";
 		Mode.ROAD:
 			for c in _road_cells():
-				w.set_road(c, true);
+				w.plan_road(c);
 		Mode.DEMOLISH:
 			var r:Rect2i = _drag_rect();
 			for b in w.buildings.duplicate():
@@ -230,6 +243,9 @@ func _on_release() -> void:
 			for rn in w.nodes:
 				if r.has_point(rn.cell) and w.occupant[w.idx(rn.cell)] == null:
 					w.set_designated(rn, false);
+			for c in w.pending_roads.keys():
+				if r.has_point(c):
+					w.pending_roads.erase(c);
 
 # --------------------------------
 # Per-frame
@@ -280,10 +296,15 @@ func _field_rect() -> Rect2i:
 	var far:Vector2i = _drag_start + Vector2i(clampi(d.x, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1), clampi(d.y, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1));
 	var lo:Vector2i = Vector2i(mini(_drag_start.x, far.x), mini(_drag_start.y, far.y));
 	var hi:Vector2i = Vector2i(maxi(_drag_start.x, far.x), maxi(_drag_start.y, far.y));
-	return Rect2i(lo, hi - lo + Vector2i.ONE);
+	var size:Vector2i = hi - lo + Vector2i.ONE;
+	return Rect2i(lo, Vector2i(maxi(size.x, _min_side()), maxi(size.y, _min_side())));       # a thin drag grows to the minimum
+
+# The smallest side of a variable-sized building (min_side in its def, default 1).
+func _min_side() -> int:
+	return Defs.BUILDINGS[build_id].get("min_side", 1);
 
 func _field_rect_valid(r:Rect2i) -> bool:
-	return r.size.x >= FIELD_MIN_SIDE and r.size.y >= FIELD_MIN_SIDE;
+	return r.size.x >= _min_side() and r.size.y >= _min_side();
 
 func _drag_rect() -> Rect2i:
 	var a:Vector2i = _drag_start;
@@ -337,6 +358,7 @@ func _pick() -> Variant:
 func _update_ghosts() -> void:
 	for g in _ghosts:
 		g.visible = false;
+	_update_preview();
 	if not _hover_ok:
 		return;
 	var w:World = World.instance;
@@ -359,14 +381,39 @@ func _update_ghosts() -> void:
 				var cells:Array[Vector2i] = _road_cells();
 				var a:Vector2i = _drag_start;
 				var b:Vector2i = _hover_cell;
-				_show_box(0, Rect2i(Vector2i(mini(a.x, b.x), a.y), Vector2i(absi(b.x - a.x) + 1, 1)), 0.2, _mat_ok);
+				var road_mat:StandardMaterial3D = _mat_ok if cells.all(w.can_plan_road) else _mat_bad;      # red: part of it can't be laid
+				_show_box(0, Rect2i(Vector2i(mini(a.x, b.x), a.y), Vector2i(absi(b.x - a.x) + 1, 1)), 0.2, road_mat);
 				if cells.size() > absi(b.x - a.x) + 1:
-					_show_box(1, Rect2i(Vector2i(b.x, mini(a.y, b.y)), Vector2i(1, absi(b.y - a.y) + 1)), 0.2, _mat_ok);
+					_show_box(1, Rect2i(Vector2i(b.x, mini(a.y, b.y)), Vector2i(1, absi(b.y - a.y) + 1)), 0.2, road_mat);
 			else:
-				_show_box(0, Rect2i(_hover_cell, Vector2i.ONE), 0.2, _mat_ok);
+				_show_box(0, Rect2i(_hover_cell, Vector2i.ONE), 0.2, _mat_ok if w.can_plan_road(_hover_cell) else _mat_bad);
 		Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
 			var rr:int = ceili(BRUSH_RADIUS);
 			_show_box(0, Rect2i(_hover_cell - Vector2i(rr, rr) + Vector2i.ONE, Vector2i(rr * 2 - 1, rr * 2 - 1)), 0.3, _mat_area);
+
+# While marking trees, rocks or forage, the things the selection would mark change colour.
+func _update_preview() -> void:
+	var renderer:ResourceRenderer = World.instance.renderer;
+	if not _hover_ok or (mode != Mode.HARVEST and mode != Mode.FORAGE):
+		renderer.set_preview(Rect2i(), Callable());
+		return;
+	var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
+	renderer.set_preview(r, _harvest_filter if mode == Mode.HARVEST else _forage_filter);
+
+func _harvest_filter(rn:ResourceNode) -> bool:
+	return not rn.is_auto() and not rn.is_forageable() and not rn.designated;
+
+func _forage_filter(rn:ResourceNode) -> bool:
+	return rn.is_forageable() and not rn.designated;
+
+# The footprint being placed by a variable-sized building tool, as text ("6x8 tiles, 48 total"), or "".
+func size_text() -> String:
+	if mode != Mode.BUILD or not _is_field_mode() or not _hover_ok:
+		return "";
+	var r:Rect2i = _field_rect() if _dragging else Rect2i(_build_origin(), build_size);
+	if r.size == Vector2i.ONE:
+		return "1x1 tile";
+	return "%dx%d tiles, %d total" % [r.size.x, r.size.y, r.size.x * r.size.y];
 
 func _show_box(i:int, r:Rect2i, height:float, mat:Material) -> void:
 	var t:Terrain = World.instance.terrain;
@@ -422,14 +469,35 @@ func _update_ring() -> void:
 		_ring.scale = Vector3.ONE;
 		_ring.position = (selected as Pawn).position + Vector3(0, 0.05, 0);
 	elif selected is Building:
-		var b:Building = selected;
-		var c:Vector2 = Vector2(b.origin) + Vector2(b.size) * 0.5;
-		_ring.scale = Vector3.ONE * maxf(b.size.x, b.size.y) * 0.85;
-		_ring.position = Vector3(c.x, World.instance.terrain.height_at(c.x, c.y) + 0.1, c.y);
+		_ring.visible = false;
+		_update_frame((selected as Building).rect());
+		return;
 	elif selected is ResourceNode:
 		var rn:ResourceNode = selected;
-		_ring.scale = Vector3.ONE * 1.2;
+		_ring.scale = Vector3.ONE * 1.0;
 		_ring.position = World.instance.terrain.cell_center(rn.cell) + Vector3(0, 0.05, 0);
+	for bar in _frame:
+		bar.visible = false;
+
+# A thin rectangular outline around the footprint, held just above the highest ground under it.
+func _update_frame(r:Rect2i) -> void:
+	const BAR:float = 0.12;
+	var hr:Vector2 = World.instance.terrain.rect_height_range(r.intersection(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE)));
+	var y:float = hr.y + 0.12;
+	var x0:float = r.position.x;
+	var z0:float = r.position.y;
+	var w:float = r.size.x;
+	var d:float = r.size.y;
+	var parts:Array = [
+		[Vector3(w, BAR, BAR), Vector3(x0 + w * 0.5, y, z0 + BAR * 0.5)],
+		[Vector3(w, BAR, BAR), Vector3(x0 + w * 0.5, y, z0 + d - BAR * 0.5)],
+		[Vector3(BAR, BAR, d), Vector3(x0 + BAR * 0.5, y, z0 + d * 0.5)],
+		[Vector3(BAR, BAR, d), Vector3(x0 + w - BAR * 0.5, y, z0 + d * 0.5)],
+	];
+	for i in 4:
+		(_frame[i].mesh as BoxMesh).size = parts[i][0];
+		_frame[i].position = parts[i][1];
+		_frame[i].visible = true;
 
 func _ghost_material(c:Color) -> StandardMaterial3D:
 	var m:StandardMaterial3D = StandardMaterial3D.new();

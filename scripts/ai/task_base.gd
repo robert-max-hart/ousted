@@ -20,7 +20,7 @@ func count(prof:int) -> int:
 
 # The job a gathered resource counts as: trees are woodcutting, rock and ore mining, anything else gathering.
 func _node_job(rn:ResourceNode) -> int:
-    if rn.kind == &"tree":
+    if rn.is_tree():
         return JobManager.Profession.WOODCUTTER;
     if rn.item == &"iron" or rn.item == &"stone":
         return JobManager.Profession.MINER;
@@ -42,11 +42,13 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
     var pc:Vector2 = Vector2(p.position.x, p.position.z);
     var room:Dictionary = {};     # item -> whether any storage has space (checked once per item)
     for rn in world.nodes:
-        if rn.reserved_by != null or rn.amount <= 0 or not pred.call(rn) or p.has_failed(rn):
+        if rn.reserved_by != null or (rn.amount <= 0 and not rn.clearing) or not pred.call(rn) or p.has_failed(rn):
             continue;
-        if not room.has(rn.item):
+        if rn.amount <= 0:
+            pass;       # nothing to carry, so no storage is needed to clear it
+        elif not room.has(rn.item):
             room[rn.item] = Stock.has_room_for(rn.item);
-        if not room[rn.item]:
+        if rn.amount > 0 and not room[rn.item]:
             continue;
         var d:float = pc.distance_squared_to(Vector2(rn.cell) + Vector2(0.5, 0.5));
         if d < best_d:
@@ -63,8 +65,11 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
     t.target = rn;
     t.move_cell(rn.cell, "Walking to %s" % rn.display_name().to_lower());
     t.work(func(pw:Pawn, dh:float) -> bool:
-        if rn.removed or rn.amount <= 0:
+        if rn.removed:
             return true;
+        if rn.amount <= 0:
+            st["acc"] += dh;                 # an empty bush in the way: a moment's work to pull it up
+            return st["acc"] >= rn.work_per_unit;
         st["acc"] += dh;
         while st["acc"] >= rn.work_per_unit and rn.amount > 0 and pw.carry_amount < Pawn.CARRY_CAP:
             st["acc"] -= rn.work_per_unit;
@@ -74,6 +79,6 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
         return rn.amount <= 0 or pw.carry_amount >= Pawn.CARRY_CAP);
     t.on_end = func(_pw:Pawn) -> void:
         rn.reserved_by = null;
-        if rn.amount <= 0 and not rn.regrows and not rn.removed:
+        if rn.amount <= 0 and (not rn.regrows or rn.clearing) and not rn.removed:
             world.remove_node(rn);
     return t;

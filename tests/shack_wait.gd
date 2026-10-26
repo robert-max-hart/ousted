@@ -17,11 +17,11 @@ func _ready() -> void:
     var th:Building = world.town_hall;
     var shacks:Callable = func() -> int:
         return world.buildings.filter(func(b:Building) -> bool: return b.def.get("shack", false)).size();
-    _expect("six homeless", world.families.homeless_count() == 6);
-    world.place_building(&"house", th.origin + Vector2i(-8, 0), Vector2i(3, 3));    # a site: 6 beds
-    world.families._build_shacks();
-    _expect("a house going up holds everyone: no shack", shacks.call() == 0);
+    _expect("eight homeless", world.families.homeless_count() == 8);
+    world.place_building(&"house", th.origin + Vector2i(-8, 0), Vector2i(3, 3));    # sites: 6 beds each
     world.place_building(&"house", th.origin + Vector2i(-12, 0), Vector2i(3, 3));
+    world.families._build_shacks();
+    _expect("houses going up hold everyone: no shack", shacks.call() == 0);
     for b in world.buildings:
         if b.def_id == &"house":
             b.def = b.def.duplicate();

@@ -112,8 +112,8 @@ const BUILDINGS:Dictionary = {
     &"stockpile": {
         "name": "Stockpile", "size": Vector2i(4, 4), "cost": {&"wood": 4}, "work": 3.0,
         "shape": "pile", "height": 0.15, "color": Color(0.5, 0.42, 0.3),
-        "storage": true, "capacity": 150, "walkable": true,
-        "desc": "An open area where citizens drop off goods. Holds 150 units. Item filters can be set in the inspector.",
+        "storage": true, "capacity": 150, "walkable": true, "drag_size": true, "flatten": true, "scalable": true,
+        "desc": "An open area where citizens drop off goods. Drag to size it: a 4x4 holds 150 units, and cost and capacity grow with the area. Item filters can be set in the inspector.",
     },
     &"granary": {
         "name": "Granary", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 14.0,
@@ -148,7 +148,16 @@ const BUILDINGS:Dictionary = {
             {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true},
             {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true},
             {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 120, "step": 20},
+            {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation"},
+            {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation"},
+            {"id": "sow_hazel", "type": "toggle", "label": "Sow hazel", "default": false, "requires_upgrade": &"cultivation"},
         ],
+        "upgrades": {
+            &"cultivation": {
+                "name": "Cultivation", "cost": {&"wood": 20, &"stone": 6}, "work": 20.0,
+                "desc": "Foragers with nothing to pick sow new patches of the wild foods you switch on, near the hut. Wild patches also spread by themselves, only slowly.",
+            },
+        },
         "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
     },
     &"mine": {
@@ -209,13 +218,13 @@ const BUILDINGS:Dictionary = {
     &"field": {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
         "shape": "field", "height": 0.0, "color": Color(0.4, 0.28, 0.18),
-        "field": true, "drag_size": true, "walkable": true, "relocatable": false,
+        "field": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
         "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector.",
     },
     &"graveyard": {
         "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
-        "graveyard": true, "drag_size": true, "walkable": true, "relocatable": false,
+        "graveyard": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
         "inputs": {&"coal": 4},
         "upgrades": {
             &"crematorium": {
@@ -229,6 +238,10 @@ const BUILDINGS:Dictionary = {
         "desc": "One grave per square. Citizens bury the dead here, which softens the grief. A grave frees its square after 10 years. It can't be demolished while any grave is in use.",
     },
 };
+
+# One farmer position per this many field plots (measured with tests/farmer_probe: a farmer sows a 64 plot field in
+# about two days and ripe plots wait about a day before they are picked).
+const PLOTS_PER_FARMER:int = 64;
 
 const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
 
@@ -285,19 +298,22 @@ const CROPS:Dictionary = {
 
 # solid:    blocks walking (pawns work from an adjacent cell)
 # auto:     gathered without player designation (foraging)
+# tree:     a wood tree: woodcutters chop and replant it (oak is deciduous: bare in winter)
 # regrows:  not removed when empty; refills while it is in season
 # forage:   a wild food the Forage tool and the Forager's Hut can pick (berry bushes are also picked by gatherers on their own)
+# spread_chance, max_total: each day a mature patch seeds a new one beside it with this chance (more with trees close by), until there are max_total of the kind
 # fruit_seasons, regrow_days: it gains one unit every regrow_days days, only in these seasons (0 spring to 3 winter)
 const RESOURCE_NODES:Dictionary = {
-    &"tree": {"name": "Pine Tree",    "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0},
+    &"tree": {"name": "Pine Tree",    "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0, "tree": true},
+    &"oak":  {"name": "Oak Tree",     "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0, "tree": true},
     &"rock": {"name": "Rock",         "item": &"stone",   "amount": 8,  "work": 0.6,  "solid": true,  "verb": "Quarrying"},
     &"ore":  {"name": "Iron Deposit", "item": &"iron",    "amount": 6,  "work": 1.2,  "solid": true,  "verb": "Mining"},
     &"bush": {"name": "Berry Bush",   "item": &"berries", "amount": 5,  "work": 0.3,  "solid": false, "verb": "Foraging", "auto": true, "regrows": true,
-              "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1},
+              "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1, "spread_chance": 0.006, "max_total": 140},
     &"mushroom": {"name": "Mushrooms", "item": &"mushrooms", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking", "regrows": true,
-              "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2},
+              "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2, "spread_chance": 0.008, "max_total": 110},
     &"hazel": {"name": "Hazel Grove", "item": &"hazelnuts", "amount": 6, "work": 0.5, "solid": false, "verb": "Gathering nuts", "regrows": true,
-              "forage": true, "fruit_seasons": [2], "regrow_days": 1},
+              "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.004, "max_total": 80},
 };
 
 # How much faster or slower things spoil at an air temperature (1.0 at 10 C). Doubles for every

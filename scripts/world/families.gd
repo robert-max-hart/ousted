@@ -20,6 +20,7 @@ func on_day() -> void:
     _births();
     assign_homes();
     _rehouse_couples();
+    _move_out_to_empty();
 
 # --------------------------------
 # Pairing
@@ -70,11 +71,14 @@ func _move_in_together(a:Pawn, b:Pawn) -> void:
         move_home(from, to.home);
 
 func move_home(p:Pawn, b:Building) -> void:
-    if p.home != null:
-        p.home.residents.erase(p);
+    var old:Building = p.home;
+    if old != null:
+        old.residents.erase(p);
+        old.update_windows();
     p.home = b;
     if b != null:
         b.residents.append(p);
+        b.update_windows();
 
 # --------------------------------
 # Pregnancy and birth
@@ -195,6 +199,44 @@ func _rehouse_couples() -> void:
             continue;
         move_home(a, to);
         move_home(b, to);
+
+# Citizens (and their partner) who share a house with nobody they are related to move out to the nearest empty
+# house, when there is one. A child or parent in the house keeps them where they are.
+func _move_out_to_empty() -> void:
+    for p in world.pawns.duplicate():
+        if p.home == null or not p.is_adult() or lives_in_shack(p) or p.home.residents.size() < 2:
+            continue;
+        var unit:Array[Pawn] = [p];
+        if p.partner != null and p.partner.home == p.home:
+            unit.append(p.partner);
+        if unit.size() >= p.home.residents.size() or _has_kin_among(unit, p.home.residents):
+            continue;
+        var to:Building = _nearest_empty_house(p.position, unit.size());
+        if to == null:
+            return;
+        for u in unit:
+            move_home(u, to);
+
+func _has_kin_among(unit:Array[Pawn], others:Array[Pawn]) -> bool:
+    for r in others:
+        if unit.has(r):
+            continue;
+        for u in unit:
+            if are_kin(u, r):
+                return true;
+    return false;
+
+func _nearest_empty_house(pos:Vector3, beds:int) -> Building:
+    var best:Building = null;
+    var best_d:float = INF;
+    for b in world.buildings:
+        if not house_has_room(b) or not b.residents.is_empty() or b.def["beds"] < beds:
+            continue;
+        var d:float = b.position.distance_squared_to(pos);
+        if d < best_d:
+            best = b;
+            best_d = d;
+    return best;
 
 # Those closest to a citizen: their partner, parents, children and siblings who are adults and alive.
 func kin_of(c:Pawn) -> Array[Pawn]:

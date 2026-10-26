@@ -21,7 +21,7 @@ var cuts        :PackedByteArray;           # harvests taken from the current so
 var moisture    :PackedFloat32Array;
 var near_water  :PackedByteArray;
 var reserved    :Array = [];                # Pawn or null per plot
-var _crops_mmi  :MultiMeshInstance3D;
+var _layers     :Dictionary = {};           # plant shape -> MultiMeshInstance3D drawing those plots
 var _visual_dirty:bool = true;
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
@@ -39,20 +39,15 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     for i in n:
         moisture[i] = 0.5;
         near_water[i] = 1 if _is_near_water(plot_cell(i)) else 0;
-    var mm:MultiMesh = MultiMesh.new();
-    mm.transform_format = MultiMesh.TRANSFORM_3D;
-    mm.use_colors = true;
-    var box:BoxMesh = BoxMesh.new();
-    box.size = Vector3(0.75, 1.0, 0.75);
-    mm.mesh = box;
-    var mat:StandardMaterial3D = StandardMaterial3D.new();
-    mat.vertex_color_use_as_albedo = true;
-    mat.vertex_color_is_srgb = true;
-    mat.roughness = 1.0;
-    _crops_mmi = MultiMeshInstance3D.new();
-    _crops_mmi.multimesh = mm;
-    _crops_mmi.material_override = mat;
-    add_child(_crops_mmi);
+    for shape in CropMeshes.SHAPES:
+        var mm:MultiMesh = MultiMesh.new();
+        mm.transform_format = MultiMesh.TRANSFORM_3D;
+        mm.use_colors = true;
+        mm.mesh = CropMeshes.mesh_for(shape);
+        var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
+        mmi.multimesh = mm;
+        add_child(mmi);
+        _layers[shape] = mmi;
 
 func _process(_delta:float) -> void:
     if _visual_dirty:
@@ -239,6 +234,10 @@ func _is_near_water(c:Vector2i) -> bool:
 # --------------------------------
 # Info / visuals
 
+# Farmer positions this field counts for in the Professions panel.
+func farmer_positions() -> int:
+    return ceili(float(plot_count()) / Defs.PLOTS_PER_FARMER);
+
 func info_text() -> String:
     if state != State.COMPLETE:
         return super.info_text();
@@ -253,6 +252,7 @@ func info_text() -> String:
     var c:Dictionary = crop();
     var s:String = "Crop: %s\n" % c["name"];
     s += "Fallow %d, Growing %d, Ripe %d, Dead %d\n" % counts;
+    s += "Needs %d farmer%s (one per %d plots)\n" % [farmer_positions(), "" if farmer_positions() == 1 else "s", Defs.PLOTS_PER_FARMER];
     s += "Soil fertility: %d%%\n" % roundi(fert / n * 100.0);
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
     s += "Sow in %s above %d C; frost below %d C kills it.\n" % [Defs.sow_text(crop_id), c["min_temp"], c["frost_temp"]];
@@ -263,28 +263,37 @@ func info_text() -> String:
     return s;
 
 func _rebuild_crops() -> void:
-    var mm:MultiMesh = _crops_mmi.multimesh;
-    var list:Array[int] = [];
+    var by_shape:Dictionary = {};
+    for shape in CropMeshes.SHAPES:
+        by_shape[shape] = [];
     for i in plot_count():
         if plot_state[i] != Plot.FALLOW:
-            list.append(i);
-    mm.instance_count = list.size();
-    for j in list.size():
-        var i:int = list[j];
-        var c:Dictionary = Defs.CROPS[plot_crop[i]];
-        var h:float;
-        var col:Color;
-        match plot_state[i]:
-            Plot.PLANTED:
-                h = 0.08 + growth[i] * 0.6;
-                col = Color(0.3, 0.6, 0.2).lerp(c["color"], growth[i] * growth[i]);
-            Plot.RIPE:
-                h = 0.75;
-                col = c["color"];
-            _:
-                h = 0.15;
-                col = Color(0.35, 0.28, 0.2);
-        var p:Vector3 = world.terrain.cell_center(plot_cell(i));
-        p.y += h * 0.5;
-        mm.set_instance_transform(j, Transform3D(Basis().scaled(Vector3(1.0, h, 1.0)), p));
-        mm.set_instance_color(j, col);
+            by_shape[CropMeshes.shape_of(plot_crop[i])].append(i);
+    for shape in CropMeshes.SHAPES:
+        var list:Array = by_shape[shape];
+        var mm:MultiMesh = (_layers[shape] as MultiMeshInstance3D).multimesh;
+        mm.instance_count = list.size();
+        for j in list.size():
+            var i:int = list[j];
+            var c:Dictionary = Defs.CROPS[plot_crop[i]];
+            var h:float;           # height and width of the plant as a share of its full size
+            var wide:float;
+            var col:Color;
+            match plot_state[i]:
+                Plot.PLANTED:
+                    h = 0.2 + growth[i] * 0.8;
+                    wide = 0.45 + growth[i] * 0.55;
+                    col = Color(0.3, 0.6, 0.2).lerp(c["color"], growth[i] * growth[i]);
+                Plot.RIPE:
+                    h = 1.0;
+                    wide = 1.0;
+                    col = c["color"];
+                _:
+                    h = 0.3;
+                    wide = 0.8;
+                    col = Color(0.4, 0.32, 0.22);
+            var cell:Vector2i = plot_cell(i);
+            var yaw:float = float(((cell.x * 73856093) ^ (cell.y * 19349663)) & 1023) / 1023.0 * TAU;       # no two plots look alike
+            var p:Vector3 = world.terrain.cell_center(cell);
+            mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(wide, h, wide)), p));
+            mm.set_instance_color(j, col);

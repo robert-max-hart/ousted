@@ -9,7 +9,7 @@ class_name World extends Node3D;
 static var instance:World = null;
 static var pending_load:Dictionary = {};     # set by SaveGame before a World is created from a save
 
-const START_PAWNS       :int = 6;
+const START_PAWNS       :int = 8;
 const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 130, &"berries": 30, &"firewood": 30};
 const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
@@ -48,6 +48,7 @@ var town_hall   :Building;
 var _entities   :Node3D;
 var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
 var saplings    :Array[ResourceNode] = [];
+var pending_roads:Dictionary = {};          # cell -> true: road cells waiting for a tree or rock to be cleared
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
 var _storage_warned:bool = false;
@@ -160,6 +161,9 @@ func _spawn_nature() -> void:
     var forest:FastNoiseLite = FastNoiseLite.new();
     forest.seed = world_seed + 3;
     forest.frequency = 0.025;
+    var species:FastNoiseLite = FastNoiseLite.new();
+    species.seed = world_seed + 11;
+    species.frequency = 0.045;
     for z in Terrain.SIZE:
         for x in Terrain.SIZE:
             var c:Vector2i = Vector2i(x, z);
@@ -171,7 +175,8 @@ func _spawn_nature() -> void:
             if slope > 1.0 and r < 0.06:
                 add_node(&"ore" if rng.randf() < 0.18 else &"rock", c);
             elif slope < 1.4 and f > 0.15 and r < 0.45:
-                add_node(&"tree", c);
+                var oak:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of oak among the pines
+                add_node(&"oak" if oak > 0.05 else &"tree", c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
             elif slope < 1.0 and r < 0.004:
@@ -217,6 +222,7 @@ func leave_colony(p:Pawn) -> void:
         p.clear_carry();
     if p.home != null:
         p.home.residents.erase(p);
+        p.home.update_windows();
     pawns.erase(p);
     families.on_death(p, -1);
     jobs.reconcile();
@@ -313,7 +319,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "pending_roads": pending_roads.keys(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -375,6 +381,8 @@ func _restore_entities(save:Dictionary) -> void:
     renderer.mark_dirty();
     rng.state = save["rng_state"];
     death_log = save.get("deaths", []);
+    for c in save.get("pending_roads", []):
+        pending_roads[c] = true;
     policies.restore(save.get("policies", {}));
     ledger.restore(save.get("ledger", {}));
     var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
@@ -394,11 +402,17 @@ func add_node(kind:StringName, c:Vector2i) -> ResourceNode:
     renderer.mark_dirty();
     return rn;
 
+# A new patch of wild food: it starts with nothing picked yet to give (it fruits in its season).
+func sow_wild(kind:StringName, c:Vector2i) -> ResourceNode:
+    var rn:ResourceNode = add_node(kind, c);
+    rn.amount = 0;
+    return rn;
+
 # Plants a new tree that grows up over time. Returns it, or null if the cell is not usable.
 func plant_tree(c:Vector2i) -> ResourceNode:
     if not can_plant_tree(c):
         return null;
-    var rn:ResourceNode = add_node(&"tree", c);
+    var rn:ResourceNode = add_node(&"oak" if rng.randf() < 0.35 else &"tree", c);
     rn.make_sapling();
     saplings.append(rn);
     return rn;
@@ -414,7 +428,7 @@ func can_plant_tree(c:Vector2i) -> bool:
     for dz in range(-1, 2):
         for dx in range(-1, 2):
             var n:Vector2i = c + Vector2i(dx, dz);
-            if terrain.in_bounds(n) and node_at[idx(n)] != null and (node_at[idx(n)] as ResourceNode).kind == &"tree":
+            if terrain.in_bounds(n) and node_at[idx(n)] != null and (node_at[idx(n)] as ResourceNode).is_tree():
                 return false;
     return true;
 
@@ -460,14 +474,23 @@ func remove_node(rn:ResourceNode) -> void:
     node_at[idx(rn.cell)] = null;
     _refresh_nav(rn.cell);
     renderer.mark_dirty();
+    if pending_roads.erase(rn.cell):
+        set_road(rn.cell, true);
 
 func node_changed(_rn:ResourceNode) -> void:
     renderer.mark_dirty();
 
 func set_designated(rn:ResourceNode, on:bool) -> void:
+    if not on:
+        rn.clearing = false;
     if rn.designated != on:
         rn.designated = on;
         renderer.mark_dirty();
+
+# Marks something in the way of a building or road: laborers clear it (a bush too, even though it would regrow).
+func mark_for_clearing(rn:ResourceNode) -> void:
+    rn.clearing = true;
+    set_designated(rn, true);
 
 # --------------------------------
 # Buildings
@@ -489,6 +512,8 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
                 return "Can't build on water";
             if occupant[idx(c)] != null:
                 return "Something is already built here";
+            if terrain.get_overlay(c) == Terrain.Overlay.ROAD:
+                return "A road is in the way";
     var hr:Vector2 = terrain.rect_height_range(r);
     var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("drag_size", false) else 1.0);
     if hr.y - hr.x > limit:
@@ -500,7 +525,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
-    if not def.get("drag_size", false) and not restoring:
+    if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
         terrain.flatten_rect(r);
     var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Building.new();
     for z in range(r.position.y, r.end.y):
@@ -509,14 +534,10 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
             occupant[idx(c)] = b;
             if restoring:
                 continue;
-            terrain.set_overlay(c, Terrain.Overlay.NONE);
+            terrain.set_overlay(c, Terrain.Overlay.SITE if is_field and not prebuilt else Terrain.Overlay.NONE);       # bare staked ground until the field is done
             var rn:ResourceNode = node_at[idx(c)];
             if rn != null:
-                # bushes are just uprooted; trees and rocks need clearing by laborers
-                if rn.regrows:
-                    remove_node(rn);
-                else:
-                    set_designated(rn, true);
+                mark_for_clearing(rn);       # nothing vanishes at once: laborers clear it before building starts
     b.setup(self, def_id, origin, size);
     _entities.add_child(b);
     buildings.append(b);
@@ -545,9 +566,7 @@ func remove_building(b:Building, refund:bool) -> void:
     for p in b.residents:
         p.home = null;
     # cancel work aimed at it now, while task callbacks can still see it
-    for p in pawns:
-        if p.task != null and (is_same(p.task.target, b) or is_same(p.task.workplace, b)):
-            p.end_task(false);
+    release_site_workers(b);
     var r:Rect2i = b.rect();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
@@ -568,6 +587,18 @@ func remove_building(b:Building, refund:bool) -> void:
     _refresh_nav_rect(r);
     b.queue_free();
     families.assign_homes();
+
+# Marks everything standing in the rect for clearing.
+func mark_for_clearing_rect(r:Rect2i) -> void:
+    for rn in nodes:
+        if r.has_point(rn.cell):
+            mark_for_clearing(rn);
+
+# Ends every citizen's task aimed at (or working for) b: cancelled hauls hand their goods back, builders walk off.
+func release_site_workers(b:Building) -> void:
+    for p in pawns:
+        if p.task != null and (is_same(p.task.target, b) or is_same(p.task.workplace, b) or is_same(p.task.related, b)):
+            p.end_task(false);
 
 func is_site_clear(b:Building) -> bool:
     return _rect_free_of_nodes(b.rect());
@@ -624,6 +655,7 @@ func _finish_relocation(site:Building) -> void:
     site.upgrades_done = old.upgrades_done.duplicate();
     site.dig_progress = old.dig_progress.duplicate();
     site.fuel = old.fuel;
+    site.fuel_coal = old.fuel_coal;
     old.fuel = 0;
     site.inputs = old.inputs.duplicate();
     old.inputs.clear();
@@ -749,6 +781,22 @@ func remove_pile(pl:GroundPile) -> void:
 func can_road(c:Vector2i) -> bool:
     return terrain.in_bounds(c) and not terrain.is_water(c) and occupant[idx(c)] == null and node_at[idx(c)] == null;
 
+# Whether the Road tool can work on this cell: not water and not under a building (a tree or rock is cleared first).
+func can_plan_road(c:Vector2i) -> bool:
+    return terrain.in_bounds(c) and not terrain.is_water(c) and occupant[idx(c)] == null;
+
+# Lays a road cell for the Road tool. Anything in the way is marked for clearing and the road goes in once it is gone. Returns true if the road is waiting on something to be cleared.
+func plan_road(c:Vector2i) -> bool:
+    if not can_plan_road(c):
+        return false;
+    var rn:ResourceNode = node_at[idx(c)];
+    if rn == null:
+        set_road(c, true);
+        return false;
+    mark_for_clearing(rn);
+    pending_roads[c] = true;
+    return true;
+
 func set_road(c:Vector2i, on:bool) -> void:
     if on and not can_road(c):
         return;
@@ -777,6 +825,7 @@ func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
     death_log.append({"name": p.first_name, "age": int(p.age), "cause": cause, "when": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "profession": p.profession_name()});
     if p.home != null:
         p.home.residents.erase(p);
+        p.home.update_windows();
     var body:Body = add_body(p, cause, spot);
     pawns.erase(p);
     families.on_death(p, body.id);
@@ -898,6 +947,7 @@ func _update_child_labor() -> void:
     child_labor_share = float(working) / kids if kids > 0 and policies.is_on(&"child_labor") else 0.0;
 
 func _on_day(_d:int) -> void:
+    renderer.update_foliage();
     ledger.on_day(self);
     for b in buildings:
         b.on_day();
@@ -912,10 +962,12 @@ func _on_day(_d:int) -> void:
         if rn.regrows and rn.amount < rn.max_amount and (rn.def["fruit_seasons"] as Array).has(s) and day % rn.def["regrow_days"] == 0:
             rn.amount += 1;
             regrown = true;
+    WildGrowth.spread_daily(self);
     if regrown:
         renderer.mark_dirty();
 
 func _apply_season(s:int) -> void:
+    renderer.update_foliage();
     terrain.set_season(s);
     renderer.set_season(s);
 

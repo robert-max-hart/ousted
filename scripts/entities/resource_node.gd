@@ -15,6 +15,7 @@ var work_per_unit:float;
 var solid       :bool;
 var regrows     :bool;
 var designated  :bool = false;      # player marked for harvest/clearing
+var clearing    :bool = false;      # in the way of a building or road: removed once cleared, even a bush that regrows
 var reserved_by :Object = null;     # pawn currently working it
 var removed     :bool = false;
 var growth      :float = 1.0;       # 0..1; trees are saplings until this reaches 1
@@ -37,9 +38,9 @@ func _init(k:StringName, c:Vector2i, rng:RandomNumberGenerator) -> void:
     yaw = rng.randf() * TAU;
     scale = rng.randf_range(0.75, 1.25);
 
-# [kind, cell, amount, growth, designated, offset, yaw, scale]
+# [kind, cell, amount, growth, designated, offset, yaw, scale, clearing]
 func to_array() -> Array:
-    return [kind, cell, amount, growth, designated, offset, yaw, scale];
+    return [kind, cell, amount, growth, designated, offset, yaw, scale, clearing];
 
 static func from_array(a:Array, rng:RandomNumberGenerator) -> ResourceNode:
     var rn:ResourceNode = ResourceNode.new(a[0], a[1], rng);
@@ -49,10 +50,15 @@ static func from_array(a:Array, rng:RandomNumberGenerator) -> ResourceNode:
     rn.offset = a[5];
     rn.yaw = a[6];
     rn.scale = a[7];
+    rn.clearing = a.size() > 8 and a[8];
     return rn;
 
 func display_name() -> String:
     return def["name"] if is_mature() else "%s sapling" % def["name"];
+
+# Chopped by woodcutters and replanted: pines and oaks.
+func is_tree() -> bool:
+    return def.get("tree", false);
 
 func is_mature() -> bool:
     return growth >= 1.0;

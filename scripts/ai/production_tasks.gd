@@ -35,9 +35,47 @@ func forager_task(p:Pawn) -> Task:
             continue;
         var t:Task = harvest_node_task(p, func(rn:ResourceNode) -> bool:
             return rn.is_forageable() and rn.is_mature() and in_radius(b, rn.cell) and b.settings.get("forage_%s" % rn.kind, true));
+        if t == null and b.has_upgrade(&"cultivation"):
+            t = _sow_task(b);
         if t != null:
             t.workplace = b;
             t.job = JobManager.Profession.FORAGER;
+            return t;
+    return null;
+
+const SOW_PER_KIND:int = 18;       # a hut sows no more of a kind than this within its radius
+
+# Sows a new patch of one of the wild foods switched on, on free ground in the hut's radius.
+func _sow_task(b:Building) -> Task:
+    var kinds:Array[StringName] = [];
+    for kind in [&"bush", &"mushroom", &"hazel"]:
+        if b.settings.get("sow_%s" % kind, false):
+            kinds.append(kind);
+    kinds.shuffle();
+    var center:Vector2i = Vector2i(b.center_cell());
+    var r:int = ceili(b.radius());
+    for kind in kinds:
+        var have:int = 0;
+        for rn in world.nodes:
+            if rn.kind == kind and in_radius(b, rn.cell):
+                have += 1;
+        if have + world.planting.size() >= SOW_PER_KIND:
+            continue;
+        for i in 30:
+            var c:Vector2i = center + Vector2i(world.rng.randi_range(-r, r), world.rng.randi_range(-r, r));
+            if not in_radius(b, c) or not WildGrowth.can_grow(world, c, kind):
+                continue;
+            world.planting[c] = true;
+            var name:String = String(Defs.RESOURCE_NODES[kind]["name"]).to_lower();
+            var t:Task = Task.new(&"plant", "Sowing %s" % name);
+            t.target = b;
+            t.move_cell(c, "Walking to sow %s" % name);
+            t.work_for(0.3, "Sowing %s" % name, func(_pw:Pawn) -> void:
+                world.planting.erase(c);
+                if WildGrowth.can_grow(world, c, kind):
+                    world.sow_wild(kind, c));
+            t.on_cancel = func(_pw:Pawn) -> void:
+                world.planting.erase(c);
             return t;
     return null;
 
@@ -253,7 +291,7 @@ func _chop_task(p:Pawn, b:Building) -> Task:
     if mode == 0:
         return null;
     return harvest_node_task(p, func(rn:ResourceNode) -> bool:
-        return rn.kind == &"tree" and in_radius(b, rn.cell) and (mode == 2 or rn.is_mature()));
+        return rn.is_tree() and in_radius(b, rn.cell) and (mode == 2 or rn.is_mature()));
 
 func _plant_task(_p:Pawn, b:Building) -> Task:
     if not b.settings.get("plant", false):

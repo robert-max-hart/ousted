@@ -10,6 +10,7 @@ enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSM
 
 const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager"];
 const MAX_BUILDERS_PER_SITE :int = 4;
+const PRIORITY_WEIGHT       :float = 1.0e6;     # one build priority step outweighs any distance on the map
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
 
 var needs:NeedsTasks;
@@ -107,7 +108,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _forage_if_hungry_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _forage_if_hungry_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -208,16 +209,74 @@ func _deliver_task(p:Pawn) -> Task:
             s.release_space(n);
     return t;
 
+# With nothing more urgent to do, a laborer carries goods from a store that suits them badly to one that suits
+# them better: food into a Granary, firewood to the woodcutter, anything out of a store that now forbids it.
+const REBALANCE_MARGIN:float = 0.5;
+
+func _rebalance_task(p:Pawn) -> Task:
+    var from:Building = null;
+    var to:Building = null;
+    var item:StringName = &"";
+    var best_gain:float = REBALANCE_MARGIN;
+    for s in world.buildings:
+        if not s.is_storage() or s.def.get("temporary", false) or p.has_failed(s):
+            continue;
+        for it in s.stored:
+            if s.available(it) <= 0:
+                continue;
+            var here:float = s.storage_rank(it);
+            for d in world.buildings:
+                if d == s or not d.can_store(it) or p.has_failed(d):
+                    continue;
+                var gain:float = here - d.storage_rank(it);
+                if gain > best_gain:
+                    best_gain = gain;
+                    from = s;
+                    to = d;
+                    item = it;
+    if from == null:
+        return null;
+    var n:int = from.reserve_out(item, mini(Pawn.CARRY_CAP, to.free_space()));
+    if n == 0:
+        return null;
+    to.reserve_space(n);
+    var st:Dictionary = {"picked": false, "done": false};
+    var name:String = Defs.item_name(item).to_lower();
+    var t:Task = Task.new(&"rebalance", "Moving %s to %s" % [name, to.display_name()]);
+    t.target = to;
+    t.related = from;
+    t.move_rect(from.rect(), from.is_walkable(), "Fetching %s" % name);
+    t.act(func(pw:Pawn) -> bool:
+        pw.set_carry(item, from.take_reserved(item, n));
+        st["picked"] = true;
+        return true);
+    t.move_rect(to.rect(), to.is_walkable(), "Moving %s to %s" % [name, to.display_name()]);
+    t.act(func(pw:Pawn) -> bool:
+        to.release_space(n);
+        st["done"] = true;
+        var put:int = to.store(item, mini(n, pw.carry_amount));
+        if put >= pw.carry_amount:
+            pw.clear_carry();
+        else:
+            pw.set_carry(item, pw.carry_amount - put);
+        return true);
+    t.on_cancel = func(_pw:Pawn) -> void:
+        if not st["picked"] and World.alive(from):
+            from.release_out(item, n);
+        if not st["done"] and World.alive(to):
+            to.release_space(n);
+    return t;
+
 func _haul_task(p:Pawn) -> Task:
     var best:Building = null;
     var best_item:StringName = &"";
     var best_d:float = INF;
     for b in world.buildings:
-        if not b.is_site() or p.has_failed(b):
+        if not b.is_site() or b.is_paused() or p.has_failed(b):
             continue;
         for item in b.cost():
             if b.remaining(item) > 0 and Stock.available(item) > 0:
-                var d:float = b.position.distance_squared_to(p.position);
+                var d:float = b.position.distance_squared_to(p.position) - b.priority * PRIORITY_WEIGHT;
                 if d < best_d:
                     best = b;
                     best_item = item;
@@ -314,7 +373,7 @@ func _fuel_task(p:Pawn) -> Task:
         house.fuel_incoming = maxi(0, house.fuel_incoming - n * heat);
         var room:int = maxi(0, house.def["fuel_capacity"] - house.fuel);
         var put:int = mini(ceili(float(room) / heat), pw.carry_amount);
-        house.fuel = mini(house.def["fuel_capacity"], house.fuel + put * heat);
+        house.add_fuel(item, put * heat);
         if put >= pw.carry_amount:
             pw.clear_carry();
         else:
@@ -361,6 +420,21 @@ func _collect_task(p:Pawn) -> Task:
             pl.reserved_by = null;
     return t;
 
+# Positions in this profession's finished buildings (0 for professions with no job buildings). A field counts
+# as a farmer position for each Defs.PLOTS_PER_FARMER plots.
+func total_slots(prof:int) -> int:
+    var slots:int = 0;
+    for b in world.buildings:
+        if prof == Profession.FARMER and b is Field and b.is_complete():
+            slots += (b as Field).farmer_positions();
+        if b.is_complete() and b.def.has("worker_slots") and JobManager.PROFESSION_NAMES.find(String(b.def.get("profession", "")).capitalize()) == prof:
+            slots += b.def["worker_slots"];
+    return slots;
+
+# Positions in the profession's buildings that no citizen of the profession fills.
+func open_slots(prof:int) -> int:
+    return maxi(0, total_slots(prof) - count(prof));
+
 # --------------------------------
 # Construction
 
@@ -368,11 +442,12 @@ func _build_task(p:Pawn) -> Task:
     var best:Building = null;
     var best_d:float = INF;
     for b in world.buildings:
-        if b.builders >= MAX_BUILDERS_PER_SITE or p.has_failed(b) or not b.ready_for_work():
+        if b.builders >= MAX_BUILDERS_PER_SITE or b.is_paused() or p.has_failed(b) or not b.ready_for_work():
             continue;
         var d:float = b.position.distance_squared_to(p.position);
         if b is Field:
             d = Vector2(b.origin).distance_squared_to(Vector2(p.position.x, p.position.z));
+        d -= b.priority * PRIORITY_WEIGHT;
         if d < best_d:
             best = b;
             best_d = d;

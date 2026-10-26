@@ -7,6 +7,12 @@ class_name Building extends Node3D;
 
 enum State { CONSTRUCTION, COMPLETE };
 
+# Build priority of a site (or an upgrade being built): paused sites get no hauling or building, and the rest are
+# served highest first (ties go to the nearest).
+const PRIORITY_NAMES:Array[String] = ["Paused", "Low", "Medium", "High", "Critical"];
+const PRIORITY_PAUSED:int = 0;
+const PRIORITY_MEDIUM:int = 2;
+
 var def_id      :StringName;
 var def         :Dictionary;
 var origin      :Vector2i;
@@ -27,6 +33,7 @@ var in_reserved :int = 0;           # units of space promised to pawns on the wa
 var forbidden   :Dictionary = {};   # item -> true when the player has forbidden it here
 var settings    :Dictionary = {};   # control id -> current value (see Defs control schema)
 var fuel        :int = 0;           # fuel stocked here in firewood-equivalents (houses; coal counts double)
+var fuel_coal   :int = 0;           # how much of `fuel` came from coal (it burns after the firewood: drives the smoke colour)
 var fuel_incoming:int = 0;          # firewood being carried here
 var inputs      :Dictionary = {};   # item -> int in the input inventory (production buildings)
 var input_incoming:Dictionary = {}; # item -> int being carried here
@@ -34,6 +41,7 @@ var upgrades_done:Dictionary = {};   # upgrade id -> true
 var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (while set, delivered/incoming/work_done belong to it)
 var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
 var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
+var priority    :int = PRIORITY_MEDIUM;
 var cost_mult   :float = 1.0;       # share of the build cost and work (a relocation costs Defs.RELOCATE_COST_MULT)
 var relocating_from:Building = null;    # on a relocation site: the building it replaces
 var relocating_to:Building = null;      # on the old building: the site being built for it
@@ -46,7 +54,13 @@ var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
 
 var _body       :MeshInstance3D;
 var _roof       :MeshInstance3D;
+var _chimney    :MeshInstance3D;
+var _smoke      :CPUParticles3D;
 var _body_mat   :StandardMaterial3D;
+var _door       :MeshInstance3D;
+var _windows    :Array[MeshInstance3D] = [];
+var _window_mat :StandardMaterial3D;
+var _site_label :Label3D;        # floats over a site that is paused or short of materials
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     world = w;
@@ -71,8 +85,9 @@ func display_name() -> String:
 func is_complete() -> bool:
     return state == State.COMPLETE;
 
+# A site can be walked over while it goes up, so whatever stands in the middle of it can still be reached and cleared.
 func is_walkable() -> bool:
-    return def.get("walkable", false);
+    return def.get("walkable", false) or state == State.CONSTRUCTION;
 
 # --------------------------------
 # Storage
@@ -82,7 +97,7 @@ func is_storage() -> bool:
 
 # Built-in capacity plus what its finished upgrades add (the Town Hall's store rooms).
 func capacity() -> int:
-    var n:int = def.get("capacity", 0) if def.get("storage", false) else 0;
+    var n:int = roundi(def.get("capacity", 0) * area_mult()) if def.get("storage", false) else 0;
     for id in upgrades_done:
         n += def.get("upgrades", {}).get(id, {}).get("capacity", 0);
     return n;
@@ -104,6 +119,17 @@ func accepts(item:StringName) -> bool:
     if def.has("accepts_items"):
         return (def["accepts_items"] as Array).has(item);
     return Defs.is_food(item) or not def.get("food_only", false);
+
+# How well this store suits an item (lower is better): food keeps best in a Granary (spoil_mult), and a store made
+# for certain goods beats a general one. A store the player has since forbidden the item in is the worst place.
+func storage_rank(item:StringName) -> float:
+    var rank:float = 0.0;
+    if forbidden.has(item):
+        rank += 100.0;
+    if Defs.is_food(item):
+        rank += spoil_mult() * 10.0;
+    var specialised:bool = def.has("accepts_items") or (def.get("food_only", false) and Defs.is_food(item));
+    return rank + (0.0 if specialised else 3.0);
 
 func can_store(item:StringName) -> bool:
     return accepts(item) and free_space() > 0;
@@ -246,12 +272,21 @@ func set_forbidden(item:StringName, forbid:bool) -> void:
 func cost() -> Dictionary:
     if upgrading != &"":
         return def["upgrades"][upgrading]["cost"];
-    if cost_mult == 1.0:
+    var mult:float = cost_mult * area_mult();
+    if is_equal_approx(mult, 1.0):
         return def["cost"];
     var c:Dictionary = {};
     for item in def["cost"]:
-        c[item] = maxi(1, ceili(def["cost"][item] * cost_mult));
+        c[item] = maxi(1, ceili(def["cost"][item] * mult));
     return c;
+
+# Buildings the player sizes by dragging and that scale with their area (stockpiles): the share of the default
+# footprint, applied to cost, work and capacity.
+func area_mult() -> float:
+    if not def.get("scalable", false):
+        return 1.0;
+    var d:Vector2i = def["size"];
+    return float(size.x * size.y) / (d.x * d.y);
 
 # True while the building is being constructed or upgraded: materials and labor are still wanted.
 func is_site() -> bool:
@@ -268,7 +303,7 @@ func has_all_materials() -> bool:
     return true;
 
 func work_required() -> float:
-    return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"] * cost_mult;
+    return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"] * cost_mult * area_mult();
 
 func progress() -> float:
     if work_required() <= 0.0:
@@ -281,9 +316,57 @@ func ready_for_work() -> bool:
 func receive(item:StringName, n:int) -> void:
     incoming[item] = maxi(0, incoming.get(item, 0) - n);
     delivered[item] = delivered.get(item, 0) + n;
+    update_site_label();
 
 func cancel_incoming(item:StringName, n:int) -> void:
     incoming[item] = maxi(0, incoming.get(item, 0) - n);
+
+func set_priority(p:int) -> void:
+    priority = clampi(p, PRIORITY_PAUSED, PRIORITY_NAMES.size() - 1);
+    if priority == PRIORITY_PAUSED:
+        world.release_site_workers(self);
+    update_site_label();
+
+func is_paused() -> bool:
+    return is_site() and priority == PRIORITY_PAUSED;
+
+# What the site still needs that the colony's storage can't supply, as "5 wood, 2 stone", or "" when there is enough.
+func shortage_text() -> String:
+    if not is_site():
+        return "";
+    var parts:PackedStringArray = [];
+    for item in cost():
+        var short:int = remaining(item) - Stock.available(item);
+        if short > 0:
+            parts.append("%d %s" % [short, Defs.item_name(item).to_lower()]);
+    return ", ".join(parts);
+
+# The floating note over a site: PAUSED, or what is missing from storage.
+func update_site_label() -> void:
+    var text:String = "";
+    var short:String = shortage_text();
+    if is_paused():
+        text = "PAUSED";
+    if short != "":
+        text += ("\n" if text != "" else "") + "Needs " + short;
+    if text == "":
+        if _site_label != null:
+            _site_label.visible = false;
+        return;
+    if _site_label == null:
+        _site_label = Label3D.new();
+        _site_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
+        _site_label.pixel_size = 0.02;
+        _site_label.font_size = 36;
+        _site_label.outline_size = 10;
+        _site_label.no_depth_test = true;
+        _site_label.shaded = false;
+        _site_label.position = Vector3(0, def.get("height", 2.0) + 2.4, 0);
+        _site_label.visible = false;
+        add_child(_site_label);
+    _site_label.text = text;
+    _site_label.modulate = Color(1.0, 0.75, 0.25) if is_paused() else Color(1.0, 0.45, 0.4);
+    _site_label.visible = true;
 
 # Adds labor; returns true once construction is finished.
 func add_work(hours:float) -> bool:
@@ -374,13 +457,18 @@ func complete() -> void:
     state = State.COMPLETE;
     work_done = work_required();
     _update_visual();
+    update_site_label();
+    world._refresh_nav_rect(rect());       # a finished building may block the cells under it
     world.on_building_completed(self);
 
 # --------------------------------
 # Simulation hooks (called by World)
 
 func on_hour() -> void:
+    update_site_label();
+    update_windows();
     _burn_fuel(1.0);
+    update_smoke();
 
 func on_day() -> void:
     pass;
@@ -417,7 +505,106 @@ func _burn_fuel(hours:float) -> void:
     var whole:int = floori(_burn_acc + 0.0001);
     if whole > 0:
         _burn_acc -= whole;
+        var from_coal:int = maxi(0, mini(fuel_coal, whole - (fuel - fuel_coal)));       # firewood goes first
         fuel = maxi(0, fuel - whole);
+        fuel_coal = clampi(fuel_coal - from_coal, 0, fuel);
+
+# Adds fuel delivered by a citizen (heat in firewood-equivalents), remembering how much of it is coal.
+func add_fuel(item:StringName, heat:int) -> void:
+    var added:int = mini(heat, def["fuel_capacity"] - fuel);
+    fuel += added;
+    if item == &"coal":
+        fuel_coal += added;
+    update_smoke();
+
+# Whether the chimney is smoking: the house is burning fuel for someone inside.
+func is_burning() -> bool:
+    return def.has("fuel_capacity") and is_complete() and settings.get("heating", false) and fuel > 0 \
+            and not residents.is_empty() and Weather.temperature < Defs.HEATING_BELOW;
+
+# The smoke follows the game speed: still when paused, quicker when sped up.
+func _on_clock_speed(_index:int) -> void:
+    if _smoke != null:
+        _smoke.speed_scale = GameClock.speed();
+
+# Smoke is grey for firewood and black for coal (the firewood in the stock burns first).
+func update_smoke() -> void:
+    if _smoke == null:
+        return;
+    var burning:bool = is_burning();
+    _smoke.emitting = burning;
+    if burning:
+        var coal:bool = fuel_coal >= fuel;
+        var mat:StandardMaterial3D = _smoke.mesh.material as StandardMaterial3D;
+        mat.albedo_color = Color(0.08, 0.08, 0.09, 0.85) if coal else Color(0.7, 0.7, 0.72, 0.75);
+
+# A dark door on the south face of a house-shaped body, and for homes a pair of windows that light up while
+# someone lives there. (Decoration only: citizens still walk to the building's edge.)
+func _build_door(body:Vector2, h:float) -> void:
+    var door_h:float = minf(1.3, h * 0.65);
+    var door:BoxMesh = BoxMesh.new();
+    door.size = Vector3(minf(0.8, body.x * 0.3), door_h, 0.1);
+    _door = _add_mesh(door, _flat_mat(Color(0.27, 0.17, 0.1)), Vector3(0, door_h * 0.5, body.y * 0.5 + 0.02));
+    if not def.has("beds") or body.x < 1.9:
+        return;
+    _window_mat = StandardMaterial3D.new();
+    _window_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
+    var pane:BoxMesh = BoxMesh.new();
+    pane.size = Vector3(0.42, 0.42, 0.08);
+    for sx in [-1.0, 1.0]:
+        var w:MeshInstance3D = _add_mesh(pane, _window_mat, Vector3(sx * (body.x * 0.5 - 0.5), h * 0.62, body.y * 0.5 + 0.02));
+        w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+        _windows.append(w);
+    update_windows();
+
+# Windows glow warm while the house is finished and has residents, and stay dark otherwise.
+func update_windows() -> void:
+    if _window_mat == null:
+        return;
+    var lit:bool = state == State.COMPLETE and not residents.is_empty();
+    _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
+
+func _build_chimney(h:float) -> void:
+    var box:BoxMesh = BoxMesh.new();
+    var top:float = h + h * 0.6 + 0.35;
+    var base:float = h + h * 0.3;
+    box.size = Vector3(0.4, top - base, 0.4);
+    _chimney = _add_mesh(box, _flat_mat(Color(0.45, 0.32, 0.28)), Vector3(size.x * 0.22, (top + base) * 0.5, size.y * 0.15));
+    _smoke = CPUParticles3D.new();
+    var puff:SphereMesh = SphereMesh.new();
+    puff.radius = 0.32;
+    puff.height = 0.64;
+    puff.radial_segments = 6;
+    puff.rings = 3;
+    var mat:StandardMaterial3D = StandardMaterial3D.new();
+    mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
+    mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
+    mat.albedo_color = Color(0.7, 0.7, 0.72, 0.75);
+    puff.material = mat;
+    _smoke.mesh = puff;
+    _smoke.amount = 14;
+    _smoke.lifetime = 4.0;
+    _smoke.direction = Vector3.UP;
+    _smoke.spread = 12.0;
+    _smoke.initial_velocity_min = 0.6;
+    _smoke.initial_velocity_max = 0.9;
+    _smoke.gravity = Vector3(0.25, 0.0, 0.0);       # a light breeze
+    _smoke.scale_amount_min = 0.7;
+    _smoke.scale_amount_max = 1.1;
+    var grow:Curve = Curve.new();
+    grow.add_point(Vector2(0.0, 0.5));
+    grow.add_point(Vector2(1.0, 2.2));
+    _smoke.scale_amount_curve = grow;
+    var fade:Gradient = Gradient.new();
+    fade.set_color(0, Color(1, 1, 1, 1));
+    fade.set_color(1, Color(1, 1, 1, 0));
+    _smoke.color_ramp = fade;
+    _smoke.emitting = false;
+    _smoke.speed_scale = GameClock.speed();
+    GameClock.speed_changed.connect(_on_clock_speed);
+    _smoke.position = _chimney.position + Vector3(0, box.size.y * 0.5, 0);
+    _smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+    add_child(_smoke);
 
 # --------------------------------
 # Save and load. Reservations, incoming deliveries and who is working here are not saved: citizens
@@ -427,10 +614,10 @@ func to_dict() -> Dictionary:
     return {
         "id": def_id, "origin": origin, "size": size, "state": state, "delivered": delivered.duplicate(),
         "work_done": work_done, "stored": stored.duplicate(), "forbidden": forbidden.duplicate(),
-        "settings": settings.duplicate(), "fuel": fuel, "inputs": inputs.duplicate(),
+        "settings": settings.duplicate(), "fuel": fuel, "fuel_coal": fuel_coal, "inputs": inputs.duplicate(),
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
-        "cost_mult": cost_mult, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
+        "cost_mult": cost_mult, "priority": priority, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
         "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1,
     };
 
@@ -444,6 +631,7 @@ func restore_dict(d:Dictionary) -> void:
         if settings.has(key):          # controls added since the save keep their defaults
             settings[key] = d["settings"][key];
     fuel = d["fuel"];
+    fuel_coal = d.get("fuel_coal", 0);
     inputs = d["inputs"];
     upgrades_done = d["upgrades_done"];
     upgrading = d["upgrading"];
@@ -452,7 +640,9 @@ func restore_dict(d:Dictionary) -> void:
     _spoil_acc = d["spoil_acc"];
     _burn_acc = d["burn_acc"];
     cost_mult = d.get("cost_mult", 1.0);
+    priority = d.get("priority", PRIORITY_MEDIUM);
     _update_visual();
+    update_site_label();
 
 # --------------------------------
 # Info
@@ -461,12 +651,15 @@ func info_text() -> String:
     var s:String = "";
     if state == State.CONSTRUCTION:
         s += "Under construction (%d%%)\n" % roundi(progress() * 100.0);
+        s += "Priority: %s\n" % PRIORITY_NAMES[priority];
         if not world.is_site_clear(self):
             s += "Waiting for the site to be cleared\n";
         for item in cost():
             s += "  %s: %d / %d\n" % [Defs.item_name(item), delivered.get(item, 0), cost()[item]];
         if not has_all_materials():
             s += "Waiting for materials\n";
+        if shortage_text() != "":
+            s += "Not enough in storage: needs %s\n" % shortage_text();
         s += "Builders: %d\n" % builders;
     else:
         s += def.get("desc", "") + "\n";
@@ -485,6 +678,9 @@ func info_text() -> String:
             s += "  %s, age %d, %s (%s)\n" % [entry["name"], entry["age"], entry["cause"], entry["when"]];
     if upgrading != &"":
         s += "Upgrading: %s (%d%%)\n" % [def["upgrades"][upgrading]["name"], roundi(progress() * 100.0)];
+        s += "Priority: %s\n" % PRIORITY_NAMES[priority];
+        if shortage_text() != "":
+            s += "Not enough in storage: needs %s\n" % shortage_text();
         for item in cost():
             s += "  %s: %d / %d\n" % [Defs.item_name(item), delivered.get(item, 0), cost()[item]];
         if not has_all_materials():
@@ -531,6 +727,9 @@ func _build_visual() -> void:
             var prism:PrismMesh = PrismMesh.new();
             prism.size = Vector3(size.x - 0.1, h * 0.6, size.y - 0.2);
             _roof = _add_mesh(prism, _flat_mat(def.get("roof", Color.DARK_RED)), Vector3(0, h + h * 0.3, 0));
+            _build_door(Vector2(size.x - 0.5, size.y - 0.5), h);
+            if def.has("fuel_capacity"):
+                _build_chimney(h);
         "well":
             var cyl:CylinderMesh = CylinderMesh.new();
             cyl.top_radius = 0.7;
@@ -576,8 +775,9 @@ func _build_visual() -> void:
             pad.size = Vector3(size.x - 0.3, h, size.y - 0.3);
             _body = _add_mesh(pad, _body_mat, Vector3(0, h * 0.5, 0));
             var crate:BoxMesh = BoxMesh.new();
-            crate.size = Vector3(0.7, 0.6, 0.7);
-            _roof = _add_mesh(crate, _flat_mat(Color(0.6, 0.45, 0.28)), Vector3(-0.8, h + 0.3, -0.8));
+            var cs:float = minf(1.0, minf(size.x, size.y) / 3.0);       # a small pile gets a small crate
+            crate.size = Vector3(0.7, 0.6, 0.7) * cs;
+            _roof = _add_mesh(crate, _flat_mat(Color(0.6, 0.45, 0.28)), Vector3(-size.x * 0.2, h + 0.3 * cs, -size.y * 0.2));
         _:
             pass;
 
@@ -595,6 +795,14 @@ func _update_visual() -> void:
     _body.position.y = h * 0.5 * sy;
     if _roof != null:
         _roof.visible = not building;
+    if _chimney != null:
+        _chimney.visible = not building;
+    if _door != null:
+        _door.visible = not building;
+    for w in _windows:
+        w.visible = not building;
+    update_windows();
+    update_smoke();
 
 func _add_mesh(mesh:Mesh, mat:Material, at:Vector3) -> MeshInstance3D:
     var mi:MeshInstance3D = MeshInstance3D.new();

@@ -6,7 +6,9 @@
 class_name HUD extends CanvasLayer;
 
 const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron"];
-const LOG_SECONDS   :float = 10.0;
+const LOG_WIDTH     :float = 440.0;
+const LOG_HEIGHT    :float = 110.0;
+const LOG_LINES     :int = 80;         # messages the log panel keeps
 const REFRESH_RATE  :float = 0.25;
 
 var _date       :Label;
@@ -15,7 +17,10 @@ var _stock      :Label;
 var _speed_btns :Array[Button] = [];
 var _tool_btns  :Dictionary = {};       # key -> Button
 var _jobs_rows  :Array[Label] = [];
-var _log        :VBoxContainer;
+var _jobs_flags :Array[Label] = [];     # a red ! on professions whose buildings have empty positions
+var _log_panel  :PanelContainer;
+var _log_scroll :ScrollContainer;
+var _log        :VBoxContainer;      # one label per message inside the log panel
 var _hint       :Label;
 var _toolbar    :PanelContainer;
 var _info       :PanelContainer;
@@ -23,7 +28,11 @@ var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
 var _move_btn   :Button;
-var _crop_menu  :PopupMenu;
+var _site_box   :VBoxContainer;      # cancel and build priority for a site
+var _cancel_btn :Button;
+var _priority_btns:Array[Button] = [];
+var _size_label :Label;              # follows the cursor while sizing a field, graveyard or stockpile
+var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the inspector's button
 var _ledger_btn :Button;
 var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
@@ -38,23 +47,29 @@ var _controls_for:Variant = null;       # the building the control widgets were 
 var _filter_checks:Dictionary = {};     # item -> CheckBox
 var _refresh    :float = 0.0;
 
+const FONT_SIZE:int = 13;         # the whole HUD's text size (Godot's default is 16)
+const TITLE_FONT_SIZE:int = 17;
+
 func _ready() -> void:
     var root:Control = Control.new();
     root.set_anchors_preset(Control.PRESET_FULL_RECT);
     root.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    var theme:Theme = Theme.new();
+    theme.default_font_size = FONT_SIZE;
+    root.theme = theme;
     add_child(root);
     _build_top_bar(root);
     _build_toolbar(root);
     _build_jobs_panel(root);
     _build_info_panel(root);
     _build_log(root);
-    _crop_menu = PopupMenu.new();
-    _crop_menu.id_pressed.connect(func(index:int) -> void:
-        var sel:Variant = World.instance.tools.selected;
-        if sel is Field and World.alive(sel):
-            (sel as Field).set_crop(Defs.CROPS.keys()[index]);
-            _refresh_info());
-    add_child(_crop_menu);
+    _size_label = Label.new();
+    _size_label.visible = false;
+    _size_label.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _size_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7));
+    _size_label.add_theme_color_override("font_outline_color", Color.BLACK);
+    _size_label.add_theme_constant_override("outline_size", 5);
+    root.add_child(_size_label);
     _ledger_panel = LedgerPanel.new();
     root.add_child(_ledger_panel);
     _ledger_panel.setup(World.instance.ledger);
@@ -68,9 +83,15 @@ func _ready() -> void:
     _refresh_all();
 
 func _process(delta:float) -> void:
-    # the event log sits just above the toolbar, which grows a line when the window is narrow
-    _log.offset_bottom = -(_toolbar.size.y + 8.0);
-    _log.offset_top = _log.offset_bottom;
+    # until the player moves it, the log panel sits at the lower left, just above the toolbar (which grows a line when narrow)
+    if not PanelMover.has_moved(_log_panel):
+        _log_panel.offset_bottom = -(_toolbar.size.y + 8.0);
+        _log_panel.offset_top = _log_panel.offset_bottom - 1.0;       # its contents decide the height (grows upward)
+    var size_text:String = World.instance.tools.size_text();
+    _size_label.visible = size_text != "";
+    if size_text != "":
+        _size_label.text = size_text;
+        _size_label.position = get_viewport().get_mouse_position() + Vector2(18, 20);
     _refresh -= delta;
     if _refresh <= 0.0:
         _refresh = REFRESH_RATE;
@@ -79,14 +100,15 @@ func _process(delta:float) -> void:
 func notify(msg:String) -> void:
     var l:Label = Label.new();
     l.text = "[%s %s] %s" % [GameClock.date_string(), GameClock.time_string(), msg];
-    l.add_theme_color_override("font_shadow_color", Color.BLACK);
+    l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    l.custom_minimum_size.x = LOG_WIDTH - 24.0;
     _log.add_child(l);
-    while _log.get_child_count() > 6:
+    while _log.get_child_count() > LOG_LINES:
         _log.get_child(0).free();
-    var tween:Tween = l.create_tween();
-    tween.tween_interval(LOG_SECONDS);
-    tween.tween_property(l, "modulate:a", 0.0, 1.5);
-    tween.tween_callback(l.queue_free);
+    _scroll_log_to_end.call_deferred();
+
+func _scroll_log_to_end() -> void:
+    _log_scroll.scroll_vertical = int(_log_scroll.get_v_scroll_bar().max_value);
 
 # --------------------------------
 # Refresh
@@ -119,7 +141,14 @@ func _refresh_all() -> void:
         var have:int = w.jobs.count(prof);
         var want:int = w.jobs.target(prof);
         var short:String = " (want %d)" % want if prof != JobManager.Profession.LABORER and want > have else "";
-        _jobs_rows[prof].text = "%s: %d%s" % [JobManager.PROFESSION_NAMES[prof], have, short];
+        var slots:int = w.jobs.total_slots(prof) if prof != JobManager.Profession.LABORER else 0;
+        var shown:String = "%d/%d" % [have, slots] if slots > 0 else str(have);       # workers over positions, where there are buildings
+        _jobs_rows[prof].text = "%s: %s%s" % [JobManager.PROFESSION_NAMES[prof], shown, short];
+        var open:int = w.jobs.open_slots(prof) if prof != JobManager.Profession.LABORER else 0;
+        open = open if have == 0 else 0;       # only a profession with nobody at all is flagged
+        _jobs_flags[prof].visible = open > 0;
+        _jobs_flags[prof].tooltip_text = "Its buildings have %d open position%s and nobody is assigned. Raise the number with +." % [open, "" if open == 1 else "s"];
+        _jobs_rows[prof].add_theme_color_override("font_color", Color(1.0, 0.7, 0.45) if open > 0 else Color.WHITE);
     var tools:PlayerTools = w.tools;
     _hint.text = tools.hint + ("   " + tools.error if tools.error != "" else "");
     _refresh_info();
@@ -137,6 +166,7 @@ func _refresh_info() -> void:
     _info_body.text = obj.info_text();
     _info_btn.visible = obj is Field;
     _refresh_relocate(obj);
+    _refresh_site(obj);
     _refresh_ledger_button(obj);
     _refresh_filters(obj);
     _refresh_controls(obj);
@@ -146,8 +176,32 @@ func _refresh_info() -> void:
     const TOP_BAR:float = 48.0;
     const PANEL_PADDING:float = 40.0;      # panel margins, title and the gap above the toolbar
     # the toolbar grows a line when the window is narrow, so measure it
-    var room:float = get_viewport().get_visible_rect().size.y - TOP_BAR - _toolbar.size.y - PANEL_PADDING;
+    var top:float = _info.global_position.y if PanelMover.has_moved(_info) else TOP_BAR;       # a moved inspector may start lower
+    var room:float = get_viewport().get_visible_rect().size.y - top - _toolbar.size.y - PANEL_PADDING;
     _info_scroll.custom_minimum_size.y = minf(_info_col.get_combined_minimum_size().y, room);
+
+# Cancel and build priority for a building going up (or being upgraded).
+func _refresh_site(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    var show:bool = b != null and b.is_site();
+    _site_box.visible = show;
+    if not show:
+        return;
+    _cancel_btn.visible = b.state == Building.State.CONSTRUCTION;
+    _cancel_btn.tooltip_text = "Stop building and take back every material delivered so far";
+    for i in _priority_btns.size():
+        _priority_btns[i].set_pressed_no_signal(b.priority == i);
+
+func _on_priority_pressed(level:int) -> void:
+    var sel:Variant = World.instance.tools.selected;
+    if sel is Building and World.alive(sel) and (sel as Building).is_site():
+        (sel as Building).set_priority(level);
+    _refresh_info();
+
+func _on_cancel_build() -> void:
+    var sel:Variant = World.instance.tools.selected;
+    if sel is Building and World.alive(sel) and (sel as Building).state == Building.State.CONSTRUCTION:
+        World.instance.remove_building(sel, true);
 
 # The Town Hall's Ledger button: enabled once it has the Governance upgrade (the record is kept regardless).
 func _refresh_ledger_button(obj:Variant) -> void:
@@ -317,6 +371,7 @@ func _on_mode_changed(mode:int) -> void:
         (_tool_btns[k] as Button).set_pressed_no_signal(k == key);
 
 func _on_selection_changed(_obj:Variant) -> void:
+    _crop_list.visible = false;
     _refresh_info();
 
 func _on_speed_changed(index:int) -> void:
@@ -332,19 +387,32 @@ func _town_hall_exists(w:World) -> bool:
 func _on_info_button() -> void:
     var obj:Variant = World.instance.tools.selected;
     if obj is Field:
-        _crop_menu.clear();
+        if _crop_list.visible:
+            _crop_list.visible = false;
+            return;
+        for child in _crop_list.get_children():
+            child.queue_free();
         for id in Defs.CROPS:
             var c:Dictionary = Defs.CROPS[id];
-            _crop_menu.add_item("%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)]);
-            _crop_menu.set_item_tooltip(_crop_menu.item_count - 1, c["desc"]);
-        _crop_menu.position = Vector2i(get_viewport().get_mouse_position()) + get_window().position;
-        _crop_menu.popup();
+            var btn:Button = Button.new();
+            btn.text = "%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)];
+            btn.tooltip_text = c["desc"];
+            btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+            btn.focus_mode = Control.FOCUS_NONE;
+            btn.pressed.connect(func() -> void:
+                var sel:Variant = World.instance.tools.selected;
+                if sel is Field and World.alive(sel):
+                    (sel as Field).set_crop(id);
+                _crop_list.visible = false;
+                _refresh_info());
+            _crop_list.add_child(btn);
+        _crop_list.visible = true;
 
 # --------------------------------
 # Construction
 
 func _build_top_bar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root);
+    var panel:PanelContainer = _panel(root, &"top");
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);
     var row:HBoxContainer = HBoxContainer.new();
     row.add_theme_constant_override("separation", 12);
@@ -381,7 +449,7 @@ func _save_button(text:String, tip:String, action:Callable) -> Button:
     return b;
 
 func _build_toolbar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root);
+    var panel:PanelContainer = _panel(root, &"toolbar");
     _toolbar = panel;
     panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE);
     panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
@@ -413,23 +481,39 @@ func _build_toolbar(root:Control) -> void:
     (_tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
 
 func _build_jobs_panel(root:Control) -> void:
-    var panel:PanelContainer = _panel(root);
+    var panel:PanelContainer = _panel(root, &"jobs");
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
     panel.offset_left = 8;
     panel.offset_top = 48;
     var col:VBoxContainer = VBoxContainer.new();
     panel.add_child(col);
-    var title:Label = Label.new();
-    title.text = "Professions";
+    var title:Button = Button.new();
+    title.text = "Professions  -";
+    title.flat = true;
+    title.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+    title.focus_mode = Control.FOCUS_NONE;
+    title.tooltip_text = "Click to collapse or expand";
     col.add_child(title);
+    var body:VBoxContainer = VBoxContainer.new();
+    col.add_child(body);
+    title.pressed.connect(func() -> void:
+        body.visible = not body.visible;
+        title.text = "Professions  -" if body.visible else "Professions  +";
+        PanelMover.refit_height(panel));
     var jobs:JobManager = World.instance.jobs;
     for prof in JobManager.PROFESSION_NAMES.size():
         var row:HBoxContainer = HBoxContainer.new();
-        col.add_child(row);
+        body.add_child(row);
         var l:Label = Label.new();
         l.custom_minimum_size.x = 150;
         row.add_child(l);
         _jobs_rows.append(l);
+        var flag:Label = Label.new();
+        flag.text = "!";
+        flag.visible = false;
+        flag.mouse_filter = Control.MOUSE_FILTER_STOP;
+        flag.add_theme_color_override("font_color", Color(1.0, 0.45, 0.3));
+        _jobs_flags.append(flag);
         if prof == JobManager.Profession.LABORER:
             l.tooltip_text = "Unassigned citizens. They clear marked trees and rocks, haul and help build.";
             l.mouse_filter = Control.MOUSE_FILTER_PASS;
@@ -441,9 +525,10 @@ func _build_jobs_panel(root:Control) -> void:
             b.custom_minimum_size.x = 28;
             b.pressed.connect(jobs.change_profession.bind(prof, d));
             row.add_child(b);
-    _build_policies(col);
+        row.add_child(flag);
+    _build_policies(body);
     var save_row:HBoxContainer = HBoxContainer.new();
-    col.add_child(save_row);
+    body.add_child(save_row);
     var do_save:Callable = func() -> void: SaveGame.save(World.instance);
     var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
     save_row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
@@ -474,7 +559,7 @@ func _build_policies(col:VBoxContainer) -> void:
         box.add_child(check);
 
 func _build_info_panel(root:Control) -> void:
-    _info = _panel(root);
+    _info = _panel(root, &"info");
     _info.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT);
     _info.grow_horizontal = Control.GROW_DIRECTION_BEGIN;
     _info.custom_minimum_size = Vector2(300, 0);
@@ -490,7 +575,7 @@ func _build_info_panel(root:Control) -> void:
     _info_scroll.add_child(col);
     _info_col = col;
     _info_title = Label.new();
-    _info_title.add_theme_font_size_override("font_size", 20);
+    _info_title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE);
     col.add_child(_info_title);
     _info_body = Label.new();
     _info_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
@@ -500,6 +585,9 @@ func _build_info_panel(root:Control) -> void:
     _info_btn.focus_mode = Control.FOCUS_NONE;
     _info_btn.pressed.connect(_on_info_button);
     col.add_child(_info_btn);
+    _crop_list = VBoxContainer.new();
+    _crop_list.visible = false;
+    col.add_child(_crop_list);
     _move_btn = Button.new();
     _move_btn.focus_mode = Control.FOCUS_NONE;
     _move_btn.visible = false;
@@ -508,6 +596,29 @@ func _build_info_panel(root:Control) -> void:
         if sel is Building and World.alive(sel):
             World.instance.tools.start_relocate(sel));
     col.add_child(_move_btn);
+    _site_box = VBoxContainer.new();
+    _site_box.visible = false;
+    col.add_child(_site_box);
+    _cancel_btn = Button.new();
+    _cancel_btn.text = "Cancel construction";
+    _cancel_btn.focus_mode = Control.FOCUS_NONE;
+    _cancel_btn.pressed.connect(_on_cancel_build);
+    _site_box.add_child(_cancel_btn);
+    var prio_title:Label = Label.new();
+    prio_title.text = "Build priority:";
+    _site_box.add_child(prio_title);
+    var prio_row:HBoxContainer = HBoxContainer.new();
+    _site_box.add_child(prio_row);
+    for i in Building.PRIORITY_NAMES.size():
+        var pb:Button = Button.new();
+        pb.text = Building.PRIORITY_NAMES[i];
+        pb.toggle_mode = true;
+        pb.focus_mode = Control.FOCUS_NONE;
+        pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+        pb.tooltip_text = "No hauling or building here" if i == 0 else "Builders and haulers serve higher priorities first";
+        pb.pressed.connect(_on_priority_pressed.bind(i));
+        prio_row.add_child(pb);
+        _priority_btns.append(pb);
     _ledger_btn = Button.new();
     _ledger_btn.text = "Ledger";
     _ledger_btn.focus_mode = Control.FOCUS_NONE;
@@ -535,16 +646,38 @@ func _build_info_panel(root:Control) -> void:
         _filter_checks[item] = check;
 
 func _build_log(root:Control) -> void:
+    _log_panel = _panel(root, &"log");
+    _log_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT);
+    _log_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
+    _log_panel.offset_left = 8;
+    _log_panel.offset_right = 8 + LOG_WIDTH;
+    _log_panel.offset_top = -(96 + LOG_HEIGHT);
+    _log_panel.offset_bottom = -96;
+    _log_panel.custom_minimum_size.x = LOG_WIDTH;
+    var col:VBoxContainer = VBoxContainer.new();
+    _log_panel.add_child(col);
+    var title:Button = Button.new();
+    title.text = "Log  -";
+    title.flat = true;
+    title.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+    title.focus_mode = Control.FOCUS_NONE;
+    title.tooltip_text = "Click to collapse or expand";
+    col.add_child(title);
+    _log_scroll = ScrollContainer.new();
+    _log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    _log_scroll.custom_minimum_size = Vector2(LOG_WIDTH, LOG_HEIGHT);
+    col.add_child(_log_scroll);
+    title.pressed.connect(func() -> void:
+        _log_scroll.visible = not _log_scroll.visible;
+        title.text = "Log  -" if _log_scroll.visible else "Log  +";
+        PanelMover.refit_height(_log_panel);
+        _scroll_log_to_end.call_deferred());
     _log = VBoxContainer.new();
-    _log.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT);
-    _log.grow_vertical = Control.GROW_DIRECTION_BEGIN;
-    _log.offset_left = 252;                 # right of the jobs panel, which grows downward when Policies is open
-    _log.offset_top = -96;
-    _log.offset_bottom = -96;
-    _log.mouse_filter = Control.MOUSE_FILTER_IGNORE;
-    root.add_child(_log);
+    _log.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    _log_scroll.add_child(_log);
 
-func _panel(root:Control) -> PanelContainer:
+# A HUD panel. With an id it can be dragged by the strip along its top edge (see PanelMover).
+func _panel(root:Control, id:StringName = &"") -> PanelContainer:
     var p:PanelContainer = PanelContainer.new();
     p.mouse_filter = Control.MOUSE_FILTER_STOP;
     var style:StyleBoxFlat = StyleBoxFlat.new();
@@ -553,6 +686,8 @@ func _panel(root:Control) -> PanelContainer:
     style.set_content_margin_all(8);
     p.add_theme_stylebox_override("panel", style);
     root.add_child(p);
+    if id != &"":
+        PanelMover.make_movable(p, id);
     return p;
 
 func _tool_button(row:Container, group:ButtonGroup, text:String, tip:String) -> Button:

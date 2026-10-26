@@ -14,6 +14,7 @@ var kind            :StringName;
 var label           :String;
 var interruptible   :bool = true;
 var target          :Variant = null;     # what to avoid retrying if it fails
+var related         :Variant = null;     # a second building this task touches (a store it takes goods from); ends if it is demolished
 var workplace       :Variant = null;     # job building this task serves; ends if it is demolished
 var job             :int = -1;           # profession whose experience this work earns and uses (-1: none)
 var steps           :Array[Dictionary] = [];

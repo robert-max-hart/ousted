@@ -35,8 +35,7 @@ func _process(_delta:float) -> void:
         world.hud._info_btn.pressed.emit();
     elif _frame == 50:
         _shot("crops_01.png");
-        world.hud._crop_menu.hide();
-        world.hud._crop_menu.id_pressed.emit(3);
+        (world.hud._crop_list.get_child(3) as Button).pressed.emit();
     elif _frame == 70:
         _shot("crops_02.png");
         _expect("picking from the menu sets the crop", field.crop_id == Defs.CROPS.keys()[3]);

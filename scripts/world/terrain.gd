@@ -8,7 +8,7 @@ class_name Terrain extends Node3D;
 
 signal changed(rect:Rect2i);
 
-enum Overlay { NONE, ROAD, TILLED };
+enum Overlay { NONE, ROAD, TILLED, SITE };
 
 const SIZE              :int = 128;
 const CHUNK             :int = 32;
@@ -21,6 +21,7 @@ const COLOR_SAND        :Color = Color(0.74, 0.68, 0.5);
 const COLOR_ROCK        :Color = Color(0.48, 0.46, 0.43);
 const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
+const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being dug: pale, bare soil
 const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
 const DETAIL_AMOUNT     :float = 0.055;
 const DETAIL_SATURATION :float = 1.15;
@@ -265,6 +266,8 @@ func _cell_color(c:Vector2i) -> Color:
     match overlay[index(c)]:
         Overlay.ROAD:
             col = COLOR_ROAD;
+        Overlay.SITE:
+            col = COLOR_SITE;
         Overlay.TILLED:
             col = COLOR_SNOW.lerp(COLOR_TILLED, 0.4) if _season == GameClock.Season.WINTER else COLOR_TILLED;
         _:

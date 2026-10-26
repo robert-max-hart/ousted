@@ -32,8 +32,10 @@ func _ready() -> void:
     h2 = world.place_building(&"house", spots[1], Vector2i(3, 3), true);
     h1.settings["heating"] = false;
     h2.settings["heating"] = false;
+    for i in world.pawns.size():       # the settlers spread over both houses by distance: put six in the first, the rest in the second
+        world.families.move_home(world.pawns[i], h1 if i < 6 else h2);
     _expect("a house sleeps 6", h1.def["beds"] == 6);
-    _expect("the six settlers filled the first house", h1.residents.size() == 6 and h2.residents.is_empty());
+    _expect("the settlers filled the first house", h1.residents.size() == 6);
     var a:Pawn = world.pawns[0];
     var b:Pawn = world.pawns[1];
     a.age = 25.0; b.age = 34.0;

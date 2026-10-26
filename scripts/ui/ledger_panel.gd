@@ -39,6 +39,7 @@ func setup(ledger:Ledger) -> void:
     style.set_corner_radius_all(6);
     style.set_content_margin_all(10);
     add_theme_stylebox_override("panel", style);
+    PanelMover.make_movable(self, &"ledger");
     var col:VBoxContainer = VBoxContainer.new();
     add_child(col);
     var head:HBoxContainer = HBoxContainer.new();

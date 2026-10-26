@@ -6,8 +6,14 @@
 class_name ResourceRenderer extends Node3D;
 
 const DESIGNATED_TINT:Color = Color(1.0, 0.8, 0.45);
+const PREVIEW_TINT:Color = Color(1.0, 0.3, 0.25);      # what a Harvest or Forage drag would mark
 const CANOPY_BY_SEASON:Array[Color] = [
     Color(0.16, 0.38, 0.18), Color(0.15, 0.35, 0.16), Color(0.2, 0.34, 0.16), Color(0.55, 0.62, 0.6),
+];
+# Oak leaves over the year: [position in seasons (0 = first day of spring), colour]. They fall at the start of winter.
+const OAK_LEAVES:Array = [
+    [0.0, Color(0.56, 0.72, 0.34)], [0.6, Color(0.3, 0.58, 0.22)], [1.3, Color(0.17, 0.42, 0.17)],
+    [2.0, Color(0.34, 0.47, 0.16)], [2.4, Color(0.76, 0.56, 0.14)], [2.75, Color(0.72, 0.3, 0.12)], [3.0, Color(0.5, 0.28, 0.14)],
 ];
 const BUSH_BY_SEASON:Array[Color] = [
     Color(0.3, 0.55, 0.22), Color(0.28, 0.5, 0.2), Color(0.55, 0.42, 0.2), Color(0.45, 0.42, 0.38),
@@ -17,11 +23,17 @@ var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
 var _markers    :MultiMeshInstance3D;
 var _canopy_mat :StandardMaterial3D;
 var _bush_mat   :StandardMaterial3D;
+var _oak_leaf_mat:StandardMaterial3D;
+var _berries    :MultiMeshInstance3D;      # berries on the bushes that have fruit, one clump per bush
+var _oak_leaves :MultiMeshInstance3D;      # follows the oak layer's instances, hidden in winter
 var _dirty      :bool = true;
+var _preview_rect:Rect2i = Rect2i();
+var _preview_filter:Callable = Callable();
 
 func _ready() -> void:
     _canopy_mat = _make_material(CANOPY_BY_SEASON[0]);
     _bush_mat = _make_material(BUSH_BY_SEASON[0]);
+    _oak_leaf_mat = _make_material(OAK_LEAVES[0][1]);
     var trunk_mat:StandardMaterial3D = _make_material(Color(0.4, 0.27, 0.17));
 
     var tree:ArrayMesh = ArrayMesh.new();
@@ -38,6 +50,29 @@ func _ready() -> void:
     canopy.radial_segments = 7;
     _add_part(tree, canopy, Transform3D(Basis(), Vector3(0, 2.4, 0)), _canopy_mat);
 
+    var oak:ArrayMesh = ArrayMesh.new();
+    var oak_trunk:CylinderMesh = CylinderMesh.new();
+    oak_trunk.top_radius = 0.12;
+    oak_trunk.bottom_radius = 0.22;
+    oak_trunk.height = 1.5;
+    oak_trunk.radial_segments = 6;
+    _add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), trunk_mat);
+    for i in 3:                                  # bare boughs, all that shows in winter
+        var bough:CylinderMesh = CylinderMesh.new();
+        bough.top_radius = 0.03;
+        bough.bottom_radius = 0.07;
+        bough.height = 1.3;
+        bough.radial_segments = 4;
+        var yaw:float = i * TAU / 3.0;
+        var lean:Basis = Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, 0.6);
+        _add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), trunk_mat);
+    var oak_canopy:ArrayMesh = ArrayMesh.new();
+    var crown:SphereMesh = SphereMesh.new();
+    crown.radius = 1.15;
+    crown.height = 2.1;
+    crown.radial_segments = 8;
+    crown.rings = 4;
+    _add_part(oak_canopy, crown, Transform3D(Basis(), Vector3(0, 2.5, 0)), _oak_leaf_mat);
     var rock_shape:SphereMesh = SphereMesh.new();
     rock_shape.radius = 0.7;
     rock_shape.height = 1.0;
@@ -73,7 +108,21 @@ func _ready() -> void:
     var hazel:ArrayMesh = ArrayMesh.new();
     _add_part(hazel, hazel_shape, Transform3D(Basis(), Vector3(0, 0.5, 0)), _make_material(Color(0.5, 0.52, 0.2)));
 
+    var berry_shape:SphereMesh = SphereMesh.new();
+    berry_shape.radius = 0.075;
+    berry_shape.height = 0.15;
+    berry_shape.radial_segments = 6;
+    berry_shape.rings = 3;
+    var berries:ArrayMesh = ArrayMesh.new();
+    var berry_mat:StandardMaterial3D = _make_material(Color.WHITE);       # the colour comes from the instance, red or blue
+    for k in 7:
+        var a:float = k * 2.399;
+        var e:float = 0.25 + 0.2 * (k % 3);
+        _add_part(berries, berry_shape, Transform3D(Basis(), Vector3(cos(a) * cos(e) * 0.47, 0.3 + sin(e) * 0.36, sin(a) * cos(e) * 0.47)), berry_mat);
+    _berries = _make_layer(berries);
     _layers[&"tree"] = _make_layer(tree);
+    _layers[&"oak"] = _make_layer(oak);
+    _oak_leaves = _make_layer(oak_canopy);
     _layers[&"rock"] = _make_layer(rock);
     _layers[&"ore"] = _make_layer(ore);
     _layers[&"bush"] = _make_layer(bush);
@@ -96,9 +145,31 @@ func _ready() -> void:
 func mark_dirty() -> void:
     _dirty = true;
 
+# Tints the things inside rect that filter accepts, while the player is dragging out a selection (an empty rect clears it).
+func set_preview(rect:Rect2i, filter:Callable) -> void:
+    if rect == _preview_rect:
+        return;
+    _preview_rect = rect;
+    _preview_filter = filter;
+    _dirty = true;
+
 func set_season(s:int) -> void:
     _canopy_mat.albedo_color = CANOPY_BY_SEASON[s];
     _bush_mat.albedo_color = BUSH_BY_SEASON[s];
+    update_foliage();
+
+# Oak leaves follow the day of the year: fresh green in spring, orange and red in autumn, gone in winter.
+func update_foliage() -> void:
+    var f:float = GameClock.year_fraction_seasons();
+    _oak_leaves.visible = f < 3.0;
+    var col:Color = OAK_LEAVES[0][1];
+    for i in range(1, OAK_LEAVES.size()):
+        var a:Array = OAK_LEAVES[i - 1];
+        var b:Array = OAK_LEAVES[i];
+        if f <= b[0]:
+            col = (a[1] as Color).lerp(b[1], inverse_lerp(a[0], b[0], f));
+            break;
+    _oak_leaf_mat.albedo_color = col;
 
 func _process(_delta:float) -> void:
     if _dirty:
@@ -120,6 +191,9 @@ func _rebuild() -> void:
         var list:Array = by_kind[k];
         var mm:MultiMesh = (_layers[k] as MultiMeshInstance3D).multimesh;
         mm.instance_count = list.size();
+        var leaves:MultiMesh = _oak_leaves.multimesh;
+        if k == &"oak":
+            leaves.instance_count = list.size();
         for i in list.size():
             var rn:ResourceNode = list[i];
             var s:float = rn.scale;
@@ -133,13 +207,28 @@ func _rebuild() -> void:
                 tint = Color(1.0, lerpf(0.8, 1.0, 1.0 - ratio), lerpf(0.8, 1.0, 1.0 - ratio));
             if rn.designated:
                 tint = DESIGNATED_TINT;
+            elif _preview_rect.has_point(rn.cell) and _preview_filter.is_valid() and _preview_filter.call(rn):
+                tint = PREVIEW_TINT;
             mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rn.yaw).scaled(Vector3.ONE * s), _node_position(world, rn)));
             mm.set_instance_color(i, tint);
+            if k == &"oak":
+                leaves.set_instance_transform(i, mm.get_instance_transform(i));
+                leaves.set_instance_color(i, tint);
+
+    var fruiting:Array = (by_kind[&"bush"] as Array).filter(func(b:ResourceNode) -> bool: return b.amount > 0);
+    var bm:MultiMesh = _berries.multimesh;
+    bm.instance_count = fruiting.size();
+    for i in fruiting.size():
+        var bush:ResourceNode = fruiting[i];
+        var ratio:float = float(bush.amount) / bush.max_amount;
+        var s:float = bush.scale * (0.7 + 0.3 * ratio) * (0.6 + 0.4 * ratio);       # fewer berries shrink the clump
+        bm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, bush.yaw).scaled(Vector3.ONE * s), _node_position(world, bush)));
+        bm.set_instance_color(i, Color(0.85, 0.12, 0.18) if (bush.cell.x + bush.cell.y * 3) % 3 != 0 else Color(0.25, 0.3, 0.85));
 
     var mmm:MultiMesh = _markers.multimesh;
     mmm.instance_count = marked.size();
     for i in marked.size():
-        var top:float = 4.2 if marked[i].kind == &"tree" else 1.6;
+        var top:float = 4.2 if marked[i].is_tree() else 1.6;
         mmm.set_instance_transform(i, Transform3D(Basis(), _node_position(world, marked[i]) + Vector3(0, top, 0)));
         mmm.set_instance_color(i, Color.WHITE);
 

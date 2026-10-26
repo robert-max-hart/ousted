@@ -13,7 +13,7 @@ signal speed_changed(speed_index:int);
 enum Season { SPRING, SUMMER, AUTUMN, WINTER };
 
 const SEASON_NAMES      :Array[String] = ["Spring", "Summer", "Autumn", "Winter"];
-const SECONDS_PER_HOUR  :float = 5.0;   # real seconds per game hour at 1x
+const SECONDS_PER_HOUR  :float = 7.5;   # real seconds per game hour at 1x (a game day is 3 real minutes)
 const HOURS_PER_DAY     :int = 24;
 const DAYS_PER_SEASON   :int = 8;
 const DAYS_PER_YEAR     :int = DAYS_PER_SEASON * 4;
