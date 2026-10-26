@@ -246,6 +246,16 @@ const TEACHER_VETERAN_XP:float = 0.4;     # teaching + general experience at whi
 static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
     return 1.0 + TEACHER_MAX_BONUS * minf(1.0, (teaching_xp + general_xp) / TEACHER_VETERAN_XP);
 
+# --------------------------------
+# Policies (decided 2026-10-23): colony-wide on/off rules the player sets in the HUD, saved with the game.
+# Each is id -> {name, desc, default}. Add a rule here, then read it with World.instance.policies.is_on(id).
+const POLICIES:Dictionary = {
+    &"child_labor": {
+        "name": "Child labor", "default": true,
+        "desc": "Children (5 to 17) with no school to attend work as laborers at half speed. Forbidden, they stay home instead.",
+    },
+};
+
 # Linear interpolation through [x, y] points sorted by x, flat beyond the ends.
 static func curve(points:Array, x:float) -> float:
     if x <= points[0][0]:

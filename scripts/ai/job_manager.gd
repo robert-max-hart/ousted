@@ -42,12 +42,12 @@ func choose_task(p:Pawn) -> Task:
             p.block_needs(1.5);
 
     if p.is_baby():
-        return needs.baby_task(p);
+        return needs.stay_home_task(p);
 
     var night:bool = GameClock.is_night();
     if p.carry_amount > 0:
         # no topping up the load when school is waiting for a child or the teacher
-        if not night and p.carry_amount < Pawn.CARRY_CAP and not school.calls(p):
+        if not night and p.carry_amount < Pawn.CARRY_CAP and not school.calls(p) and not _child_barred(p):
             t = _gather_more_task(p, p.carry_item);
             if t != null:
                 return t;
@@ -71,6 +71,8 @@ func choose_task(p:Pawn) -> Task:
         t = school.school_task(p);
         if t != null:
             return t;
+        if _child_barred(p):
+            return needs.stay_home_task(p);
 
     for job in _job_order(p.profession):
         t = (job as Callable).call(p);
@@ -148,6 +150,18 @@ func _least_experienced(prof:int) -> Pawn:
         if p.profession == prof and (best == null or p.experience(prof) < best.experience(prof)):
             best = p;
     return best;
+
+# A child who may not work (the child labor policy is off).
+func _child_barred(p:Pawn) -> bool:
+    return p.is_child() and not world.policies.is_on(&"child_labor");
+
+# Forbidding child labor sends working children home at once; school and needs are left alone.
+func on_policy_changed(id:StringName) -> void:
+    if id != &"child_labor" or world.policies.is_on(id):
+        return;
+    for p in world.pawns:
+        if p.is_child() and p.task != null and p.task.interruptible and p.task.kind != &"school" and p.task.kind != &"stay_home":
+            p.end_task(false);
 
 func _assign(p:Pawn, prof:int) -> void:
     p.profession = prof;

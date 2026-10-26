@@ -379,12 +379,36 @@ func _build_jobs_panel(root:Control) -> void:
             b.custom_minimum_size.x = 28;
             b.pressed.connect(jobs.change_profession.bind(prof, d));
             row.add_child(b);
+    _build_policies(col);
     var save_row:HBoxContainer = HBoxContainer.new();
     col.add_child(save_row);
     var do_save:Callable = func() -> void: SaveGame.save(World.instance);
     var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
     save_row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
     save_row.add_child(_save_button("Load", "Load the quicksave (F9)", do_load));
+
+# A "Policies" button that opens the list of colony-wide rules as check boxes.
+func _build_policies(col:VBoxContainer) -> void:
+    var box:VBoxContainer = VBoxContainer.new();
+    box.visible = false;
+    var toggle:Button = Button.new();
+    toggle.text = "Policies";
+    toggle.tooltip_text = "Colony-wide rules";
+    toggle.toggle_mode = true;
+    toggle.focus_mode = Control.FOCUS_NONE;
+    toggle.toggled.connect(func(on:bool) -> void: box.visible = on);
+    col.add_child(toggle);
+    col.add_child(box);
+    var policies:Policies = World.instance.policies;
+    for id in Defs.POLICIES:
+        var check:CheckBox = CheckBox.new();
+        check.text = Defs.POLICIES[id]["name"];
+        check.tooltip_text = Defs.POLICIES[id]["desc"];
+        check.focus_mode = Control.FOCUS_NONE;
+        check.set_pressed_no_signal(policies.is_on(id));
+        var apply:Callable = func(on:bool, rule:StringName) -> void: policies.set_on(rule, on);
+        check.toggled.connect(apply.bind(id));
+        box.add_child(check);
 
 func _build_info_panel(root:Control) -> void:
     _info = _panel(root);

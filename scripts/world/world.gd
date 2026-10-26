@@ -23,6 +23,7 @@ const MAX_WALK_SLOPE    :float = 2.2;
 var terrain     :Terrain;
 var nav         :NavGrid;
 var jobs        :JobManager;
+var policies    :Policies = Policies.new();
 var visuals     :WorldVisuals;
 var tools       :PlayerTools;
 var hud         :HUD;
@@ -91,6 +92,7 @@ func _ready() -> void:
     renderer.name = "Nature";
     add_child(renderer);
     jobs = JobManager.new(self);
+    policies.changed.connect(jobs.on_policy_changed);
 
     if loading:
         _restore_entities(save);
@@ -227,7 +229,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
+        "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -266,6 +268,7 @@ func _restore_entities(save:Dictionary) -> void:
     renderer.mark_dirty();
     rng.state = save["rng_state"];
     death_log = save.get("deaths", []);
+    policies.restore(save.get("policies", {}));
     var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
     if saved_targets != null:
         jobs.targets = saved_targets;

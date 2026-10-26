@@ -60,7 +60,7 @@ func warm_task(p:Pawn) -> Task:
     return t;
 
 # Babies never work and never leave the house: they go indoors and stay there.
-func baby_task(p:Pawn) -> Task:
+func stay_home_task(p:Pawn) -> Task:
     var b:Building = world.shelter_for(p);
     var t:Task = Task.new(&"stay_home", "Staying home", false);
     if b != null and not (p.indoors and is_same(p.shelter, b)):
