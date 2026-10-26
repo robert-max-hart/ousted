@@ -55,6 +55,14 @@ func _on_hour(_hour:int) -> void:
     _update_temperature();
     weather_changed.emit();
 
+# A new game starts with clear weather (or, for the title screen, a given strength of rain or snow).
+func reset(precipitation:float = 0.0) -> void:
+    is_raining = precipitation > 0.0;
+    intensity = precipitation;
+    _roll_day();
+    _update_temperature();
+    weather_changed.emit();
+
 func save_state() -> Dictionary:
     return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset};
 

@@ -7,6 +7,7 @@
 class_name Terrain extends Node3D;
 
 signal changed(rect:Rect2i);
+signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting or a road, field or site laid or removed
 
 enum Overlay { NONE, ROAD, TILLED, SITE };
 
@@ -152,6 +153,7 @@ func set_overlay(c:Vector2i, value:int) -> void:
         return;
     overlay[index(c)] = value;
     _mark_dirty_rect(Rect2i(c, Vector2i.ONE));
+    ground_changed.emit(Rect2i(c, Vector2i.ONE));
 
 # Min/max corner height inside a rect, as Vector2(min, max).
 func rect_height_range(r:Rect2i) -> Vector2:
@@ -209,6 +211,7 @@ func _after_edit(r:Rect2i) -> void:
     r = r.intersection(Rect2i(0, 0, SIZE, SIZE));
     _mark_dirty_rect(r);
     changed.emit(r);
+    ground_changed.emit(r);
 
 # --------------------------------
 # Ray picking (no physics needed)
@@ -330,7 +333,11 @@ func _build_chunk(ci:int) -> void:
             normals[v + 1] = _corner_normal(x + 1, z);
             normals[v + 2] = _corner_normal(x + 1, z + 1);
             normals[v + 3] = _corner_normal(x, z + 1);
-            if overlay[index(cell)] != Overlay.NONE:
+            if overlay[index(cell)] == Overlay.ROAD:
+                for j in 4:       # packed earth is mottled: each corner a little lighter or darker
+                    var speck:float = float((((x * 2 + (j & 1)) * 73856093) ^ ((z * 2 + (j >> 1)) * 19349663)) & 1023) / 1023.0;
+                    colors[v + j] = Color(own.r * (0.88 + speck * 0.24), own.g * (0.88 + speck * 0.24), own.b * (0.9 + speck * 0.2));
+            elif overlay[index(cell)] != Overlay.NONE:
                 for j in 4:
                     colors[v + j] = own;
             else:

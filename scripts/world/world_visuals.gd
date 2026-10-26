@@ -160,6 +160,8 @@ func _update_lighting() -> void:
 const RAIN_PARTICLES :int = 2500;
 const SNOW_PARTICLES :int = 1800;
 
+var _fx_host    :Node3D;       # what the rain and snow emitters hang from (the camera rig; behind the title, a fixed point)
+
 func _make_precip(extents:float) -> CPUParticles3D:
     var p:CPUParticles3D = CPUParticles3D.new();
     p.local_coords = false;
@@ -170,7 +172,7 @@ func _make_precip(extents:float) -> CPUParticles3D:
     p.position = Vector3(0, 22, 0);
     p.emitting = false;
     p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-    world.camera_rig.add_child(p);
+    _fx_host.add_child(p);
     return p;
 
 func _precip_material(color:Color) -> StandardMaterial3D:
@@ -180,7 +182,8 @@ func _precip_material(color:Color) -> StandardMaterial3D:
     m.albedo_color = color;
     return m;
 
-func setup_weather_fx() -> void:
+func setup_weather_fx(host:Node3D = null) -> void:
+    _fx_host = host if host != null else world.camera_rig;
     _rain = _make_precip(35.0);
     _rain.lifetime = 1.1;
     _rain.initial_velocity_min = 18.0;
@@ -200,6 +203,9 @@ func setup_weather_fx() -> void:
     flake.size = Vector3(0.08, 0.08, 0.08);
     flake.material = _precip_material(Color(1, 1, 1, 0.9));
     _snow.mesh = flake;
+    if world.is_backdrop:       # behind the title the weather is already in full swing when the picture appears
+        _rain.preprocess = _rain.lifetime;
+        _snow.preprocess = _snow.lifetime;
     Weather.weather_changed.connect(_on_weather_changed);
     _on_weather_changed();
 
@@ -225,8 +231,8 @@ func _update_precip() -> void:
         return;
     var wet:float = Weather.intensity;
     var snow_f:float = Weather.snow_fraction();
-    _rain.speed_scale = GameClock.speed();       # rain and snow stop when the game is paused and run faster when it is sped up
-    _snow.speed_scale = GameClock.speed();
+    _rain.speed_scale = World.fx_speed();       # rain and snow stop when the game is paused and run faster when it is sped up
+    _snow.speed_scale = World.fx_speed();
     _rain.emitting = wet > 0.01 and snow_f < 1.0;
     _snow.emitting = wet > 0.01 and snow_f > 0.0;
     var rain_mat:StandardMaterial3D = (_rain.mesh as BoxMesh).material as StandardMaterial3D;

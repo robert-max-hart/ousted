@@ -59,6 +59,18 @@ static func autosave(world:World) -> void:
     if autosave_enabled and not world.pawns.is_empty():
         write(world, AUTOSAVE);
 
+# From the title screen: starts the main scene from a saved game. Returns "" or the reason it failed.
+static func start_from_slot(tree:SceneTree, slot:String) -> String:
+    var error:Array = [];
+    var data:Dictionary = read(slot, error);
+    if data.is_empty():
+        return error[0];
+    GameClock.restore_state(data["clock"]);
+    Weather.restore_state(data["weather"]);
+    World.pending_load = data;
+    tree.change_scene_to_file(MAIN_SCENE);
+    return "";
+
 # Replaces the running world with the saved one. Done between frames so nothing is freed while one of
 # its own callbacks (a button press) is still running.
 static func load_slot(world:World, slot:String = QUICKSAVE) -> void:

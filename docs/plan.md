@@ -333,3 +333,23 @@ Save and load was moved earlier and built at the end of M2 (quicksave, autosave 
 - About 45 fps on integrated graphics (UHD 620) at 1600×900 with shadows.
 - Known simplifications: colony-wide stock, free and instant terraforming, fixed 6×6 fields,
   no seeds, no ageing or births, placeholder primitive art.
+
+---
+
+## 9. Later ideas (visual polish)
+
+- **Wind sway for grass and trees (noted 2026-10-26, not built).** Grass tufts (`GrassDetail`), pines, oak crowns and bushes
+  (`ResourceRenderer`) are all MultiMeshes with a `StandardMaterial3D` and vertex colours, so they stand perfectly still.
+  Sway needs a small custom spatial shader (vertex function) in place of those materials:
+  - Displace vertices sideways in proportion to height above the base (`VERTEX.y`, or a baked vertex-colour mask), so roots
+    and trunks stay put and tips and crowns move most; trunks nearly rigid, crowns and grass blades more.
+  - Phase from the instance's world position (a hash, or `INSTANCE_CUSTOM`) so neighbours don't move in step; a slow large
+    wave plus a faster small flutter.
+  - The shader must reproduce what the standard material does today: albedo times vertex colour times instance colour
+    (the tint trick `add_part` uses, and the per-season colours set on the materials).
+  - Drive it from a wind uniform, not `TIME`: an accumulated wind clock advanced by `World.fx_speed()`, so sway pauses with
+    the game and speeds up with it (like rain, snow and smoke already do), and a wind strength that follows the weather
+    (calm in clear weather, stronger in rain, strongest in storms) and could set the smoke and rain slant.
+  - Cost: vertex work only, likely small, but measure on the UHD 620 (about 45 fps at 1600x900 before the tufts); fade the
+    sway out at distance, as the grass tufts already fade out of view.
+  - Also fits the title screen (frozen town, moving grass and trees).

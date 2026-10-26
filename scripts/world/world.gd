@@ -8,6 +8,13 @@ class_name World extends Node3D;
 
 static var instance:World = null;
 static var pending_load:Dictionary = {};     # set by SaveGame before a World is created from a save
+static var new_game_seed:int = 0;           # set by the title screen for the next new game (0 = random)
+static var backdrop:bool = false;           # the title screen builds a frozen mock town with no citizens, HUD or tools
+
+# How fast particle effects (rain, snow, smoke) play: with the game's clock, except behind the title screen where the
+# clock is stopped and they run at normal speed.
+static func fx_speed() -> float:
+    return 1.0 if instance != null and instance.is_backdrop else GameClock.speed()
 
 const START_PAWNS       :int = 8;
 const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 130, &"berries": 30, &"firewood": 30};
@@ -36,6 +43,7 @@ var hud         :HUD;
 var camera_rig  :RTSCamera;
 var renderer    :ResourceRenderer;
 var rng         :RandomNumberGenerator = RandomNumberGenerator.new();
+var is_backdrop :bool = false;      # this world is the title screen's picture
 
 var buildings   :Array[Building] = [];
 var pawns       :Array[Pawn] = [];
@@ -60,13 +68,15 @@ static func alive(o:Variant) -> bool:
 
 func _ready() -> void:
     instance = self;
+    is_backdrop = backdrop;
     var save:Dictionary = pending_load;
     pending_load = {};
     var loading:bool = not save.is_empty();
     if loading:
         world_seed = save["seed"];
     elif world_seed == 0:
-        world_seed = randi() % 1000000;
+        world_seed = new_game_seed if new_game_seed > 0 else randi() % 1000000;
+        new_game_seed = 0;
     rng.seed = world_seed;
     print("Ousted world seed: %d" % world_seed);
 
@@ -98,6 +108,8 @@ func _ready() -> void:
     renderer = ResourceRenderer.new();
     renderer.name = "Nature";
     add_child(renderer);
+    add_child(RoadDetail.new(self));
+    add_child(GrassDetail.new(self));
     jobs = JobManager.new(self);
     families = Families.new(self);
     policies.changed.connect(jobs.on_policy_changed);
@@ -108,6 +120,9 @@ func _ready() -> void:
         _spawn_nature();
         var start:Vector2i = _find_start_cell();
         _clear_nodes(start, 10);
+        if backdrop:
+            TitleBackdrop.build(self, start);
+            return;
         town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
         _start_colony_goods(start);
         Defs.ageing_days_per_year = 4.0;

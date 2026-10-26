@@ -59,6 +59,8 @@ var _smoke      :CPUParticles3D;
 var _body_mat   :StandardMaterial3D;
 var _door       :MeshInstance3D;
 var _windows    :Array[MeshInstance3D] = [];
+var windows_lit_always:bool = false;      # the title screen's mock town: lit without residents
+var smoke_always:bool = false;            # ... and smoking without a fire to feed
 var _window_mat :StandardMaterial3D;
 var _site_label :Label3D;        # floats over a site that is paused or short of materials
 
@@ -525,13 +527,15 @@ func is_burning() -> bool:
 # The smoke follows the game speed: still when paused, quicker when sped up.
 func _on_clock_speed(_index:int) -> void:
     if _smoke != null:
-        _smoke.speed_scale = GameClock.speed();
+        _smoke.speed_scale = World.fx_speed();
 
 # Smoke is grey for firewood and black for coal (the firewood in the stock burns first).
 func update_smoke() -> void:
     if _smoke == null:
         return;
-    var burning:bool = is_burning();
+    var burning:bool = smoke_always or is_burning();
+    if smoke_always and not _smoke.emitting:
+        _smoke.preprocess = _smoke.lifetime;       # the title's chimneys already have plumes when it appears
     _smoke.emitting = burning;
     if burning:
         var coal:bool = fuel_coal >= fuel;
@@ -561,7 +565,7 @@ func _build_door(body:Vector2, h:float) -> void:
 func update_windows() -> void:
     if _window_mat == null:
         return;
-    var lit:bool = state == State.COMPLETE and not residents.is_empty();
+    var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty());
     _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
 
 func _build_chimney(h:float) -> void:
@@ -600,7 +604,7 @@ func _build_chimney(h:float) -> void:
     fade.set_color(1, Color(1, 1, 1, 0));
     _smoke.color_ramp = fade;
     _smoke.emitting = false;
-    _smoke.speed_scale = GameClock.speed();
+    _smoke.speed_scale = World.fx_speed();
     GameClock.speed_changed.connect(_on_clock_speed);
     _smoke.position = _chimney.position + Vector3(0, box.size.y * 0.5, 0);
     _smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;

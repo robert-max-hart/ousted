@@ -15,6 +15,17 @@ const OAK_LEAVES:Array = [
     [0.0, Color(0.56, 0.72, 0.34)], [0.6, Color(0.3, 0.58, 0.22)], [1.3, Color(0.17, 0.42, 0.17)],
     [2.0, Color(0.34, 0.47, 0.16)], [2.4, Color(0.76, 0.56, 0.14)], [2.75, Color(0.72, 0.3, 0.12)], [3.0, Color(0.5, 0.28, 0.14)],
 ];
+# Shrubs are clumps of lobes: [centre, radius, shade]. A berry bush is low and spread; a hazel stool taller.
+const BUSH_LOBES:Array = [
+    [Vector3(0, 0.3, 0), 0.34, 1.0], [Vector3(0.32, 0.22, 0.1), 0.27, 0.9], [Vector3(-0.3, 0.24, 0.14), 0.28, 0.95],
+    [Vector3(0.05, 0.2, -0.33), 0.27, 0.88], [Vector3(-0.1, 0.22, 0.34), 0.26, 0.92], [Vector3(0.12, 0.5, 0.0), 0.22, 1.1],
+];
+const HAZEL_LOBES:Array = [
+    [Vector3(0, 0.75, 0), 0.4, 1.0], [Vector3(0.42, 0.55, 0.12), 0.34, 0.9], [Vector3(-0.4, 0.6, -0.1), 0.35, 0.94],
+    [Vector3(0.05, 0.5, -0.45), 0.32, 0.88], [Vector3(-0.08, 0.52, 0.44), 0.33, 0.92], [Vector3(0.1, 1.05, 0.05), 0.28, 1.08],
+    [Vector3(0.3, 0.95, -0.25), 0.24, 1.04],
+];
+
 const BUSH_BY_SEASON:Array[Color] = [
     Color(0.3, 0.55, 0.22), Color(0.28, 0.5, 0.2), Color(0.55, 0.42, 0.2), Color(0.45, 0.42, 0.38),
 ];
@@ -38,17 +49,31 @@ func _ready() -> void:
 
     var tree:ArrayMesh = ArrayMesh.new();
     var trunk:CylinderMesh = CylinderMesh.new();
-    trunk.top_radius = 0.1;
-    trunk.bottom_radius = 0.16;
-    trunk.height = 1.4;
+    trunk.top_radius = 0.07;
+    trunk.bottom_radius = 0.15;
+    trunk.height = 1.7;
     trunk.radial_segments = 6;
-    add_part(tree, trunk, Transform3D(Basis(), Vector3(0, 0.7, 0)), trunk_mat);
-    var canopy:CylinderMesh = CylinderMesh.new();
-    canopy.top_radius = 0.0;
-    canopy.bottom_radius = 0.95;
-    canopy.height = 2.8;
-    canopy.radial_segments = 7;
-    add_part(tree, canopy, Transform3D(Basis(), Vector3(0, 2.4, 0)), _canopy_mat);
+    trunk.rings = 1;
+    add_part(tree, trunk, Transform3D(Basis(), Vector3(0, 0.85, 0)), trunk_mat);
+    var flare:CylinderMesh = CylinderMesh.new();      # roots spreading at the foot
+    flare.top_radius = 0.15;
+    flare.bottom_radius = 0.27;
+    flare.height = 0.22;
+    flare.radial_segments = 6;
+    flare.rings = 1;
+    add_part(tree, flare, Transform3D(Basis(), Vector3(0, 0.11, 0)), trunk_mat, Color(0.85, 0.85, 0.85));
+    # four tiers of branches, wide and dark at the bottom, each turned a little against the one below
+    var tiers:Array = [[1.0, 1.5, 1.75, 8, 0.8], [0.8, 1.4, 2.3, 7, 0.88], [0.6, 1.25, 2.85, 7, 0.95], [0.36, 1.1, 3.35, 6, 1.0]];
+    for i in tiers.size():
+        var tier:CylinderMesh = CylinderMesh.new();
+        tier.top_radius = 0.0;
+        tier.bottom_radius = tiers[i][0];
+        tier.height = tiers[i][1];
+        tier.radial_segments = tiers[i][3];
+        tier.rings = 1;
+        tier.cap_bottom = false;
+        var shade:float = tiers[i][4];
+        add_part(tree, tier, Transform3D(Basis(Vector3.UP, i * 0.55), Vector3(0, tiers[i][2], 0)), _canopy_mat, Color(shade, shade, shade));
 
     var oak:ArrayMesh = ArrayMesh.new();
     var oak_trunk:CylinderMesh = CylinderMesh.new();
@@ -57,6 +82,13 @@ func _ready() -> void:
     oak_trunk.height = 1.5;
     oak_trunk.radial_segments = 6;
     add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), trunk_mat);
+    var oak_flare:CylinderMesh = CylinderMesh.new();      # buttress roots at the foot
+    oak_flare.top_radius = 0.22;
+    oak_flare.bottom_radius = 0.4;
+    oak_flare.height = 0.3;
+    oak_flare.radial_segments = 6;
+    oak_flare.rings = 1;
+    add_part(oak, oak_flare, Transform3D(Basis(), Vector3(0, 0.15, 0)), trunk_mat, Color(0.85, 0.85, 0.85));
     for i in 3:                                  # bare boughs, all that shows in winter
         var bough:CylinderMesh = CylinderMesh.new();
         bough.top_radius = 0.03;
@@ -67,12 +99,17 @@ func _ready() -> void:
         var lean:Basis = Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, 0.6);
         add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), trunk_mat);
     var oak_canopy:ArrayMesh = ArrayMesh.new();
-    var crown:SphereMesh = SphereMesh.new();
-    crown.radius = 1.15;
-    crown.height = 2.1;
-    crown.radial_segments = 8;
-    crown.rings = 4;
-    add_part(oak_canopy, crown, Transform3D(Basis(), Vector3(0, 2.5, 0)), _oak_leaf_mat);
+    # a crown of overlapping lobes, the upper ones lighter
+    var lobes:Array = [[Vector3(0, 2.6, 0), 0.95, 1.0], [Vector3(0.7, 2.25, 0.2), 0.7, 0.9], [Vector3(-0.65, 2.3, -0.3), 0.72, 0.95],
+        [Vector3(0.1, 2.2, -0.75), 0.66, 0.88], [Vector3(-0.2, 2.35, 0.7), 0.68, 0.92], [Vector3(0.15, 3.15, 0.05), 0.62, 1.08]];
+    for lobe in lobes:
+        var ball:SphereMesh = SphereMesh.new();
+        ball.radius = lobe[1];
+        ball.height = lobe[1] * 1.7;
+        ball.radial_segments = 7;
+        ball.rings = 3;
+        var light:float = lobe[2];
+        add_part(oak_canopy, ball, Transform3D(Basis(), lobe[0]), _oak_leaf_mat, Color(light, light, light));
     var rock_shape:SphereMesh = SphereMesh.new();
     rock_shape.radius = 0.7;
     rock_shape.height = 1.0;
@@ -83,13 +120,17 @@ func _ready() -> void:
     var ore:ArrayMesh = ArrayMesh.new();
     add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.58, 0.36, 0.3)));
 
-    var bush_shape:SphereMesh = SphereMesh.new();
-    bush_shape.radius = 0.45;
-    bush_shape.height = 0.7;
-    bush_shape.radial_segments = 8;
-    bush_shape.rings = 4;
     var bush:ArrayMesh = ArrayMesh.new();
-    add_part(bush, bush_shape, Transform3D(Basis(), Vector3(0, 0.3, 0)), _bush_mat);
+    add_lobes(bush, BUSH_LOBES, _bush_mat);
+    for k in 5:                                  # a few bare twigs at the foot
+        var twig:CylinderMesh = CylinderMesh.new();
+        twig.top_radius = 0.01;
+        twig.bottom_radius = 0.028;
+        twig.height = 0.34;
+        twig.radial_segments = 3;
+        twig.rings = 1;
+        var lean:Basis = Basis(Vector3.UP, k * 1.9) * Basis(Vector3.RIGHT, 0.55);
+        add_part(bush, twig, Transform3D(lean, Vector3(0, 0.1, 0) + lean * Vector3(0, 0.12, 0)), trunk_mat, Color(0.8, 0.8, 0.8));
 
     var cap_shape:SphereMesh = SphereMesh.new();
     cap_shape.radius = 0.22;
@@ -100,13 +141,18 @@ func _ready() -> void:
     add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(-0.2, 0.1, 0.1)), _make_material(Color(0.72, 0.5, 0.3)));
     add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.15, 0.1, -0.1)), _make_material(Color(0.8, 0.35, 0.25)));
     add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.05, 0.1, 0.25)), _make_material(Color(0.72, 0.5, 0.3)));
-    var hazel_shape:SphereMesh = SphereMesh.new();
-    hazel_shape.radius = 0.6;
-    hazel_shape.height = 1.1;
-    hazel_shape.radial_segments = 8;
-    hazel_shape.rings = 4;
     var hazel:ArrayMesh = ArrayMesh.new();
-    add_part(hazel, hazel_shape, Transform3D(Basis(), Vector3(0, 0.5, 0)), _make_material(Color(0.5, 0.52, 0.2)));
+    var hazel_mat:StandardMaterial3D = _make_material(Color(0.5, 0.52, 0.2));
+    for k in 3:                                  # several stems rising from one stool
+        var stem:CylinderMesh = CylinderMesh.new();
+        stem.top_radius = 0.025;
+        stem.bottom_radius = 0.05;
+        stem.height = 0.8;
+        stem.radial_segments = 4;
+        stem.rings = 1;
+        var tilt:Basis = Basis(Vector3.UP, k * 2.1) * Basis(Vector3.RIGHT, 0.28);
+        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.4, 0)), trunk_mat);
+    add_lobes(hazel, HAZEL_LOBES, hazel_mat);
 
     var berry_shape:SphereMesh = SphereMesh.new();
     berry_shape.radius = 0.075;
@@ -115,10 +161,13 @@ func _ready() -> void:
     berry_shape.rings = 3;
     var berries:ArrayMesh = ArrayMesh.new();
     var berry_mat:StandardMaterial3D = _make_material(Color.WHITE);       # the colour comes from the instance, red or blue
-    for k in 7:
-        var a:float = k * 2.399;
-        var e:float = 0.25 + 0.2 * (k % 3);
-        add_part(berries, berry_shape, Transform3D(Basis(), Vector3(cos(a) * cos(e) * 0.47, 0.3 + sin(e) * 0.36, sin(a) * cos(e) * 0.47)), berry_mat);
+    for k in BUSH_LOBES.size():                  # one berry on the outside of each lobe, and a second on the bigger ones
+        var lobe:Array = BUSH_LOBES[k];
+        var centre:Vector3 = lobe[0];
+        var out:Vector3 = Vector3(centre.x, 0.0, centre.z).normalized() if Vector2(centre.x, centre.z).length() > 0.01 else Vector3.RIGHT;
+        for turn in ([0.0, 1.1] if lobe[1] > 0.27 else [0.0]):
+            var dir:Vector3 = (Basis(Vector3.UP, turn * (1.0 if k % 2 == 0 else -1.0)) * (out * 0.75 + Vector3.UP * 0.65)).normalized();
+            add_part(berries, berry_shape, Transform3D(Basis(), centre + dir * lobe[1] * 0.97), berry_mat);
     _berries = _make_layer(berries);
     _layers[&"tree"] = _make_layer(tree);
     _layers[&"oak"] = _make_layer(oak);
@@ -255,8 +304,20 @@ func _make_layer(mesh:Mesh) -> MultiMeshInstance3D:
     add_child(mmi);
     return mmi;
 
+# Adds a clump of squashed spheres to a mesh: lobes are [centre, radius, shade].
+static func add_lobes(target:ArrayMesh, lobes:Array, mat:Material) -> void:
+    for lobe in lobes:
+        var ball:SphereMesh = SphereMesh.new();
+        ball.radius = lobe[1];
+        ball.height = lobe[1] * 1.6;
+        ball.radial_segments = 7;
+        ball.rings = 3;
+        var shade:float = lobe[2];
+        add_part(target, ball, Transform3D(Basis(), lobe[0]), mat, Color(shade, shade, shade));
+
 # Bakes a primitive into target as a new surface, offset by xf.
-static func add_part(target:ArrayMesh, prim:PrimitiveMesh, xf:Transform3D, mat:Material) -> void:
+# tint: multiplied into the part's colour (a little shading variation inside one mesh).
+static func add_part(target:ArrayMesh, prim:PrimitiveMesh, xf:Transform3D, mat:Material, tint:Color = Color.WHITE) -> void:
     var arrays:Array = prim.get_mesh_arrays();
     var verts:PackedVector3Array = arrays[Mesh.ARRAY_VERTEX];
     var normals:PackedVector3Array = arrays[Mesh.ARRAY_NORMAL];
@@ -266,5 +327,10 @@ static func add_part(target:ArrayMesh, prim:PrimitiveMesh, xf:Transform3D, mat:M
     arrays[Mesh.ARRAY_VERTEX] = verts;
     arrays[Mesh.ARRAY_NORMAL] = normals;
     arrays[Mesh.ARRAY_TANGENT] = null;
+    if tint != Color.WHITE:
+        var colors:PackedColorArray = PackedColorArray();
+        colors.resize(verts.size());
+        colors.fill(tint);
+        arrays[Mesh.ARRAY_COLOR] = colors;
     target.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays);
     target.surface_set_material(target.get_surface_count() - 1, mat);

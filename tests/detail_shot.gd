@@ -40,8 +40,8 @@ func _ready() -> void:
         f.growth[i] = [0.3, 0.65, 0.9][(cell.y - f.origin.y) % 3];
     f._visual_dirty = true;
     world.camera_rig.focus_on(Vector3(o.x + 6, 0, o.y + 5));
-    world.camera_rig._distance = 16.0;
-    world.camera_rig._target_distance = 16.0;
+    world.camera_rig._distance = 11.0;
+    world.camera_rig._target_distance = 11.0;
     world.tools.select(null);
 
 func _process(_delta:float) -> void:

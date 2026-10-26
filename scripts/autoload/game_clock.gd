@@ -44,6 +44,12 @@ func _emit_hour(abs_hour:int) -> void:
         if d % DAYS_PER_SEASON == 0:
             season_changed.emit(season());
 
+# A new game starts from the first morning again, at normal speed.
+func reset() -> void:
+    total_hours = START_HOUR;
+    _last_hour = int(START_HOUR);
+    set_speed(1);
+
 # --------------------------------
 # Save and load
 

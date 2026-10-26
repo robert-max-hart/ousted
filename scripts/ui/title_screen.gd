@@ -1,0 +1,252 @@
+# ----------------------------------------------------------------
+# TitleScreen
+#     The first scene. A frozen mock town (TitleBackdrop, in a random
+#     season) behind the game's name in big golden letters, with
+#     Continue, New Game and Quit. New Game picks a difficulty and
+#     optionally a map seed, then starts the main scene.
+# ----------------------------------------------------------------
+class_name TitleScreen extends Node;
+
+const GOLD          :Color = Color(0.97, 0.78, 0.16);
+const GOLD_EDGE     :Color = Color(0.36, 0.2, 0.03);
+const TITLE_HOUR    :float = 17.2;       # late afternoon light
+const SERIF_FONTS   :Array[String] = ["URW Bookman", "Bookman Old Style", "Palatino Linotype", "Palatino", "Georgia", "DejaVu Serif", "serif"];
+
+var _menu       :VBoxContainer;
+var _new_panel  :PanelContainer;
+var _difficulty :StringName = &"normal";
+var _diff_btns  :Dictionary = {};        # difficulty id -> Button
+var _diff_text  :Label;
+var _seed_edit  :LineEdit;
+var _message    :Label;
+var _continue_slot:String = "";
+
+func _ready() -> void:
+    _build_backdrop();
+    _build_ui();
+
+# A World built as a picture: random map and season, clock stopped, light at golden hour.
+func _build_backdrop() -> void:
+    GameClock.set_speed(0);
+    var season:int = randi() % 4;
+    GameClock.total_hours = float((season * GameClock.DAYS_PER_SEASON + 3) * GameClock.HOURS_PER_DAY) + TITLE_HOUR;
+    Weather.reset(0.85 if randf() < 0.35 else 0.0);       # now and then it rains (or, in winter, snows) behind the title
+    World.backdrop = true;
+    add_child((load(SaveGame.MAIN_SCENE) as PackedScene).instantiate());
+    World.backdrop = false;
+
+func _build_ui() -> void:
+    var layer:CanvasLayer = CanvasLayer.new();
+    add_child(layer);
+    var root:Control = Control.new();
+    root.set_anchors_preset(Control.PRESET_FULL_RECT);
+    root.theme = _theme();
+    layer.add_child(root);
+
+    # darken the top and bottom a little so the letters and buttons read against any scene
+    var shade:GradientTexture2D = GradientTexture2D.new();
+    shade.fill_from = Vector2(0, 0);
+    shade.fill_to = Vector2(0, 1);
+    shade.gradient = Gradient.new();
+    shade.gradient.offsets = PackedFloat32Array([0.0, 0.32, 0.65, 1.0]);
+    shade.gradient.colors = PackedColorArray([Color(0, 0, 0, 0.55), Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.0), Color(0, 0, 0, 0.6)]);
+    var shade_rect:TextureRect = TextureRect.new();
+    shade_rect.texture = shade;
+    shade_rect.set_anchors_preset(Control.PRESET_FULL_RECT);
+    shade_rect.stretch_mode = TextureRect.STRETCH_SCALE;
+    shade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    root.add_child(shade_rect);
+
+    var title:Label = Label.new();
+    title.text = "Ousted";
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
+    title.set_anchors_preset(Control.PRESET_CENTER_TOP);
+    title.anchor_left = 0.0;
+    title.anchor_right = 1.0;
+    title.offset_left = 0.0;
+    title.offset_right = 0.0;
+    title.offset_top = 36.0;
+    title.add_theme_font_override("font", _title_font());
+    title.add_theme_font_size_override("font_size", 132);
+    title.add_theme_color_override("font_color", GOLD);
+    title.add_theme_color_override("font_outline_color", GOLD_EDGE);
+    title.add_theme_constant_override("outline_size", 16);
+    title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55));
+    title.add_theme_constant_override("shadow_offset_x", 4);
+    title.add_theme_constant_override("shadow_offset_y", 6);
+    title.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    root.add_child(title);
+
+    var center:CenterContainer = CenterContainer.new();
+    center.set_anchors_preset(Control.PRESET_FULL_RECT);
+    center.anchor_right = 0.4;       # the menu sits in the left part of the screen, the town in the rest
+    center.offset_top = 150.0;
+    center.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    root.add_child(center);
+    var stack:VBoxContainer = VBoxContainer.new();
+    stack.add_theme_constant_override("separation", 10);
+    center.add_child(stack);
+    _menu = VBoxContainer.new();
+    _menu.add_theme_constant_override("separation", 10);
+    stack.add_child(_menu);
+    _continue_slot = "quicksave" if SaveGame.exists(SaveGame.QUICKSAVE) else "autosave" if SaveGame.exists(SaveGame.AUTOSAVE) else "";
+    var cont:Button = _menu_button("Continue");
+    cont.disabled = _continue_slot == "";
+    cont.tooltip_text = "Load your last saved game" if _continue_slot != "" else "There is no saved game yet";
+    cont.pressed.connect(_on_continue);
+    var new_game:Button = _menu_button("New Game");
+    new_game.pressed.connect(_show_new_game);
+    var quit:Button = _menu_button("Quit");
+    quit.pressed.connect(get_tree().quit);
+    _build_new_game_panel(stack);
+    _message = Label.new();
+    _message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
+    _message.add_theme_color_override("font_color", Color(1.0, 0.6, 0.5));
+    stack.add_child(_message);
+    (new_game if cont.disabled else cont).grab_focus();
+
+    var footer:Label = Label.new();
+    footer.text = "A colony of the cold north. Prototype.";
+    footer.add_theme_color_override("font_color", Color(1, 1, 1, 0.6));
+    footer.set_anchors_preset(Control.PRESET_BOTTOM_LEFT);
+    footer.grow_vertical = Control.GROW_DIRECTION_BEGIN;
+    footer.offset_left = 14.0;
+    footer.offset_bottom = -10.0;
+    root.add_child(footer);
+
+func _menu_button(text:String) -> Button:
+    var b:Button = Button.new();
+    b.text = text;
+    b.custom_minimum_size = Vector2(260, 46);
+    b.focus_mode = Control.FOCUS_ALL;
+    _menu.add_child(b);
+    return b;
+
+func _build_new_game_panel(stack:VBoxContainer) -> void:
+    _new_panel = PanelContainer.new();
+    _new_panel.visible = false;
+    _new_panel.custom_minimum_size = Vector2(430, 0);
+    stack.add_child(_new_panel);
+    var col:VBoxContainer = VBoxContainer.new();
+    col.add_theme_constant_override("separation", 8);
+    _new_panel.add_child(col);
+    var heading:Label = Label.new();
+    heading.text = "New Game";
+    heading.add_theme_font_size_override("font_size", 24);
+    heading.add_theme_color_override("font_color", GOLD);
+    col.add_child(heading);
+    var row:HBoxContainer = HBoxContainer.new();
+    row.add_theme_constant_override("separation", 8);
+    col.add_child(row);
+    var group:ButtonGroup = ButtonGroup.new();
+    for id in [&"easy", &"normal", &"hard"]:
+        var b:Button = Button.new();
+        b.text = Defs.DIFFICULTIES[id]["name"];
+        b.toggle_mode = true;
+        b.button_group = group;
+        b.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+        b.custom_minimum_size = Vector2(0, 38);
+        b.pressed.connect(_pick_difficulty.bind(id));
+        row.add_child(b);
+        _diff_btns[id] = b;
+    _diff_text = Label.new();
+    _diff_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _diff_text.custom_minimum_size = Vector2(400, 64);
+    col.add_child(_diff_text);
+    var seed_row:HBoxContainer = HBoxContainer.new();
+    col.add_child(seed_row);
+    var seed_label:Label = Label.new();
+    seed_label.text = "Map seed";
+    seed_label.custom_minimum_size.x = 90;
+    seed_row.add_child(seed_label);
+    _seed_edit = LineEdit.new();
+    _seed_edit.placeholder_text = "Random";
+    _seed_edit.max_length = 9;
+    _seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    seed_row.add_child(_seed_edit);
+    var buttons:HBoxContainer = HBoxContainer.new();
+    buttons.add_theme_constant_override("separation", 8);
+    col.add_child(buttons);
+    var back:Button = Button.new();
+    back.text = "Back";
+    back.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    back.pressed.connect(_show_menu);
+    buttons.add_child(back);
+    var start:Button = Button.new();
+    start.text = "Start";
+    start.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    start.pressed.connect(_on_start);
+    buttons.add_child(start);
+    _pick_difficulty(&"normal");
+
+func _pick_difficulty(id:StringName) -> void:
+    _difficulty = id;
+    (_diff_btns[id] as Button).set_pressed_no_signal(true);
+    var d:Dictionary = Defs.DIFFICULTIES[id];
+    var upgrades:PackedStringArray = [];
+    for up in d["town_hall"]:
+        upgrades.append(Defs.BUILDINGS[&"town_hall"]["upgrades"][up]["name"]);
+    var seeds:PackedStringArray = [];
+    for crop in d["seeds"]:
+        seeds.append(Defs.CROPS[crop]["name"]);
+    _diff_text.text = "Town Hall: %s\nSeeds to start: %s" % [", ".join(upgrades) if not upgrades.is_empty() else "bare (build storage yourself)", ", ".join(seeds)];
+
+func _show_new_game() -> void:
+    _menu.visible = false;
+    _new_panel.visible = true;
+    _message.text = "";
+
+func _show_menu() -> void:
+    _new_panel.visible = false;
+    _menu.visible = true;
+    _message.text = "";
+
+func _on_start() -> void:
+    Defs.difficulty = _difficulty;
+    var text:String = _seed_edit.text.strip_edges();
+    World.new_game_seed = text.to_int() if text.is_valid_int() and text.to_int() > 0 else (hash(text) % 1000000 if text != "" else 0);
+    GameClock.reset();
+    Weather.reset();
+    get_tree().change_scene_to_file(SaveGame.MAIN_SCENE);
+
+func _on_continue() -> void:
+    _message.text = SaveGame.start_from_slot(get_tree(), _continue_slot);
+
+func _title_font() -> Font:
+    var f:SystemFont = SystemFont.new();
+    f.font_names = PackedStringArray(SERIF_FONTS);
+    f.font_weight = 900;
+    f.antialiasing = TextServer.FONT_ANTIALIASING_GRAY;
+    f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO;
+    return f;
+
+# Dark translucent buttons with a gold edge, in the same serif as the title.
+func _theme() -> Theme:
+    var t:Theme = Theme.new();
+    var font:SystemFont = _title_font() as SystemFont;
+    font.font_weight = 600;
+    t.default_font = font;
+    t.default_font_size = 20;
+    var normal:StyleBoxFlat = _box(Color(0.1, 0.08, 0.05, 0.72), Color(0.6, 0.45, 0.12, 0.9));
+    var hover:StyleBoxFlat = _box(Color(0.22, 0.16, 0.06, 0.85), GOLD);
+    var pressed:StyleBoxFlat = _box(Color(0.32, 0.22, 0.05, 0.92), GOLD);
+    var disabled:StyleBoxFlat = _box(Color(0.08, 0.08, 0.08, 0.55), Color(0.4, 0.4, 0.4, 0.5));
+    for style_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+        var sb:StyleBoxFlat = {"normal": normal, "hover": hover, "pressed": pressed, "disabled": disabled, "focus": hover}[style_name];
+        t.set_stylebox(style_name, "Button", sb);
+    t.set_color("font_color", "Button", Color(0.95, 0.88, 0.7));
+    t.set_color("font_hover_color", "Button", Color(1, 0.95, 0.75));
+    t.set_color("font_pressed_color", "Button", GOLD);
+    t.set_color("font_disabled_color", "Button", Color(0.55, 0.55, 0.5));
+    t.set_stylebox("panel", "PanelContainer", _box(Color(0.08, 0.06, 0.04, 0.82), Color(0.6, 0.45, 0.12, 0.9), 14));
+    t.set_color("font_color", "Label", Color(0.95, 0.9, 0.78));
+    return t;
+
+func _box(bg:Color, edge:Color, margin:int = 8) -> StyleBoxFlat:
+    var s:StyleBoxFlat = StyleBoxFlat.new();
+    s.bg_color = bg;
+    s.border_color = edge;
+    s.set_border_width_all(2);
+    s.set_corner_radius_all(8);
+    s.set_content_margin_all(margin);
+    return s;
