@@ -90,7 +90,7 @@ func info_text() -> String:
     if designated:
         s += "Marked for foraging\n" if is_forageable() else "Marked for harvest\n";
     elif is_auto():
-        s += "Foraged by gatherers\n";
+        s += "Laborers pick it when food runs short; mark it with the Forage tool to have it picked now\n";
     elif is_forageable():
         s += "Use the Forage tool to mark it, or a Forager's Hut picks it\n";
     else:

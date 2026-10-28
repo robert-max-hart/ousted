@@ -725,9 +725,7 @@ func info_text() -> String:
 func _build_visual() -> void:
     var shape:String = def.get("shape", "house");
     var h:float = def.get("height", 2.0);
-    _body_mat = StandardMaterial3D.new();
-    _body_mat.albedo_color = def.get("color", Color.GRAY);
-    _body_mat.roughness = 0.9;
+    _body_mat = SurfaceTextures.material(def.get("wall", &"planks"), def.get("color", Color.GRAY));
     match shape:
         "house":
             var box:BoxMesh = BoxMesh.new();
@@ -735,7 +733,7 @@ func _build_visual() -> void:
             _body = _add_mesh(box, _body_mat, Vector3(0, h * 0.5, 0));
             var prism:PrismMesh = PrismMesh.new();
             prism.size = Vector3(size.x - 0.1, h * 0.6, size.y - 0.2);
-            _roof = _add_mesh(prism, _flat_mat(def.get("roof", Color.DARK_RED)), Vector3(0, h + h * 0.3, 0));
+            _roof = _add_mesh(prism, SurfaceTextures.material(&"shingle", def.get("roof", Color.DARK_RED)), Vector3(0, h + h * 0.3, 0));
             _build_door(Vector2(size.x - 0.5, size.y - 0.5), h);
             if def.has("fuel_capacity"):
                 _build_chimney(h);
@@ -757,7 +755,7 @@ func _build_visual() -> void:
             _body = _add_mesh(shed, _body_mat, Vector3(-size.x * 0.2, h * 0.5, -size.y * 0.25));
             var cap:PrismMesh = PrismMesh.new();
             cap.size = Vector3(size.x * 0.55, h * 0.4, size.y * 0.45);
-            _roof = _add_mesh(cap, _flat_mat(def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
+            _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
             var heap:BoxMesh = BoxMesh.new();
             heap.size = Vector3(1.2, 0.6, 1.2);
             _add_mesh(heap, _flat_mat(Color(0.6, 0.6, 0.6)), Vector3(size.x * 0.25, 0.4, size.y * 0.2));

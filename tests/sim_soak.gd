@@ -125,7 +125,6 @@ func _exercise_tools() -> void:
             print("demolishing stockpile, delivered=", temp.delivered);
             world.remove_building(temp, true));
     world.jobs.change_profession(JobManager.Profession.FARMER, 1);
-    world.jobs.change_profession(JobManager.Profession.GATHERER, -1);
     world.tools.set_mode(PlayerTools.Mode.BUILD, &"house");
     world.tools.set_mode(PlayerTools.Mode.SELECT);
 

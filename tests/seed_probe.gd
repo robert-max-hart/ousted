@@ -3,7 +3,7 @@
 #     A hard start (wheat only) with a Forager's Hut, foragers and a
 #     gatherer picking wild food for a number of days. Prints the day
 #     each seed is found and how many foraging trips that took.
-#     godot --headless --path . --fixed-fps 60 res://tests/seed_probe.tscn -- <days> [foragers] [gatherers] [difficulty]
+#     godot --headless --path . --fixed-fps 60 res://tests/seed_probe.tscn -- <days> [foragers] [difficulty]
 # ----------------------------------------------------------------
 extends Node;
 
@@ -19,8 +19,7 @@ func _ready() -> void:
     var args:PackedStringArray = OS.get_cmdline_user_args();
     _days = args[0].to_int();
     var foragers:int = args[1].to_int() if args.size() > 1 else 2;
-    var gatherers:int = args[2].to_int() if args.size() > 2 else 1;
-    Defs.difficulty = StringName(args[3]) if args.size() > 3 else &"hard";
+    Defs.difficulty = StringName(args[2]) if args.size() > 2 else &"hard";
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     var th:Building = world.town_hall;
@@ -38,7 +37,6 @@ func _ready() -> void:
     for p in world.pawns:
         p.profession = JobManager.Profession.LABORER;
     world.jobs.change_profession(JobManager.Profession.FORAGER, foragers);
-    world.jobs.change_profession(JobManager.Profession.GATHERER, gatherers - 1);       # one gatherer already
     world.jobs.sync_targets();
     world.jobs.reconcile();
     _known = world.seeds.known.size();

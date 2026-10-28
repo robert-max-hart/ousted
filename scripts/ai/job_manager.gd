@@ -6,6 +6,8 @@
 # ----------------------------------------------------------------
 class_name JobManager extends TaskBase;
 
+# GATHERER is retired (laborers harvest what is marked, food included); the slot stays so old saves and the
+# experience of the "gathering" job keep their numbers, and reconcile() turns any left into laborers.
 enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER };
 
 const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager"];
@@ -93,11 +95,9 @@ func choose_task(p:Pawn) -> Task:
 func _job_order(prof:int) -> Array[Callable]:
     match prof:
         Profession.BUILDER:
-            return [_build_task, _haul_task, _fuel_task, _collect_task, _clear_task];
+            return [_build_task, _road_task, _haul_task, _fuel_task, _collect_task, _clear_task];
         Profession.FARMER:
             return [_farm_task, _haul_task, _fuel_task, _collect_task, _clear_task];
-        Profession.GATHERER:
-            return [_forage_task, _clear_task, _haul_task, _fuel_task, _collect_task];
         Profession.WOODCUTTER:
             return [production.woodcutter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.FORAGER:
@@ -108,7 +108,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _forage_if_hungry_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -120,7 +120,7 @@ func target(prof:int) -> int:
     return targets.get(prof, 0);
 
 func change_profession(prof:int, delta:int) -> void:
-    if prof == Profession.LABORER:
+    if prof == Profession.LABORER or prof == Profession.GATHERER:
         return;
     targets[prof] = clampi(target(prof) + delta, 0, maxi(world.pawns.size(), count(prof)));
     reconcile();
@@ -133,8 +133,12 @@ func sync_targets() -> void:
             targets[p.profession] = targets.get(p.profession, 0) + 1;
 
 func reconcile() -> void:
+    targets.erase(Profession.GATHERER);
+    for p in world.pawns:
+        if p.profession == Profession.GATHERER:
+            p.profession = Profession.LABORER;
     for prof in PROFESSION_NAMES.size():
-        if prof == Profession.LABORER:
+        if prof == Profession.LABORER or prof == Profession.GATHERER:
             continue;
         var have:int = count(prof);
         while have > target(prof):
@@ -467,6 +471,31 @@ func _build_task(p:Pawn) -> Task:
     t.on_end = func(_pw:Pawn) -> void:
         if World.alive(b):
             b.builders -= 1;
+    return t;
+
+# Lays a staked road cell (World.road_work): the nearest one nobody is working on.
+func _road_task(p:Pawn) -> Task:
+    var best:Vector2i = Vector2i.ZERO;
+    var best_d:float = INF;
+    var pc:Vector2 = Vector2(p.position.x, p.position.z);
+    for c in world.road_work:
+        if world.road_claimed.has(c) or p.has_failed(c):
+            continue;
+        var d:float = pc.distance_squared_to(Vector2(c) + Vector2(0.5, 0.5));
+        if d < best_d:
+            best = c;
+            best_d = d;
+    if best_d == INF:
+        return null;
+    var cell:Vector2i = best;
+    world.road_claimed[cell] = true;
+    var t:Task = Task.new(&"road", "Laying road");
+    t.job = Profession.BUILDER;
+    t.move_cell(cell, "Walking to the road");
+    t.work(func(_pw:Pawn, dh:float) -> bool:
+        return world.work_road(cell, dh));
+    t.on_end = func(_pw:Pawn) -> void:
+        world.road_claimed.erase(cell);
     return t;
 
 # --------------------------------

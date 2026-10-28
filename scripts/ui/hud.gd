@@ -423,7 +423,7 @@ func _on_info_button() -> void:
             var btn:Button = Button.new();
             var known:bool = World.instance.seeds.has(id);
             btn.text = "%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)] if known else "%s: no seeds yet" % c["name"];
-            btn.tooltip_text = c["desc"] if known else "Foragers and gatherers may find its seeds while picking wild food.";
+            btn.tooltip_text = c["desc"] if known else "Citizens picking wild food may find its seeds while picking wild food.";
             btn.disabled = not known;
             btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
             btn.focus_mode = Control.FOCUS_NONE;
@@ -577,8 +577,11 @@ func _build_jobs_panel(root:Control) -> void:
         flag.mouse_filter = Control.MOUSE_FILTER_STOP;
         flag.add_theme_color_override("font_color", Color(1.0, 0.45, 0.3));
         _jobs_flags.append(flag);
+        if prof == JobManager.Profession.GATHERER:
+            row.visible = false;       # retired profession, see JobManager.Profession
+            continue;
         if prof == JobManager.Profession.LABORER:
-            l.tooltip_text = "Unassigned citizens. They clear marked trees and rocks, haul and help build.";
+            l.tooltip_text = "Unassigned citizens. They harvest what is marked (trees, rocks, wild food), haul and help build.";
             l.mouse_filter = Control.MOUSE_FILTER_PASS;
             continue;
         for d in [-1, 1]:
@@ -590,7 +593,6 @@ func _build_jobs_panel(root:Control) -> void:
             row.add_child(b);
         row.add_child(flag);
 
-# The colony-wide rules as check boxes in a panel of their own, opened by the top bar's Policies button.
 func menu_open() -> bool:
     return _menu.visible;
 
@@ -647,6 +649,7 @@ func _build_menu(root:Control) -> void:
         b.pressed.connect(item[1]);
         col.add_child(b);
 
+# The colony-wide rules as check boxes in a panel of their own, opened by the top bar's Policies button.
 func _build_policies_panel(root:Control) -> void:
     var panel:PanelContainer = _panel(root, &"policies");
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);

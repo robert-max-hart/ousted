@@ -37,12 +37,21 @@ func _ready() -> void:
     _expect("the tree is marked for clearing", tree.designated and world.pending_roads.has(cells[1]));
     _expect("no road under the tree yet", world.terrain.get_overlay(cells[1]) == Terrain.Overlay.NONE);
     _expect("the bush is marked too, not pulled up at once", not bush.removed and bush.clearing and world.pending_roads.has(cells[3]));
-    _expect("open cells got road", world.terrain.get_overlay(cells[0]) == Terrain.Overlay.ROAD);
+    _expect("open cells are staked, not yet road", world.terrain.get_overlay(cells[0]) == Terrain.Overlay.SITE and world.road_work.has(cells[0]));
+    _expect("a road cell needs work", not world.work_road(cells[0], Defs.ROAD_WORK_HOURS * 0.5) and world.terrain.get_overlay(cells[0]) == Terrain.Overlay.SITE);
+    _expect("the work lays it", world.work_road(cells[0], Defs.ROAD_WORK_HOURS) and world.terrain.get_overlay(cells[0]) == Terrain.Overlay.ROAD);
+    var saved_work:Dictionary = world.serialize();
+    _expect("staked cells are saved", (saved_work["road_work"] as Array).size() == 2);
+    for c in [cells[2], cells[4]]:
+        world.work_road(c, 99.0);
     var saved:Dictionary = world.serialize();
     _expect("pending roads are saved", (saved["pending_roads"] as Array).has(cells[1]));
     world.remove_node(tree);
     world.remove_node(bush);
-    _expect("clearing finishes the road", world.terrain.get_overlay(cells[1]) == Terrain.Overlay.ROAD and world.terrain.get_overlay(cells[3]) == Terrain.Overlay.ROAD and world.pending_roads.is_empty());
+    _expect("clearing stakes the road", world.terrain.get_overlay(cells[1]) == Terrain.Overlay.SITE and world.road_work.has(cells[1]) and world.pending_roads.is_empty());
+    world.work_road(cells[1], 99.0);
+    world.work_road(cells[3], 99.0);
+    _expect("the work finishes it", world.terrain.get_overlay(cells[1]) == Terrain.Overlay.ROAD and world.terrain.get_overlay(cells[3]) == Terrain.Overlay.ROAD);
 
     var f:Building = world.place_building(&"field", world.town_hall.origin + Vector2i(14, 8), Vector2i(3, 3));
     _expect("a field being built is a site", world.terrain.get_overlay(f.origin) == Terrain.Overlay.SITE);

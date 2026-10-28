@@ -52,6 +52,7 @@ const ITEMS:Dictionary = {
 # mine_hours: labor-hours to dig one unit of each item (a surface rock or deposit is 2.5x quicker)
 # radius:   work radius in cells (shown when placing and selecting)
 # worker_slots, profession: how many citizens of that profession work here
+# wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
 # fuel_capacity: housing that burns firewood to stay warm; this is how much it can hold
@@ -63,7 +64,7 @@ const ITEMS:Dictionary = {
 # walkable: pawns can walk through the footprint
 const BUILDINGS:Dictionary = {
     &"town_hall": {
-        "name": "Town Hall", "size": Vector2i(4, 4), "cost": {&"wood": 30, &"stone": 10}, "work": 20.0,
+        "wall": &"stone", "name": "Town Hall", "size": Vector2i(4, 4), "cost": {&"wood": 30, &"stone": 10}, "work": 20.0,
         "shape": "house", "height": 3.0, "color": Color(0.62, 0.48, 0.34), "roof": Color(0.42, 0.22, 0.16),
         "water": true, "unique": true, "heated_by": &"heating",
         "upgrades": {
@@ -93,7 +94,7 @@ const BUILDINGS:Dictionary = {
         "desc": "The settlers' starting goods. It takes nothing new and is gone once it is empty.",
     },
     &"house": {
-        "name": "Wooden House", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 4}, "work": 24.0,
+        "wall": &"plaster", "name": "Wooden House", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 4}, "work": 24.0,
         "shape": "house", "height": 2.2, "color": Color(0.6, 0.45, 0.3), "roof": Color(0.5, 0.3, 0.18),
         "beds": 6, "fuel_capacity": 40,
         "controls": [
@@ -104,7 +105,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Shelter for up to 6 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5.",
     },
     &"well": {
-        "name": "Well", "size": Vector2i(2, 2), "cost": {&"stone": 10, &"wood": 2}, "work": 12.0,
+        "wall": &"stone", "name": "Well", "size": Vector2i(2, 2), "cost": {&"stone": 10, &"wood": 2}, "work": 12.0,
         "shape": "well", "height": 1.0, "color": Color(0.55, 0.55, 0.55), "roof": Color(0.45, 0.3, 0.2),
         "water": true,
         "desc": "Fresh water close to home.",
@@ -183,7 +184,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Digs iron, coal and stone without running out, but 2.5 times slower than gathering at the surface, and coal takes twice as long as iron (miners without an iron or steel tool dig it at a quarter of the speed). Iron comes first, then coal, then stone, each until its cap is reached. Coal needs the Deep Shafts upgrade. No storage. Miners carry the ore to a storage building, and work the surface if there is no mine to work at.",
     },
     &"blacksmith": {
-        "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
+        "wall": &"stone", "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
         "shape": "house", "height": 1.9, "color": Color(0.38, 0.36, 0.36), "roof": Color(0.25, 0.22, 0.22),
         "storage": true, "capacity": 60, "accepts_items": [&"tool_wood", &"tool_iron", &"tool_steel"],
         "worker_slots": 2, "profession": "BLACKSMITH",
@@ -202,7 +203,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Makes tools that speed up work: steel first, then iron, then wooden, whichever it has the materials for. Tiers can be switched off. Stores finished tools; citizens pick them up and equip them.",
     },
     &"school": {
-        "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
+        "wall": &"plaster", "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
         "shape": "house", "height": 2.2, "color": Color(0.72, 0.64, 0.46), "roof": Color(0.34, 0.3, 0.42),
         "worker_slots": 1, "profession": "TEACHER", "school_capacity": 12,
         "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",
@@ -220,7 +221,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector.",
     },
     &"graveyard": {
-        "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
+        "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
         "graveyard": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
         "inputs": {&"coal": 4},
@@ -308,7 +309,7 @@ const CROPS:Dictionary = {
 # auto:     gathered without player designation (foraging)
 # tree:     a wood tree: woodcutters chop and replant it (oak is deciduous: bare in winter)
 # regrows:  not removed when empty; refills while it is in season
-# forage:   a wild food the Forage tool and the Forager's Hut can pick (berry bushes are also picked by gatherers on their own)
+# forage:   a wild food the Forage tool and the Forager's Hut can pick (laborers also pick berry bushes on their own when food runs short)
 # spread_chance, max_total: each day a mature patch seeds a new one beside it with this chance (more with trees close by), until there are max_total of the kind
 # fruit_seasons, regrow_days: it gains one unit every regrow_days days, only in these seasons (0 spring to 3 winter)
 const RESOURCE_NODES:Dictionary = {
@@ -441,6 +442,8 @@ const TEACHER_VETERAN_XP:float = 0.4;     # teaching + general experience at whi
 
 static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
     return 1.0 + TEACHER_MAX_BONUS * minf(1.0, (teaching_xp + general_xp) / TEACHER_VETERAN_XP);
+
+const ROAD_WORK_HOURS:float = 0.4;       # labor-hours to lay one road cell (roads need work, no materials)
 
 # --------------------------------
 # Policies (decided 2026-10-23): colony-wide on/off rules the player sets in the HUD, saved with the game.

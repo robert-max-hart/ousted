@@ -16,7 +16,7 @@ const MODE_HINTS:Dictionary = {
     Mode.BUILD:    "Click to place. R rotates. Right-click to stop building.",
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
-    Mode.ROAD:     "Drag to lay a road. Roads speed up walking. Trees and rocks in the way are marked for clearing, and the road goes in once they are gone.",
+    Mode.ROAD:     "Drag to lay a road. Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
     Mode.DEMOLISH: "Drag to remove buildings and roads and to cancel harvest marks.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
     Mode.LOWER:    "Hold the left mouse button to lower the ground.",
@@ -249,9 +249,9 @@ func _on_release() -> void:
             for rn in w.nodes:
                 if r.has_point(rn.cell) and w.occupant[w.idx(rn.cell)] == null:
                     w.set_designated(rn, false);
-            for c in w.pending_roads.keys():
+            for c in w.pending_roads.keys() + w.road_work.keys():
                 if r.has_point(c):
-                    w.pending_roads.erase(c);
+                    w.cancel_road(c);
 
 # --------------------------------
 # Per-frame

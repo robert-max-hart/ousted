@@ -20,7 +20,7 @@ const START_PAWNS       :int = 8;
 const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 130, &"berries": 30, &"firewood": 30};
 const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
-    JobManager.Profession.FARMER, JobManager.Profession.GATHERER,
+    JobManager.Profession.FARMER,
 ];
 const MAX_BUILD_SLOPE   :float = 2.5;
 const MAX_WALK_SLOPE    :float = 2.2;
@@ -57,6 +57,8 @@ var town_hall   :Building;
 var _entities   :Node3D;
 var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
 var saplings    :Array[ResourceNode] = [];
+var road_work:Dictionary = {};              # cell -> work hours done: road cells staked out, waiting for builders and laborers
+var road_claimed:Dictionary = {};           # cell -> true while a citizen is working on it (not saved)
 var pending_roads:Dictionary = {};          # cell -> true: road cells waiting for a tree or rock to be cleared
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
@@ -188,15 +190,15 @@ func _spawn_nature() -> void:
             var slope:float = terrain.cell_slope(c);
             var f:float = forest.get_noise_2d(x, z);
             var r:float = rng.randf();
-            if slope > 1.0 and r < 0.06:
-                add_node(&"ore" if rng.randf() < 0.18 else &"rock", c);
+            if slope > 1.0 and r < 0.09:
+                add_node(&"ore" if rng.randf() < 0.12 else &"rock", c);       # (the ore share dropped as the rocks grew: iron is unchanged)
             elif slope < 1.4 and f > 0.15 and r < 0.45:
                 var oak:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of oak among the pines
                 add_node(&"oak" if oak > 0.05 else &"tree", c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
-            elif slope < 1.0 and r < 0.004:
-                add_node(&"rock", c);
+            elif slope < 1.0 and r < 0.012:
+                add_node(&"rock", c);             # loose surface stone on open ground (three times what it was)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
                 add_node(&"mushroom", c);         # damp patches among the trees
             elif slope < 1.0 and f > -0.3 and f <= -0.1 and r > 0.6 and r < 0.64:
@@ -335,7 +337,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "pending_roads": pending_roads.keys(), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -399,6 +401,8 @@ func _restore_entities(save:Dictionary) -> void:
     death_log = save.get("deaths", []);
     for c in save.get("pending_roads", []):
         pending_roads[c] = true;
+    for e in save.get("road_work", []):
+        road_work[e[0]] = e[1];
     policies.restore(save.get("policies", {}));
     seeds.restore(save.get("seeds", null));
     ledger.restore(save.get("ledger", {}));
@@ -492,7 +496,7 @@ func remove_node(rn:ResourceNode) -> void:
     _refresh_nav(rn.cell);
     renderer.mark_dirty();
     if pending_roads.erase(rn.cell):
-        set_road(rn.cell, true);
+        stake_road(rn.cell);
 
 func node_changed(_rn:ResourceNode) -> void:
     renderer.mark_dirty();
@@ -796,16 +800,41 @@ func can_road(c:Vector2i) -> bool:
 func can_plan_road(c:Vector2i) -> bool:
     return terrain.in_bounds(c) and not terrain.is_water(c) and occupant[idx(c)] == null;
 
-# Lays a road cell for the Road tool. Anything in the way is marked for clearing and the road goes in once it is gone. Returns true if the road is waiting on something to be cleared.
+# Plans a road cell for the Road tool. Anything in the way is marked for clearing first; then the cell is staked out
+# and citizens do ROAD_WORK_HOURS of work on it (no materials). Returns true if it is waiting on something to be cleared.
 func plan_road(c:Vector2i) -> bool:
-    if not can_plan_road(c):
+    if not can_plan_road(c) or terrain.get_overlay(c) != Terrain.Overlay.NONE or road_work.has(c) or pending_roads.has(c):
         return false;
     var rn:ResourceNode = node_at[idx(c)];
     if rn == null:
-        set_road(c, true);
+        stake_road(c);
         return false;
     mark_for_clearing(rn);
     pending_roads[c] = true;
+    return true;
+
+func stake_road(c:Vector2i) -> void:
+    if not can_road(c):
+        return;
+    road_work[c] = 0.0;
+    terrain.set_overlay(c, Terrain.Overlay.SITE);       # bare staked ground until the road is done
+
+func cancel_road(c:Vector2i) -> void:
+    pending_roads.erase(c);
+    if road_work.erase(c):
+        road_claimed.erase(c);
+        terrain.set_overlay(c, Terrain.Overlay.NONE);
+
+# Adds work to a staked road cell; true once the road is laid.
+func work_road(c:Vector2i, dh:float) -> bool:
+    if not road_work.has(c):
+        return true;
+    road_work[c] += dh;
+    if road_work[c] < Defs.ROAD_WORK_HOURS:
+        return false;
+    road_work.erase(c);
+    terrain.set_overlay(c, Terrain.Overlay.NONE);
+    set_road(c, true);
     return true;
 
 func set_road(c:Vector2i, on:bool) -> void:
