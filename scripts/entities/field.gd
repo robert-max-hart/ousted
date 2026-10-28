@@ -93,6 +93,43 @@ func fertility(i:int) -> float:
 
 func _set_fertility(i:int, v:float) -> void:
     world.soil_fertility[world.terrain.index(plot_cell(i))] = clampf(v, 0.0, 1.0);
+    world.terrain.refresh_rect(Rect2i(plot_cell(i), Vector2i.ONE));
+
+func mean_fertility() -> float:
+    var sum:float = 0.0;
+    for i in plot_count():
+        sum += fertility(i);
+    return sum / maxf(1.0, plot_count());
+
+# Per-plot soil percentages floating over the plots while the soil view is on and this field is selected.
+var _soil_labels:Array[Label3D] = [];
+
+func show_soil_numbers(on:bool) -> void:
+    if not on:
+        for l in _soil_labels:
+            l.visible = false;
+        return;
+    while _soil_labels.size() < plot_count():
+        var l:Label3D = Label3D.new();
+        l.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
+        l.pixel_size = 0.008;
+        l.font_size = 32;
+        l.outline_size = 8;
+        l.no_depth_test = true;
+        l.modulate = Color(1, 1, 1);
+        add_child(l);
+        l.top_level = true;
+        _soil_labels.append(l);
+    for i in _soil_labels.size():
+        var l:Label3D = _soil_labels[i];
+        l.visible = i < plot_count();
+        if not l.visible:
+            continue;
+        var c:Vector2i = plot_cell(i);
+        l.global_position = world.terrain.cell_center(c) + Vector3(0, 0.6, 0);
+        var text:String = "%d" % roundi(fertility(i) * 100.0);
+        if l.text != text:
+            l.text = text;
 
 func can_plant() -> bool:
     return Weather.can_sow(crop());
@@ -356,7 +393,12 @@ func info_text() -> String:
     if counts[Plot.FROZEN] > 0:
         s += "Frozen plots: harvest them now\n";
     s += "Needs %d farmer%s (one per %d plots)\n" % [farmer_positions(), "" if farmer_positions() == 1 else "s", Defs.PLOTS_PER_FARMER];
-    s += "Soil fertility: %d%%\n" % roundi(fert / n * 100.0);
+    var lo:float = 1.0;
+    var hi:float = 0.0;
+    for i in plot_count():
+        lo = minf(lo, fertility(i));
+        hi = maxf(hi, fertility(i));
+    s += "Soil fertility: %d%% (%d to %d)\n" % [roundi(fert / n * 100.0), roundi(lo * 100.0), roundi(hi * 100.0)];
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
     var why:String = Weather.sow_block_reason(c);
     s += "Sowing now: %s\n" % ("yes" if why == "" else "no, " + why);

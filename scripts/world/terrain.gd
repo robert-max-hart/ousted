@@ -35,6 +35,8 @@ var heights :PackedFloat32Array;
 var overlay :PackedByteArray;
 var _chunks :Array[MeshInstance3D] = [];
 var _dirty  :Dictionary = {};
+var soil_view :bool = false;            # colour the ground by soil fertility (set_soil_view)
+var soil_source :Callable;               # cell index -> fertility 0..1, set by World
 var _material:StandardMaterial3D;
 var _season :int = 0;
 var _tint_noise:FastNoiseLite;
@@ -248,6 +250,24 @@ func set_season(s:int) -> void:
     _season = s;
     mark_all_dirty();
 
+# The soil overlay: ground drawn from brown (worn out) through yellow to green (rich).
+func set_soil_view(on:bool) -> void:
+    if soil_view == on:
+        return;
+    soil_view = on;
+    mark_all_dirty();
+
+# Redraws a rect (the soil colours changed under a field).
+func refresh_rect(r:Rect2i) -> void:
+    if soil_view:
+        _mark_dirty_rect(r);
+
+static func soil_color(f:float) -> Color:
+    var poor:Color = Color(0.5, 0.3, 0.16);
+    var middling:Color = Color(0.82, 0.74, 0.25);
+    var rich:Color = Color(0.2, 0.62, 0.2);
+    return poor.lerp(middling, clampf(f / 0.5, 0.0, 1.0)) if f < 0.5 else middling.lerp(rich, clampf((f - 0.5) / 0.4, 0.0, 1.0));
+
 func mark_all_dirty() -> void:
     for i in CHUNKS * CHUNKS:
         _dirty[i] = true;
@@ -267,6 +287,8 @@ func _corner_normal(x:int, z:int) -> Vector3:
 
 func _cell_color(c:Vector2i) -> Color:
     var col:Color;
+    if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
+        return soil_color(soil_source.call(index(c)));
     match overlay[index(c)]:
         Overlay.ROAD:
             col = COLOR_ROAD;

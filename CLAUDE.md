@@ -11,11 +11,15 @@ The focus is realistic agriculture, and there is no combat.
 **M1 (core loop), M2 (logistics and economy) and M3 (population) are done and tuned. M4 (agriculture depth) steps 1 to 3 (crops, foraging, seeds) are built, plus a long polish pass and a title screen.** Everything is committed (last commit `90eb10c`, 2026-10-27) but **the commits since 2026-10-26 are not pushed** (`origin/main` is at the 2026-10-26 state). The only untracked file is `playtest_notes.txt`. The playtest notes pass of 2026-10-27 is described in the next section, with the pinned future work.
 
 **Next session, in order of what I'd do:**
-1. **M4 step 4: fertility overlay and rotation hints** (soil fertility and per-crop effects already exist: make them visible with a terrain overlay toggle, per-plot numbers and a low-soil warning on the crop pick). Then water (irrigation channels, buckets, drought), pests, orchards, livestock and manure.
+1. **M4 water** (irrigation channels, buckets, drought), then pests, orchards, livestock and manure. (Step 4, the fertility overlay, is done: see its section.)
 2. **Things to check on the user's machine (I could only test headless or in screenshots):** the frame rate with the grass tufts and the richer tree meshes (`GrassDetail.DENSITY`, 0.9, is the knob); how the title screen's camera drift and weather feel live; the seed find rate (`Seeds.FIND_CHANCE` 0.002 per forage trip, a guess for 'a small bonus', measured only at 0.003 and 0.007 with `tests/seed_probe.tscn`).
 3. **Ideas noted, not built:** wind sway for grass and trees (`docs/plan.md` section 9); a load menu with slots and a settings screen (the Esc menu has Quit to title); more happiness buildings (tavern etc.); the seed trader (M7) as the main seed source. (Tilled soil texture was done 2026-10-27.) The pinned list from the playtest notes is in the next section.
 4. **Known loose ends:** the soak sometimes ends with no births since housing now moves unrelated housemates out (`Families._move_out_to_empty`); one `school` test run threw a freed-pawn error once (not reproduced in three reruns); the `Forager` stops sowing and picking while the food stock is above its cap.
 5. **Housekeeping:** `godot --headless --import` re-saves `scripts/ui/player_tools.gd` with tabs (see Gotchas): **do not `git checkout` it if you have uncommitted edits there** (it wipes them); convert the leading tabs back to 4 spaces instead. Push only when asked; commit only when asked.
+
+## M4 step 4: fertility overlay (2026-10-28, built)
+
+Top bar **Soil** toggle (`Terrain.set_soil_view`, `soil_source` callable set by `World`, `Terrain.soil_color`: brown to yellow to green; fields redraw via `Terrain.refresh_rect` when a plot's fertility changes). The selected field shows per-plot percentages (`Field.show_soil_numbers`, Label3D pool) and "Soil fertility: avg (min to max)". The crop list flags draining crops on poor soil with "! " (`HUD.LOW_SOIL` 0.4) and marks restoring crops "(restores soil)" under `GOOD_SOIL` 0.7; tooltips give the soil change per harvest and the yield on this soil. Test: `tests/soil_view`. Not seen windowed (no display). Not built: a rotation planner or last-crop memory per plot. **Next: water** (irrigation channels, buckets, drought), then pests, orchards, livestock and manure.
 
 ## Playtest 2 fixes (2026-10-28): done, committed and pushed
 

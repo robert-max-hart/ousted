@@ -89,6 +89,7 @@ func _ready() -> void:
     print("Ousted world seed: %d" % world_seed);
 
     terrain = Terrain.new();
+    terrain.soil_source = func(i:int) -> float: return soil_fertility[i];
     terrain.name = "Terrain";
     add_child(terrain);
     terrain.generate(world_seed);

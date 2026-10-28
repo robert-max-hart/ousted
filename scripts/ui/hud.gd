@@ -6,6 +6,8 @@
 class_name HUD extends CanvasLayer;
 
 const SHOWN_ITEMS   :Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron"];
+const LOW_SOIL      :float = 0.4;           # a field under this warns on crops that drain it
+const GOOD_SOIL     :float = 0.7;           # under this a soil-restoring crop is pointed out
 const LOG_WIDTH     :float = 440.0;
 const LOG_HEIGHT    :float = 110.0;
 const LOG_LINES     :int = 80;         # messages the log panel keeps
@@ -36,6 +38,7 @@ var _info_btn   :Button;
 var _move_btn   :Button;
 var _jobs_panel :PanelContainer;
 var _jobs_toggle:Button;
+var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
 var _citizens_toggle:Button;
 var _log_toggle :Button;
 var _citizens   :CitizensPanel;
@@ -211,6 +214,9 @@ func _refresh_info() -> void:
     _help_label.text = help;
     _help_label.visible = _help_open and help != "";
     _info_btn.visible = obj is Field;
+    for b in World.instance.buildings:
+        if b is Field:
+            (b as Field).show_soil_numbers(_soil_toggle.button_pressed and is_same(b, obj));
     _refresh_relocate(obj);
     _refresh_site(obj);
     _extras.refresh(obj);
@@ -462,8 +468,19 @@ func _on_info_button() -> void:
             var c:Dictionary = Defs.CROPS[id];
             var btn:Button = Button.new();
             var known:bool = World.instance.seeds.has(id);
+            var soil:float = (obj as Field).mean_fertility();
             btn.text = "%s: %d days, sows %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)] if known else "%s: no seeds yet" % c["name"];
             btn.tooltip_text = c["desc"] if known else "Citizens picking wild food may find its seeds while picking wild food.";
+            if known:
+                var drain:float = c["fertility"];
+                btn.tooltip_text += "\nSoil: %s%d%% per harvest. Yield on this field's soil (%d%%): %d%%." % ["+" if drain > 0.0 else "", roundi(drain * 100.0), roundi(soil * 100.0), roundi(lerpf(0.4, 1.3, soil) / 1.3 * 100.0)];
+                if drain < 0.0 and soil < LOW_SOIL:
+                    btn.text = "! " + btn.text;
+                    btn.add_theme_color_override("font_color", Color(1.0, 0.65, 0.3));
+                    btn.tooltip_text += "\nLow soil: this crop will take the field lower. Grow something that restores it first (beans).";
+                elif drain > 0.0 and soil < GOOD_SOIL:
+                    btn.text += " (restores soil)";
+                    btn.add_theme_color_override("font_color", Color(0.6, 0.9, 0.5));
             btn.disabled = not known;
             btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
             btn.focus_mode = Control.FOCUS_NONE;
@@ -502,6 +519,11 @@ func _build_top_bar(root:Control) -> void:
     _citizens_toggle = _panel_toggle(row, "Citizens");
     _log_toggle = _panel_toggle(row, "Log");
     _policies_btn = _panel_toggle(row, "Policies");
+    _soil_toggle = _panel_toggle(row, "Soil");
+    _soil_toggle.tooltip_text = "Show soil fertility on the ground (brown poor, green rich)";
+    _soil_toggle.toggled.connect(func(on:bool) -> void:
+        World.instance.terrain.set_soil_view(on);
+        _refresh_info());
     var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
     for i in labels.size():
         var b:Button = Button.new();
