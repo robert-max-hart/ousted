@@ -31,6 +31,12 @@ var _info_title :Label;
 var _info_body  :Label;
 var _info_btn   :Button;
 var _move_btn   :Button;
+var _jobs_panel :PanelContainer;
+var _jobs_toggle:Button;
+var _citizens_toggle:Button;
+var _log_toggle :Button;
+var _citizens   :CitizensPanel;
+var _extras     :InspectorExtras;    # mark-for-harvest button and the worker list
 var _site_box   :VBoxContainer;      # cancel and build priority for a site
 var _cancel_btn :Button;
 var _priority_btns:Array[Button] = [];
@@ -83,6 +89,12 @@ func _ready() -> void:
     _ledger_panel = LedgerPanel.new();
     root.add_child(_ledger_panel);
     _ledger_panel.setup(World.instance.ledger);
+    _citizens = CitizensPanel.new();
+    root.add_child(_citizens);
+    _citizens.setup();
+    _bind_toggle(_jobs_toggle, _jobs_panel, true);
+    _bind_toggle(_log_toggle, _log_panel, true);
+    _bind_toggle(_citizens_toggle, _citizens, false);
 
     var tools:PlayerTools = World.instance.tools;
     tools.mode_changed.connect(_on_mode_changed);
@@ -139,6 +151,9 @@ func _refresh_all() -> void:
         _policies_btn.button_pressed = false;
     _apply_category();
     parts.append("Pop %d" % w.pawns.size());
+    var idle:int = w.pawns.filter(func(p:Pawn) -> bool: return p.is_idle()).size();
+    if idle > 0:
+        parts.append("Idle %d" % idle);
     var homeless:int = w.families.homeless_count();
     if homeless > 0:
         parts.append("Homeless %d" % homeless);
@@ -188,6 +203,7 @@ func _refresh_info() -> void:
     _info_btn.visible = obj is Field;
     _refresh_relocate(obj);
     _refresh_site(obj);
+    _extras.refresh(obj);
     _refresh_ledger_button(obj);
     _refresh_filters(obj);
     _refresh_controls(obj);
@@ -457,15 +473,11 @@ func _build_top_bar(root:Control) -> void:
     _stock.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS;
     _stock.mouse_filter = Control.MOUSE_FILTER_PASS;
     row.add_child(_stock);
-    _policies_btn = Button.new();
-    _policies_btn.text = "Policies";
-    _policies_btn.toggle_mode = true;
-    _policies_btn.focus_mode = Control.FOCUS_NONE;
-    row.add_child(_policies_btn);
-    var do_save:Callable = func() -> void: SaveGame.save(World.instance);
-    var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
-    row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
-    row.add_child(_save_button("Load", "Load the quicksave (F9)", do_load));
+    # panel toggles: each button opens and closes its panel
+    _jobs_toggle = _panel_toggle(row, "Jobs");
+    _citizens_toggle = _panel_toggle(row, "Citizens");
+    _log_toggle = _panel_toggle(row, "Log");
+    _policies_btn = _panel_toggle(row, "Policies");
     var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
     for i in labels.size():
         var b:Button = Button.new();
@@ -477,12 +489,18 @@ func _build_top_bar(root:Control) -> void:
         row.add_child(b);
         _speed_btns.append(b);
 
-func _save_button(text:String, tip:String, action:Callable) -> Button:
+# A toggle button that shows and hides a panel (and stays in step if the panel is closed some other way).
+func _bind_toggle(btn:Button, panel:Control, shown:bool) -> void:
+    panel.visible = shown;
+    btn.set_pressed_no_signal(shown);
+    btn.toggled.connect(func(on:bool) -> void: panel.visible = on);
+
+func _panel_toggle(row:Container, text:String) -> Button:
     var b:Button = Button.new();
     b.text = text;
-    b.tooltip_text = tip;
+    b.toggle_mode = true;
     b.focus_mode = Control.FOCUS_NONE;
-    b.pressed.connect(action);
+    row.add_child(b);
     return b;
 
 func _build_toolbar(root:Control) -> void:
@@ -502,7 +520,7 @@ func _build_toolbar(root:Control) -> void:
     group.allow_unpress = false;
     var modes:Array = [
         [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"],
-        [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.DEMOLISH, "Demolish"],
+        [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
         [PlayerTools.Mode.RAISE, "Raise"], [PlayerTools.Mode.LOWER, "Lower"], [PlayerTools.Mode.FLATTEN, "Flatten"],
     ];
     for m in modes:
@@ -545,6 +563,7 @@ func _apply_category() -> void:
 
 func _build_jobs_panel(root:Control) -> void:
     var panel:PanelContainer = _panel(root, &"jobs");
+    _jobs_panel = panel;
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
     panel.offset_left = 8;
     panel.offset_top = 48;
@@ -711,6 +730,8 @@ func _build_info_panel(root:Control) -> void:
         if sel is Building and World.alive(sel):
             World.instance.tools.start_relocate(sel));
     col.add_child(_move_btn);
+    _extras = InspectorExtras.new();
+    col.add_child(_extras);
     _site_box = VBoxContainer.new();
     _site_box.visible = false;
     col.add_child(_site_box);

@@ -9,7 +9,7 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
@@ -17,7 +17,8 @@ const MODE_HINTS:Dictionary = {
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
     Mode.ROAD:     "Drag to lay a road. Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
-    Mode.DEMOLISH: "Drag to remove buildings and roads and to cancel harvest marks.",
+    Mode.DEMOLISH: "Drag to demolish buildings and roads.",
+    Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
     Mode.LOWER:    "Hold the left mouse button to lower the ground.",
     Mode.FLATTEN:  "Hold the left mouse button to level the ground to where you clicked.",
@@ -49,6 +50,10 @@ var _radius_key :String = "";
 var _mat_ok     :StandardMaterial3D;
 var _mat_bad    :StandardMaterial3D;
 var _mat_area   :StandardMaterial3D;
+var _model_ghost:BuildGhost;                       # the real shape of the building being placed, tinted
+var _mat_m_ok   :StandardMaterial3D;
+var _mat_m_short:StandardMaterial3D;
+var _mat_m_bad  :StandardMaterial3D;
 var _ring       :MeshInstance3D;
 var _frame      :Array[MeshInstance3D] = [];       # four bars outlining a selected building's footprint
 
@@ -56,6 +61,12 @@ func _ready() -> void:
     _mat_ok = _ghost_material(Color(0.3, 0.9, 0.4, 0.4));
     _mat_bad = _ghost_material(Color(0.95, 0.25, 0.2, 0.4));
     _mat_area = _ghost_material(Color(1.0, 0.8, 0.3, 0.3));
+    _mat_m_ok = _model_material(Color(0.4, 1.0, 0.5, 0.55));
+    _mat_m_short = _model_material(Color(1.0, 0.7, 0.2, 0.55));
+    _mat_m_bad = _model_material(Color(1.0, 0.3, 0.25, 0.55));
+    _model_ghost = BuildGhost.new();
+    _model_ghost.visible = false;
+    add_child(_model_ghost);
     for i in 2:
         var g:MeshInstance3D = MeshInstance3D.new();
         g.mesh = BoxMesh.new();
@@ -129,7 +140,11 @@ func _relocation_cost(b:Building) -> Dictionary:
     return c;
 
 func select(obj:Variant) -> void:
+    var before:Variant = selected;
     selected = obj;
+    for o in [before, obj]:
+        if World.alive(o) and o is Building:
+            (o as Building).update_site_label();       # a site spells out what it is missing only while selected
     selection_changed.emit(obj);
 
 # --------------------------------
@@ -201,7 +216,7 @@ func _on_press() -> void:
                 select(moved);
             elif error == "":
                 World.instance.place_building(build_id, origin, build_size);
-        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.DEMOLISH:
+        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.DEMOLISH, Mode.CANCEL:
             _dragging = true;
             _drag_start = _hover_cell;
         Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
@@ -246,11 +261,16 @@ func _on_release() -> void:
             for z in range(r.position.y, r.end.y):
                 for x in range(r.position.x, r.end.x):
                     w.set_road(Vector2i(x, z), false);
+        Mode.CANCEL:
+            var cr:Rect2i = _drag_rect();
+            for b in w.buildings.duplicate():
+                if b.state == Building.State.CONSTRUCTION and b.rect().intersects(cr):
+                    w.remove_building(b, true);
             for rn in w.nodes:
-                if r.has_point(rn.cell) and w.occupant[w.idx(rn.cell)] == null:
+                if cr.has_point(rn.cell) and w.occupant[w.idx(rn.cell)] == null:
                     w.set_designated(rn, false);
             for c in w.pending_roads.keys() + w.road_work.keys():
-                if r.has_point(c):
+                if cr.has_point(c):
                     w.cancel_road(c);
 
 # --------------------------------
@@ -364,6 +384,7 @@ func _pick() -> Variant:
 func _update_ghosts() -> void:
     for g in _ghosts:
         g.visible = false;
+    _model_ghost.hide_ghost();
     _update_preview();
     if not _hover_ok:
         return;
@@ -377,9 +398,10 @@ func _update_ghosts() -> void:
                 return;
             var origin:Vector2i = _build_origin();
             var ok:bool = w.can_place(build_id, origin, build_size, relocating != null) == "";
-            var h:float = maxf(0.3, Defs.BUILDINGS[build_id]["height"]);
-            _show_box(0, Rect2i(origin, build_size), h, _mat_ok if ok else _mat_bad);
-        Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH:
+            var short:bool = ok and not _can_afford();
+            _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad if not ok else _mat_area if short else _mat_ok);
+            _model_ghost.show_at(w, build_id, origin, build_size, _mat_m_bad if not ok else _mat_m_short if short else _mat_m_ok);
+        Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH, Mode.CANCEL:
             var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
             _show_box(0, r, 0.4, _mat_bad if mode == Mode.DEMOLISH else _mat_area);
         Mode.ROAD:
@@ -504,6 +526,21 @@ func _update_frame(r:Rect2i) -> void:
         (_frame[i].mesh as BoxMesh).size = parts[i][0];
         _frame[i].position = parts[i][1];
         _frame[i].visible = true;
+
+# Whether the colony's stores hold the materials for the building being placed right now.
+func _can_afford() -> bool:
+    var cost:Dictionary = _relocation_cost(relocating) if relocating != null else Defs.BUILDINGS[build_id]["cost"];
+    for item in cost:
+        if Stock.available(item) < cost[item]:
+            return false;
+    return true;
+
+# Shaded and see-through, so the building's shape still reads.
+func _model_material(c:Color) -> StandardMaterial3D:
+    var m:StandardMaterial3D = StandardMaterial3D.new();
+    m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
+    m.albedo_color = c;
+    return m;
 
 func _ghost_material(c:Color) -> StandardMaterial3D:
     var m:StandardMaterial3D = StandardMaterial3D.new();

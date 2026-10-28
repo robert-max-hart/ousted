@@ -350,14 +350,18 @@ func shortage_text() -> String:
             parts.append("%d %s" % [short, Defs.item_name(item).to_lower()]);
     return ", ".join(parts);
 
-# The floating note over a site: PAUSED, or what is missing from storage.
+# The floating note over a site: PAUSED, a priority other than the usual, and a "!" when storage can't cover
+# what it still needs (the full list of what is missing shows while it is selected).
 func update_site_label() -> void:
     var text:String = "";
     var short:String = shortage_text();
     if is_paused():
         text = "PAUSED";
+    elif is_site() and priority != PRIORITY_MEDIUM:
+        text = "%s priority" % PRIORITY_NAMES[priority];
     if short != "":
-        text += ("\n" if text != "" else "") + "Needs " + short;
+        var picked:bool = world.tools != null and is_same(world.tools.selected, self);
+        text += ("\n" if text != "" else "") + ("Needs " + short if picked else "!");
     if text == "":
         if _site_label != null:
             _site_label.visible = false;
@@ -365,9 +369,9 @@ func update_site_label() -> void:
     if _site_label == null:
         _site_label = Label3D.new();
         _site_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
-        _site_label.pixel_size = 0.02;
-        _site_label.font_size = 36;
-        _site_label.outline_size = 10;
+        _site_label.pixel_size = 0.015;
+        _site_label.font_size = 28;
+        _site_label.outline_size = 8;
         _site_label.no_depth_test = true;
         _site_label.shaded = false;
         _site_label.position = Vector3(0, def.get("height", 2.0) + 2.4, 0);
