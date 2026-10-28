@@ -16,7 +16,8 @@ static var backdrop:bool = false;           # the title screen builds a frozen m
 static func fx_speed() -> float:
     return 1.0 if instance != null and instance.is_backdrop else GameClock.speed()
 
-const START_PAWNS       :int = 8;
+const START_PAWNS       :int = 12;
+const START_CHILDREN    :int = 3;                  # the last few of them are children (5 to 17)
 const START_STOCK       :Dictionary = {&"wood": 40, &"stone": 20, &"iron": 4, &"wheat": 130, &"berries": 30, &"firewood": 30};
 const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
@@ -203,8 +204,8 @@ func _spawn_nature() -> void:
                 add_node(&"oak" if oak > 0.05 else &"tree", c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
-            elif slope < 1.0 and r < 0.012:
-                add_node(&"rock", c);             # loose surface stone on open ground (three times what it was)
+            elif slope < 1.0 and r < 0.008:
+                add_node(&"rock", c);             # loose surface stone on open ground (twice what it was originally)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
                 add_node(&"mushroom", c);         # damp patches among the trees
             elif slope < 1.0 and f > -0.3 and f <= -0.1 and r > 0.6 and r < 0.64:
@@ -339,6 +340,8 @@ func _spawn_settlers(start:Vector2i) -> void:
         var c:Vector2i = nav.nearest_walkable(start + Vector2i(rng.randi_range(-4, 4), 3 + rng.randi_range(0, 2)), 6);
         var p:Pawn = Pawn.new();
         p.setup(self, c, rng, used);
+        if i >= START_PAWNS - START_CHILDREN:
+            p.age = rng.randi_range(6, 14) + rng.randf();
         used.append(p.first_name);
         if i < START_PROFESSIONS.size():
             p.profession = START_PROFESSIONS[i];
@@ -386,7 +389,7 @@ func _restore_entities(save:Dictionary) -> void:
         if rn.growth < 1.0:
             saplings.append(rn);
     for bd in save["buildings"]:
-        var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true);
+        var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true, bd.get("facing", 0));
         b.restore_dict(bd);
         if not b.expansion.is_empty():
             Expansion.hold_cells(self, b);
@@ -576,7 +579,7 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
     return "";
 
 # restoring: put a saved building back as it was (no flattening, clearing or overlay changes).
-func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:bool = false, restoring:bool = false) -> Building:
+func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:bool = false, restoring:bool = false, facing:int = 0) -> Building:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
@@ -594,6 +597,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
             var rn:ResourceNode = node_at[idx(c)];
             if rn != null:
                 mark_for_clearing(rn);       # nothing vanishes at once: laborers clear it before building starts
+    b.facing = facing;
     b.setup(self, def_id, origin, size);
     _entities.add_child(b);
     buildings.append(b);
@@ -685,10 +689,10 @@ func relocation_block_reason(b:Building) -> String:
 
 # Starts building the same thing at a new spot for a share of the cost (Defs.RELOCATE_COST_MULT). The old building keeps
 # working, takes nothing new, and is replaced once the new one is finished.
-func relocate(b:Building, origin:Vector2i, size:Vector2i) -> Building:
+func relocate(b:Building, origin:Vector2i, size:Vector2i, facing:int = 0) -> Building:
     if relocation_block_reason(b) != "" or can_place(b.def_id, origin, size, true) != "":
         return null;
-    var site:Building = place_building(b.def_id, origin, size);
+    var site:Building = place_building(b.def_id, origin, size, false, false, facing);
     site.cost_mult = Defs.RELOCATE_COST_MULT;
     site.relocating_from = b;
     b.relocating_to = site;
@@ -756,9 +760,22 @@ func nearest_storage_with(item:StringName, pos:Vector3) -> Building:
         return b.is_storage() and b.available(item) > 0);
 
 # Nearest storage building that would accept the item and has room for it.
+# Distance still counts, but a store that suits the item (a Granary for food) beats a nearer general one
+# (Building.storage_rank, each point worth STORAGE_RANK_CELLS cells of walking).
+const STORAGE_RANK_CELLS:float = 3.0;
+
 func nearest_storage_for(item:StringName, pos:Vector3) -> Building:
-    return nearest_building(pos, func(b:Building) -> bool:
-        return b.can_store(item));
+    var best:Building = null;
+    var best_score:float = INF;
+    for b in buildings:
+        if not b.can_store(item):
+            continue;
+        var c:Vector2 = Vector2(b.origin) + Vector2(b.size) * 0.5;
+        var score:float = c.distance_to(Vector2(pos.x, pos.z)) + b.storage_rank(item) * STORAGE_RANK_CELLS;
+        if score < best_score:
+            best = b;
+            best_score = score;
+    return best;
 
 # Puts n units into the nearest storage with room, spilling to further ones and finally onto
 # the ground near pos. Returns how many ended up in storage.
@@ -856,7 +873,7 @@ func stake_road(c:Vector2i) -> void:
     if not can_road(c):
         return;
     road_work[c] = 0.0;
-    terrain.set_overlay(c, Terrain.Overlay.SITE);       # bare staked ground until the road is done
+    terrain.set_overlay(c, Terrain.Overlay.ROAD_SITE);       # faintly worn ground until the road is done
 
 func cancel_road(c:Vector2i) -> void:
     pending_roads.erase(c);

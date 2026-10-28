@@ -19,6 +19,7 @@ func on_day() -> void:
     _pair_up();
     _births();
     assign_homes();
+    _reunite_couples();
     _rehouse_couples();
     _move_out_to_empty();
 
@@ -161,6 +162,9 @@ func assign_homes() -> void:
     homeless.sort_custom(func(a:Pawn, b:Pawn) -> bool:
         return a.age < b.age);
     for p in homeless:
+        if p.partner != null and p.partner.home != null and not lives_in_shack(p.partner) and house_has_room(p.partner.home):
+            move_home(p, p.partner.home);       # a couple goes to the same house
+            continue;
         var b:Building = _roomiest_house_near(p.position, 1);
         if b == null:
             return;
@@ -180,6 +184,32 @@ func _roomiest_house_near(pos:Vector3, beds:int) -> Building:
             best = b;
             best_score = score;
     return best;
+
+# Partners who live in different houses (they paired while homeless, or housing spread them out) move in together:
+# into the one's house when it has room, else both to a house with two free beds. Someone with a child still at
+# home stays; the other moves.
+func _reunite_couples() -> void:
+    for a in world.pawns.duplicate():
+        var b:Pawn = a.partner;
+        if b == null or world.pawns.find(b) < world.pawns.find(a):
+            continue;
+        if a.home != null and a.home == b.home:
+            continue;
+        var a_stays:bool = a.home != null and not lives_in_shack(a) and _has_child_at_home(a);
+        var b_stays:bool = b.home != null and not lives_in_shack(b) and _has_child_at_home(b);
+        if not b_stays and house_has_room(a.home) and not lives_in_shack(a):
+            move_home(b, a.home);
+        elif not a_stays and house_has_room(b.home) and not lives_in_shack(b):
+            move_home(a, b.home);
+        elif not a_stays and not b_stays:
+            var to:Building = _roomiest_house_near(a.position, 2);
+            if to != null:
+                move_home(a, to);
+                move_home(b, to);
+
+func _has_child_at_home(p:Pawn) -> bool:
+    return p.home.residents.any(func(r:Pawn) -> bool:
+        return not r.is_adult() and r.parents.has(p));
 
 # A couple sharing a full house moves out together to a house with two free beds, leaving room for a baby. They
 # stay put while a child of theirs still lives there, so no one is left without an adult.

@@ -60,7 +60,7 @@ func _rebuild() -> void:
             var fs:float = float((h >> 16) & 255) / 255.0;
             var x:float = c.x + 0.1 + fx * 0.8;
             var z:float = c.y + 0.1 + fz * 0.8;
-            var s:float = 0.7 + fs * 0.9;
+            var s:float = 0.45 + fs * 0.55;
             mm.set_instance_transform(n, Transform3D(Basis(Vector3.UP, fx * TAU).scaled(Vector3(s, s, s)), Vector3(x, t.height_at(x, z) + 0.01, z)));
             mm.set_instance_color(n, STONES[(h >> 24) & 3]);
             n += 1;

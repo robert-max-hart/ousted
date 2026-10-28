@@ -17,6 +17,8 @@ var def_id      :StringName;
 var def         :Dictionary;
 var origin      :Vector2i;
 var size        :Vector2i;
+var facing      :int = 0;                 # quarter turns clockwise (set before setup); only the look turns
+var vsize       :Vector2i;                # the footprint as the unturned model sees it
 var state       :int = State.CONSTRUCTION;
 var delivered   :Dictionary = {};   # item -> int already on site
 var incoming    :Dictionary = {};   # item -> int being carried here
@@ -75,6 +77,10 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     def = Defs.BUILDINGS[id];
     origin = o;
     size = s;
+    if def.get("drag_size", false) or def.get("field", false):
+        facing = 0;       # fields, stockpiles and graveyards are sized by dragging, not turned
+    vsize = Vector2i(s.y, s.x) if facing % 2 == 1 else s;
+    rotation.y = -facing * PI * 0.5;
     name = "%s_%d_%d" % [id, o.x, o.y];
     for c in def.get("controls", []):
         settings[c["id"]] = c["default"];
@@ -612,7 +618,7 @@ func _build_chimney(h:float) -> void:
     var top:float = h + h * pitch + 0.35;
     var base:float = h + h * pitch * 0.5;
     box.size = Vector3(0.4, top - base, 0.4);
-    _chimney = _add_mesh(box, _flat_mat(Color(0.45, 0.32, 0.28)), Vector3(size.x * 0.22, (top + base) * 0.5, size.y * 0.15));
+    _chimney = _add_mesh(box, _flat_mat(Color(0.45, 0.32, 0.28)), Vector3(vsize.x * 0.22, (top + base) * 0.5, vsize.y * 0.15));
     _smoke = CPUParticles3D.new();
     var puff:SphereMesh = SphereMesh.new();
     puff.radius = 0.32;
@@ -655,7 +661,7 @@ func _build_chimney(h:float) -> void:
 
 func to_dict() -> Dictionary:
     return {
-        "id": def_id, "origin": origin, "size": size, "state": state, "delivered": delivered.duplicate(),
+        "id": def_id, "origin": origin, "size": size, "facing": facing, "state": state, "delivered": delivered.duplicate(),
         "work_done": work_done, "stored": stored.duplicate(), "forbidden": forbidden.duplicate(),
         "settings": settings.duplicate(), "fuel": fuel, "fuel_coal": fuel_coal, "inputs": inputs.duplicate(),
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
@@ -691,6 +697,13 @@ func restore_dict(d:Dictionary) -> void:
 # --------------------------------
 # Info
 
+# The explanations kept out of the inspector's main text: shown on request with the "?" button (a glossary can reuse them).
+func help_text() -> String:
+    var s:String = def.get("desc", "");
+    if def.has("spoil_mult"):
+        s += "\nFood keeps %s here." % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
+    return s;
+
 func info_text() -> String:
     var s:String = "";
     if state == State.CONSTRUCTION:
@@ -705,14 +718,10 @@ func info_text() -> String:
         if shortage_text() != "":
             s += "Not enough in storage: needs %s\n" % shortage_text();
         s += "Builders: %d\n" % builders;
-    else:
-        s += def.get("desc", "") + "\n";
     if capacity() > 0 and state == State.COMPLETE:
         s += "Stored %d / %d\n" % [used(), capacity()];
         for item in stored:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
-        if def.has("spoil_mult"):
-            s += "Food keeps %s here.\n" % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
     if def.has("school_capacity") and state == State.COMPLETE:
         s += "Pupils: %d / %d\n" % [attendees, def["school_capacity"]];
         s += "Teacher: %s\n" % ("teaching now (pupils learn %.2fx)" % teaching_mult if teaching else "none present");
@@ -776,13 +785,13 @@ func _build_visual() -> void:
                 _build_chimney(h);
         "house":
             var box:BoxMesh = BoxMesh.new();
-            box.size = Vector3(size.x - 0.5, h, size.y - 0.5);
+            box.size = Vector3(vsize.x - 0.5, h, vsize.y - 0.5);
             _body = _add_mesh(box, _body_mat, Vector3(0, h * 0.5, 0));
             var pitch:float = def.get("roof_pitch", 0.55);
             var prism:PrismMesh = PrismMesh.new();
-            prism.size = Vector3(size.x - 0.1, h * pitch, size.y - 0.2);
+            prism.size = Vector3(vsize.x - 0.1, h * pitch, vsize.y - 0.2);
             _roof = _add_mesh(prism, SurfaceTextures.material(&"shingle", def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
-            _build_door(Vector2(size.x - 0.5, size.y - 0.5), h);
+            _build_door(Vector2(vsize.x - 0.5, vsize.y - 0.5), h);
             if def.has("fuel_capacity"):
                 _build_chimney(h);
         "well":
@@ -796,35 +805,35 @@ func _build_visual() -> void:
             _roof = _add_mesh(cap, _flat_mat(def.get("roof", Color.BROWN)), Vector3(0, h + 0.9, 0));
         "mine":
             var pit:BoxMesh = BoxMesh.new();
-            pit.size = Vector3(size.x - 0.3, 0.2, size.y - 0.3);
+            pit.size = Vector3(vsize.x - 0.3, 0.2, vsize.y - 0.3);
             _add_mesh(pit, _flat_mat(Color(0.32, 0.28, 0.25)), Vector3(0, 0.1, 0));
             var shed:BoxMesh = BoxMesh.new();
-            shed.size = Vector3(size.x * 0.5, h, size.y * 0.4);
-            _body = _add_mesh(shed, _body_mat, Vector3(-size.x * 0.2, h * 0.5, -size.y * 0.25));
+            shed.size = Vector3(vsize.x * 0.5, h, vsize.y * 0.4);
+            _body = _add_mesh(shed, _body_mat, Vector3(-vsize.x * 0.2, h * 0.5, -vsize.y * 0.25));
             var cap:PrismMesh = PrismMesh.new();
-            cap.size = Vector3(size.x * 0.55, h * 0.4, size.y * 0.45);
-            _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
+            cap.size = Vector3(vsize.x * 0.55, h * 0.4, vsize.y * 0.45);
+            _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-vsize.x * 0.2, h + h * 0.2, -vsize.y * 0.25));
             BuildingShapes.mine_extras(self);
         "graveyard":
             _fence = Fence.new(self, &"stone", 1);       # the ground itself is a terrain overlay (Terrain.Overlay.GRAVE)
             add_child(_fence);
         "cart":
             var bed:BoxMesh = BoxMesh.new();
-            bed.size = Vector3(size.x - 0.3, h * 0.5, size.y * 0.8);
+            bed.size = Vector3(vsize.x - 0.3, h * 0.5, vsize.y * 0.8);
             _body = _add_mesh(bed, _body_mat, Vector3(0, h * 0.55, 0));
             var load_mesh:BoxMesh = BoxMesh.new();
-            load_mesh.size = Vector3(size.x - 0.7, h * 0.35, size.y * 0.55);
+            load_mesh.size = Vector3(vsize.x - 0.7, h * 0.35, vsize.y * 0.55);
             _roof = _add_mesh(load_mesh, _flat_mat(Color(0.75, 0.65, 0.4)), Vector3(0, h * 0.95, 0));
             var wheel:CylinderMesh = CylinderMesh.new();
             wheel.top_radius = 0.28;
             wheel.bottom_radius = 0.28;
             wheel.height = 0.1;
             for sx in [-0.55, 0.55]:
-                var w:MeshInstance3D = _add_mesh(wheel, _flat_mat(Color(0.25, 0.18, 0.12)), Vector3(sx, 0.28, size.y * 0.42));
+                var w:MeshInstance3D = _add_mesh(wheel, _flat_mat(Color(0.25, 0.18, 0.12)), Vector3(sx, 0.28, vsize.y * 0.42));
                 w.rotation.z = PI * 0.5;
         "pile":
             var pad:BoxMesh = BoxMesh.new();
-            pad.size = Vector3(size.x - 0.3, h, size.y - 0.3);
+            pad.size = Vector3(vsize.x - 0.3, h, vsize.y - 0.3);
             _body = _add_mesh(pad, _body_mat, Vector3(0, h * 0.5, 0));
             _fence = Fence.new(self, &"rope", 2);
             add_child(_fence);

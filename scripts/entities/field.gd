@@ -50,7 +50,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     for i in n:
         moisture[i] = 0.5;
         near_water[i] = 1 if _is_near_water(plot_cell(i)) else 0;
-    _fence = Fence.new(self, &"wood", 1);
+    _fence = Fence.new(self, &"field", 1);
     add_child(_fence);
     for shape in CropMeshes.SHAPES:
         var mm:MultiMesh = MultiMesh.new();
@@ -352,17 +352,24 @@ func info_text() -> String:
     var s:String = "Crop: %s\n" % c["name"];
     s += "Fallow %d, Growing %d, Ripe %d, Dead %d, Frozen %d\n" % counts;
     if harvest_early:
-        s += "Harvesting early: growing plots are taken for part of the crop, and nothing is sown meanwhile.\n";
+        s += "Harvesting early\n";
     if counts[Plot.FROZEN] > 0:
-        s += "Frozen plots can be harvested for part of the crop for a day, then they are lost.\n";
+        s += "Frozen plots: harvest them now\n";
     s += "Needs %d farmer%s (one per %d plots)\n" % [farmer_positions(), "" if farmer_positions() == 1 else "s", Defs.PLOTS_PER_FARMER];
     s += "Soil fertility: %d%%\n" % roundi(fert / n * 100.0);
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
-    s += "Sows %s.\n" % Defs.sow_text(crop_id);
     var why:String = Weather.sow_block_reason(c);
     s += "Sowing now: %s\n" % ("yes" if why == "" else "no, " + why);
+    return s;
+
+func help_text() -> String:
+    var s:String = super.help_text();
+    var c:Dictionary = crop();
+    s += "\nSows %s." % Defs.sow_text(crop_id);
     if c.has("harvests"):
-        s += "Gives up to %d cuttings from one sowing.\n" % c["harvests"];
+        s += "\nGives up to %d cuttings from one sowing." % c["harvests"];
+    s += "\nHarvesting early: growing plots are taken for part of the crop, and nothing is sown meanwhile.";
+    s += "\nFrozen plots can be harvested for part of the crop for a day, then they are lost.";
     return s;
 
 func _rebuild_crops() -> void:

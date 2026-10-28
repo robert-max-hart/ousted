@@ -9,7 +9,7 @@ class_name Terrain extends Node3D;
 signal changed(rect:Rect2i);
 signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting or a road, field or site laid or removed
 
-enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE };
+enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE };      # (new ids go last: saves keep the numbers)
 
 const SIZE              :int = 128;
 const CHUNK             :int = 32;
@@ -284,6 +284,8 @@ func _cell_color(c:Vector2i) -> Color:
                 col = COLOR_ROCK.lerp(COLOR_SNOW, 0.5) if _season == GameClock.Season.WINTER else COLOR_ROCK;
             else:
                 col = GRASS_BY_SEASON[_season].lerp(COLOR_ROCK, clampf((slope - 0.8) / 0.6, 0.0, 1.0));
+            if overlay[index(c)] == Overlay.ROAD_SITE:
+                col = col.lerp(COLOR_ROAD, 0.22);       # a staked road: the grass only faintly worn, nothing like a finished road
     # soft, low-frequency patches plus a faint per-cell speckle so the grid doesn't look flat
     var v:float = float(absi(hash(c)) % 1000) / 1000.0 * 0.012 - 0.006;
     if _tint_noise != null:
@@ -346,7 +348,7 @@ func _build_chunk(ci:int) -> void:
                     var row:float = 1.0 if overlay[index(cell)] == Overlay.SITE else (1.1 if j < 2 else 0.86);
                     var shade:float = row * (0.94 + crumb * 0.12);
                     colors[v + j] = Color(own.r * shade, own.g * shade, own.b * shade);
-            elif overlay[index(cell)] != Overlay.NONE:
+            elif overlay[index(cell)] != Overlay.NONE and overlay[index(cell)] != Overlay.ROAD_SITE:
                 for j in 4:
                     colors[v + j] = own;
             else:

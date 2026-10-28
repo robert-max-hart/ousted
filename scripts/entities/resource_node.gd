@@ -81,6 +81,13 @@ func is_auto() -> bool:
 func is_forageable() -> bool:
     return def.get("forage", false);
 
+func help_text() -> String:
+    if is_auto():
+        return "Laborers pick it when food runs short; mark it with the Forage tool to have it picked now.";
+    if is_forageable():
+        return "Use the Forage tool to mark it, or a Forager's Hut picks it.";
+    return "Use the Harvest tool to mark it.";
+
 func info_text() -> String:
     var s:String = "%s: %d / %d\n" % [Defs.item_name(item), amount, max_amount];
     if not is_mature():
@@ -89,12 +96,6 @@ func info_text() -> String:
         s += "Fruits in: %s\n" % ", ".join((def["fruit_seasons"] as Array).map(func(i:int) -> String: return GameClock.SEASON_NAMES[i]));
     if designated:
         s += "Marked for foraging\n" if is_forageable() else "Marked for harvest\n";
-    elif is_auto():
-        s += "Laborers pick it when food runs short; mark it with the Forage tool to have it picked now\n";
-    elif is_forageable():
-        s += "Use the Forage tool to mark it, or a Forager's Hut picks it\n";
-    else:
-        s += "Use the Harvest tool to mark it\n";
     if reserved_by != null:
         s += "Being worked by %s\n" % reserved_by.get("first_name");
     return s;

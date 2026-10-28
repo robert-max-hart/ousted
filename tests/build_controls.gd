@@ -111,7 +111,7 @@ func _ready() -> void:
     world.tools.set_mode(PlayerTools.Mode.BUILD, &"field");
     world.tools._hover_ok = true;
     world.tools._hover_cell = Vector2i(20, 20);
-    _expect("2x2 by default: '%s'" % world.tools.size_text(), world.tools.size_text() == "2x2 tiles, 4 total");
+    _expect("the cursor is one tile: '%s'" % world.tools.size_text(), world.tools.size_text() == "1x1 tile");
     world.tools._dragging = true;
     world.tools._drag_start = Vector2i(20, 20);
     world.tools._hover_cell = Vector2i(25, 27);
@@ -120,7 +120,7 @@ func _ready() -> void:
     world.tools._drag_start = Vector2i(20, 20);
     world.tools._hover_cell = Vector2i(20, 24);
     world.tools._dragging = true;
-    _expect("a thin drag grows to 2 wide: '%s'" % world.tools.size_text(), world.tools.size_text() == "2x5 tiles, 10 total");
+    _expect("a thin drag stays thin and is below the minimum: '%s'" % world.tools.size_text(), world.tools.size_text() == "1x5 tiles, 5 total" and not world.tools._field_rect_valid(world.tools._field_rect()));
     world.tools._dragging = false;
     world.tools.set_mode(PlayerTools.Mode.BUILD, &"stockpile");
     _expect("a stockpile can still be 1x1", world.tools.build_size == Vector2i.ONE);

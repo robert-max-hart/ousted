@@ -29,6 +29,9 @@ var _toolbar    :PanelContainer;
 var _info       :PanelContainer;
 var _info_title :Label;
 var _info_body  :Label;
+var _help_btn   :Button;               # "?" beside the title: shows or hides the explanations (help_text)
+var _help_label :Label;
+var _help_open  :bool = false;
 var _info_btn   :Button;
 var _move_btn   :Button;
 var _jobs_panel :PanelContainer;
@@ -49,6 +52,8 @@ var _menu       :Control;            # the Esc menu: a dimmed full-screen layer 
 var _menu_resume_speed:int = 1;
 
 var _filter_box :VBoxContainer;
+var _filter_head:Button;              # "Accepts: ..." summary; opens and closes the item toggles
+var _filter_flow:HFlowContainer;
 var _controls_box:VBoxContainer;
 var _info_scroll:ScrollContainer;
 var _info_col:VBoxContainer;
@@ -56,7 +61,7 @@ var _upgrade_box:VBoxContainer;
 var _upgrade_sig:String = "";             # what the upgrade buttons were last built for
 var _controls_sig:String = "";
 var _controls_for:Variant = null;       # the building the control widgets were built for
-var _filter_checks:Dictionary = {};     # item -> CheckBox
+var _filter_checks:Dictionary = {};     # item -> toggle Button
 var _refresh    :float = 0.0;
 
 const FONT_SIZE:int = 13;         # the whole HUD's text size (Godot's default is 16)
@@ -200,6 +205,11 @@ func _refresh_info() -> void:
     else:
         _info_title.text = obj.display_name();
     _info_body.text = obj.info_text();
+    var help:String = obj.help_text() if obj.has_method("help_text") else "";
+    _help_btn.visible = help != "";
+    _help_btn.set_pressed_no_signal(_help_open);
+    _help_label.text = help;
+    _help_label.visible = _help_open and help != "";
     _info_btn.visible = obj is Field;
     _refresh_relocate(obj);
     _refresh_site(obj);
@@ -387,17 +397,31 @@ func _refresh_filters(obj:Variant) -> void:
         return;
     var b:Building = obj;
     for item in _filter_checks:
-        var check:CheckBox = _filter_checks[item];
+        var check:Button = _filter_checks[item];
         var can:bool = Defs.is_food(item) or not b.def.get("food_only", false);
         if b.def.has("accepts_items"):
             can = (b.def["accepts_items"] as Array).has(item);
         check.visible = can;
         check.set_pressed_no_signal(not b.forbidden.has(item));
+    _update_filter_head(b);
+
+# One line: everything is accepted, or what is switched off.
+func _update_filter_head(b:Building) -> void:
+    var off:Array[String] = [];
+    var total:int = 0;
+    for item in _filter_checks:
+        if (_filter_checks[item] as Button).visible:
+            total += 1;
+            if b.forbidden.has(item):
+                off.append(Defs.item_name(item));
+    var summary:String = "everything" if off.is_empty() else ("nothing" if off.size() == total else "all but " + (", ".join(off) if off.size() <= 2 else "%d items" % off.size()));
+    _filter_head.text = "Accepts: %s %s" % [summary, "-" if _filter_flow.visible else "+"];
 
 func _on_filter_toggled(on:bool, item:StringName) -> void:
     var obj:Variant = World.instance.tools.selected;
     if obj is Building and World.alive(obj):
         (obj as Building).set_forbidden(item, not on);
+        _update_filter_head(obj);
 
 # --------------------------------
 # Callbacks
@@ -708,9 +732,28 @@ func _build_info_panel(root:Control) -> void:
     col.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
     _info_scroll.add_child(col);
     _info_col = col;
+    var title_row:HBoxContainer = HBoxContainer.new();
+    col.add_child(title_row);
     _info_title = Label.new();
     _info_title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE);
-    col.add_child(_info_title);
+    _info_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    title_row.add_child(_info_title);
+    _help_btn = Button.new();
+    _help_btn.text = "?";
+    _help_btn.toggle_mode = true;
+    _help_btn.focus_mode = Control.FOCUS_NONE;
+    _help_btn.tooltip_text = "Show or hide what this does";
+    _help_btn.toggled.connect(func(on:bool) -> void:
+        _help_open = on;
+        _help_label.visible = on and _help_label.text != "";
+        PanelMover.refit_height(_info));
+    title_row.add_child(_help_btn);
+    _help_label = Label.new();
+    _help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _help_label.custom_minimum_size.x = 300;
+    _help_label.add_theme_color_override("font_color", Color(0.78, 0.8, 0.72));
+    _help_label.visible = false;
+    col.add_child(_help_label);
     _info_body = Label.new();
     _info_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
     _info_body.custom_minimum_size.x = 300;
@@ -770,15 +813,30 @@ func _build_info_panel(root:Control) -> void:
     _filter_box = VBoxContainer.new();
     _filter_box.visible = false;
     col.add_child(_filter_box);
-    var ftitle:Label = Label.new();
-    ftitle.text = "Accepts:";
-    _filter_box.add_child(ftitle);
+    _filter_head = Button.new();
+    _filter_head.flat = true;
+    _filter_head.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+    _filter_head.focus_mode = Control.FOCUS_NONE;
+    _filter_head.tooltip_text = "Click to choose which goods this store takes";
+    _filter_box.add_child(_filter_head);
+    _filter_flow = HFlowContainer.new();
+    _filter_flow.visible = false;
+    _filter_flow.add_theme_constant_override("h_separation", 3);
+    _filter_flow.add_theme_constant_override("v_separation", 3);
+    _filter_box.add_child(_filter_flow);
+    _filter_head.pressed.connect(func() -> void:
+        _filter_flow.visible = not _filter_flow.visible;
+        if World.instance.tools.selected is Building:
+            _update_filter_head(World.instance.tools.selected);
+        PanelMover.refit_height(_info));
     for item in Defs.ITEMS:
-        var check:CheckBox = CheckBox.new();
+        var check:Button = Button.new();       # a lit button is an item the store accepts
         check.text = Defs.item_name(item);
+        check.toggle_mode = true;
         check.focus_mode = Control.FOCUS_NONE;
+        check.add_theme_font_size_override("font_size", 11);
         check.toggled.connect(_on_filter_toggled.bind(item));
-        _filter_box.add_child(check);
+        _filter_flow.add_child(check);
         _filter_checks[item] = check;
 
 func _build_log(root:Control) -> void:

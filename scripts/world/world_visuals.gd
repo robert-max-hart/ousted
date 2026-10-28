@@ -139,7 +139,7 @@ func _update_lighting() -> void:
     var night_t:float = fposmod(h - 21.0, 24.0) / 8.0;
     var arc:float = sin((day_t if is_day else night_t) * PI);
     var elevation:float = lerpf(6.0, 62.0 if is_day else 45.0, arc);
-    var azimuth:float = lerpf(110.0, -110.0, day_t) if is_day else lerpf(-110.0, 110.0, night_t);
+    var azimuth:float = lerpf(110.0, -110.0, day_t) if is_day else lerpf(110.0, -110.0, night_t);
     _sun.rotation = Vector3(-deg_to_rad(elevation), deg_to_rad(azimuth), 0.0);
     _sun.light_color = (a[1] as Color).lerp(b[1], t);
     _sun.light_energy = lerpf(a[2], b[2], t) * gloom;

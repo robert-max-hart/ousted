@@ -31,7 +31,7 @@ func _ready() -> void:
     var c:Pawn = world.pawns[2];
     _expect("everyone starts homeless", world.pawns.all(func(p:Pawn) -> bool: return p.home == null));
     _expect("a homeless citizen has nowhere to sleep", world.shelter_for(a) == null);
-    _expect("the HUD count sees them", world.families.homeless_count() == 8);
+    _expect("the HUD count sees them", world.families.homeless_count() == World.START_PAWNS);
     # too soon
     world.families._build_shacks();
     _expect("no shack before %d hours homeless" % Defs.SHACK_AFTER_HOURS, world.buildings.all(func(x:Building) -> bool: return not x.def.get("shack", false)));

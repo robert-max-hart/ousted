@@ -33,6 +33,9 @@ func _init(b:Building, kind:StringName, gap:int = 1) -> void:
             rail_size = Vector3(1.0, 0.42, 0.16);
             tex = &"stone";
             tint = Color(0.62, 0.6, 0.57);
+        &"field":
+            post_size = Vector3(0.08, 0.5, 0.08);
+            rail_size = Vector3(1.0, 0.05, 0.04);
         &"rope":
             post_size = Vector3(0.1, 0.6, 0.1);
             rail_size = Vector3(1.0, 0.03, 0.03);
@@ -82,7 +85,7 @@ func rebuild() -> void:
     for e in edges:
         points[e[0]] = true;
         points[e[1]] = true;
-    var rails_per:int = 2 if _kind == &"wood" else 1;
+    var rails_per:int = 2 if _kind == &"wood" or _kind == &"field" else 1;
     var pm:MultiMesh = _posts.multimesh;
     pm.instance_count = points.size();
     var i:int = 0;
@@ -101,7 +104,7 @@ func rebuild() -> void:
         var yaxis:Vector3 = zaxis.cross(xaxis);
         var basis:Basis = Basis(xaxis * along.length(), yaxis, zaxis);
         var mid:Vector3 = (a + b) * 0.5;
-        var heights:Array = [0.32, 0.62] if _kind == &"wood" else [rail_h * 0.5 - 0.05 if _kind == &"stone" else post_h * 0.85];
+        var heights:Array = [0.32, 0.62] if _kind == &"wood" else [0.18, 0.4] if _kind == &"field" else [rail_h * 0.5 - 0.05 if _kind == &"stone" else post_h * 0.85];
         for hgt in heights:
             rm.set_instance_transform(i, Transform3D(basis, mid + Vector3(0, hgt, 0)));
             i += 1;

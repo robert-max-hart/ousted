@@ -56,7 +56,7 @@ static func _roof_mat(b:Building) -> StandardMaterial3D:
 # Granary: a tall silo with a cone roof, a smaller one beside it, iron bands and a door.
 
 static func silo(b:Building) -> void:
-    var s:Vector2 = Vector2(b.size);
+    var s:Vector2 = Vector2(b.vsize);
     var r:float = minf(s.x, s.y) * 0.27;
     var tall:float = 3.1;
     var at:Vector3 = Vector3(-s.x * 0.2, 0.0, -s.y * 0.12);
@@ -88,7 +88,7 @@ static func silo(b:Building) -> void:
 # Town Hall: a long stone hall with a gabled roof, columns at the door and a clock tower.
 
 static func hall(b:Building) -> void:
-    var s:Vector2 = Vector2(b.size);
+    var s:Vector2 = Vector2(b.vsize);
     var body:Vector2 = s - Vector2(0.5, 0.5);
     var bh:float = b.def.get("height", 3.0) * 0.62;
     var box:BoxMesh = BoxMesh.new();
@@ -114,7 +114,7 @@ static func hall(b:Building) -> void:
 # Mine: a headframe with a winding wheel, a tunnel mouth in a rocky mound, rails with a cart and ore heaps.
 
 static func mine_extras(b:Building) -> void:
-    var s:Vector2 = Vector2(b.size);
+    var s:Vector2 = Vector2(b.vsize);
     var timber:StandardMaterial3D = _colour(TIMBER);
     var hx:float = s.x * 0.27;
     var hz:float = -s.y * 0.12;
@@ -146,7 +146,7 @@ static func mine_extras(b:Building) -> void:
 # Extras on house-shaped buildings, chosen by the def's "decor" key.
 
 static func decorate(b:Building, kind:String) -> void:
-    var s:Vector2 = Vector2(b.size);
+    var s:Vector2 = Vector2(b.vsize);
     var body:Vector2 = s - Vector2(0.5, 0.5);
     var h:float = b.def.get("height", 2.0);
     var front:float = body.y * 0.5;
@@ -159,8 +159,8 @@ static func decorate(b:Building, kind:String) -> void:
             var glow:StandardMaterial3D = _colour(Color(1.0, 0.5, 0.15));
             glow.emission_enabled = true;
             glow.emission = Color(1.0, 0.45, 0.1);
-            glow.emission_energy_multiplier = 1.4;
-            _box(b, Vector3(0.7, 0.45, 0.08), glow, Vector3(-body.x * 0.25, 0.55, front + 0.03));
+            glow.emission_energy_multiplier = 0.9;
+            _box(b, Vector3(0.6, 0.4, 0.04), glow, Vector3(-body.x * 0.25, 0.4, front + 0.09));
             _box(b, Vector3(0.9, 0.7, 0.14), _colour(DARK), Vector3(-body.x * 0.25, 0.4, front));
             _box(b, Vector3(0.45, 0.26, 0.24), _colour(IRON), Vector3(body.x * 0.3, 0.38, front + 0.5));
             _box(b, Vector3(0.22, 0.25, 0.2), _colour(IRON), Vector3(body.x * 0.3, 0.13, front + 0.5));

@@ -37,10 +37,10 @@ func _ready() -> void:
     GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 12.0;
     _expect("late in the first week of spring every warm-season crop can, pumpkins included", can.call(&"wheat") and can.call(&"potato") and can.call(&"pumpkin"));
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 4) * GameClock.HOURS_PER_DAY + 12.0;      # mid summer
-    _expect("mid summer: radishes can; wheat, barley and pumpkins are too late (frost would come first)", can.call(&"radish") and not can.call(&"wheat") and not can.call(&"barley") and not can.call(&"pumpkin"));
-    _expect("and the field says why", Weather.sow_block_reason(Defs.CROPS[&"wheat"]).begins_with("too late"));
+    _expect("mid summer: everything warm enough can be sown, ripening or not", can.call(&"radish") and can.call(&"wheat") and can.call(&"barley") and can.call(&"pumpkin"));
+    _expect("and no block reason is given", Weather.sow_block_reason(Defs.CROPS[&"wheat"]) == "");
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 2 + 1) * GameClock.HOURS_PER_DAY;      # early autumn
-    _expect("early autumn: wheat is too late", not can.call(&"wheat"));
+    _expect("early autumn: wheat can still be sown", can.call(&"wheat"));
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 3 + 4) * GameClock.HOURS_PER_DAY;      # winter
     var any:bool = false;
     for id in Defs.CROPS:

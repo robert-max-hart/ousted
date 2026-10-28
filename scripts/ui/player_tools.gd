@@ -32,6 +32,7 @@ const FIELD_MAX_SIDE:int = 16;
 var mode        :int = Mode.SELECT;
 var build_id    :StringName = &"";
 var build_size  :Vector2i = Vector2i.ONE;
+var build_facing:int = 0;                # quarter turns (R); the footprint swaps on odd turns, so the look turns with it
 var selected    :Variant = null;
 var expanding   :Building = null;      # the field, stockpile or graveyard being grown (Mode.EXPAND)
 var relocating  :Building = null;     # while placing a moved building: the one being moved
@@ -112,13 +113,14 @@ func set_mode(m:int, id:StringName = &"") -> void:
     build_id = id;
     relocating = null;
     expanding = null;
+    build_facing = 0;
     if m == Mode.BUILD:
         build_size = Defs.BUILDINGS[id]["size"];
         if _is_field_mode():
-            build_size = Vector2i(_min_side(), _min_side());       # a click places the smallest size; drag to make it bigger
+            build_size = Vector2i.ONE;       # the cursor is one tile: press and drag to size it (anything under the minimum is refused)
         hint = "%s (%s). %s" % [Defs.BUILDINGS[id]["name"], Defs.cost_string(Defs.BUILDINGS[id]["cost"]), MODE_HINTS[m]];
         if _is_field_mode():
-            hint = "%s. Click for the smallest size (%dx%d), or press and drag to size it (up to %d cells a side)." % [
+            hint = "%s. Press on one corner and drag to size it (at least %dx%d, up to %d cells a side)." % [
                 Defs.BUILDINGS[id]["name"], _min_side(), _min_side(), FIELD_MAX_SIDE];
     else:
         hint = MODE_HINTS[m];
@@ -142,6 +144,7 @@ func start_relocate(b:Building) -> void:
     set_mode(Mode.BUILD, b.def_id);
     relocating = b;
     build_size = b.size;
+    build_facing = b.facing;
     hint = "Moving the %s (costs %s). Click the new spot. R rotates. Right-click to cancel." % [b.display_name(), Defs.cost_string(_relocation_cost(b))];
 
 func _relocation_cost(b:Building) -> Dictionary:
@@ -178,12 +181,15 @@ func _unhandled_input(event:InputEvent) -> void:
                 GameClock.set_speed(2);
             KEY_3:
                 GameClock.set_speed(3);
+            KEY_4:
+                GameClock.set_speed(4);
             KEY_F5:
                 SaveGame.save(World.instance);
             KEY_F9:
                 SaveGame.load_slot(World.instance);
             KEY_R:
                 build_size = Vector2i(build_size.y, build_size.x);
+                build_facing = (build_facing + 1) % 4;
             KEY_ESCAPE:
                 _cancel();
         return;
@@ -222,11 +228,11 @@ func _on_press() -> void:
             error = World.instance.can_place(build_id, origin, build_size, relocating != null);
             if error == "" and relocating != null:
                 var moved:Building = relocating;
-                World.instance.relocate(moved, origin, build_size);
+                World.instance.relocate(moved, origin, build_size, build_facing);
                 set_mode(Mode.SELECT);
                 select(moved);
             elif error == "":
-                World.instance.place_building(build_id, origin, build_size);
+                World.instance.place_building(build_id, origin, build_size, false, false, build_facing);
         Mode.EXPAND:
             if World.alive(expanding):
                 var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);
@@ -250,7 +256,7 @@ func _on_release() -> void:
     var w:World = World.instance;
     match mode:
         Mode.BUILD:
-            # a plain click (no drag) keeps the default footprint
+            # a plain click (no drag) is one tile, under the minimum
             var fr:Rect2i = _field_rect();
             error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "%s must be at least %dx%d." % [Defs.BUILDINGS[build_id]["name"], _min_side(), _min_side()];
             if error == "":
@@ -332,21 +338,19 @@ func _build_origin() -> Vector2i:
 func _is_field_mode() -> bool:
     return mode == Mode.BUILD and Defs.BUILDINGS[build_id].get("drag_size", false);
 
-# The field footprint for the current drag, or the default footprint for a click without a drag.
+# The footprint for the current drag (a single tile for a click without a drag, which is below the minimum).
 func _field_rect() -> Rect2i:
-    if _drag_start == _hover_cell:
-        return Rect2i(_build_origin(), build_size);
     # the corner under the start stays put; the far edge follows the cursor up to the size limit
     var d:Vector2i = _hover_cell - _drag_start;
     var far:Vector2i = _drag_start + Vector2i(clampi(d.x, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1), clampi(d.y, -(FIELD_MAX_SIDE - 1), FIELD_MAX_SIDE - 1));
     var lo:Vector2i = Vector2i(mini(_drag_start.x, far.x), mini(_drag_start.y, far.y));
     var hi:Vector2i = Vector2i(maxi(_drag_start.x, far.x), maxi(_drag_start.y, far.y));
     var size:Vector2i = hi - lo + Vector2i.ONE;
-    return Rect2i(lo, Vector2i(maxi(size.x, _min_side()), maxi(size.y, _min_side())));       # a thin drag grows to the minimum
+    return Rect2i(lo, size);
 
-# The smallest side of a variable-sized building (min_side in its def, default 1).
+# The smallest side of a variable-sized building (min_side in its def, default 2 for the drag-sized ones).
 func _min_side() -> int:
-    return Defs.BUILDINGS[build_id].get("min_side", 1);
+    return Defs.BUILDINGS[build_id].get("min_side", 2 if Defs.BUILDINGS[build_id].get("drag_size", false) else 1);
 
 func _field_rect_valid(r:Rect2i) -> bool:
     return r.size.x >= _min_side() and r.size.y >= _min_side();
@@ -416,10 +420,13 @@ func _update_ghosts() -> void:
                 _show_box(0, fr, 0.3, _mat_ok if fok else _mat_bad);
                 return;
             var origin:Vector2i = _build_origin();
+            if _is_field_mode() and relocating == null:
+                _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad);       # one tile is below the minimum until dragged out
+                return;
             var ok:bool = w.can_place(build_id, origin, build_size, relocating != null) == "";
             var short:bool = ok and not _can_afford();
             _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad if not ok else _mat_area if short else _mat_ok);
-            _model_ghost.show_at(w, build_id, origin, build_size, _mat_m_bad if not ok else _mat_m_short if short else _mat_m_ok);
+            _model_ghost.show_at(w, build_id, origin, build_size, _mat_m_bad if not ok else _mat_m_short if short else _mat_m_ok, build_facing);
         Mode.EXPAND:
             if World.alive(expanding):
                 var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);

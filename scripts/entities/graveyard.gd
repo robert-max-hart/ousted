@@ -171,12 +171,12 @@ func info_text() -> String:
     if oldest < INF:
         var days:float = (oldest + decay_hours() - GameClock.total_hours) / GameClock.HOURS_PER_DAY;
         s += "The oldest grave is freed in %d days.\n" % maxi(0, ceili(days));
-    s += "Graves are freed after %d years.\n" % roundi(Defs.GRAVE_DECAY_YEARS);
     if has_upgrade(&"crematorium"):
         s += "Coal for cremation: %d / %d\n" % [input_amount(&"coal"), def["inputs"][&"coal"]];
-    if used_slots() > 0:
-        s += "Can't be demolished while graves are in use.\n";
     return s;
+
+func help_text() -> String:
+    return "%s\nGraves are freed after %d years.\nCan't be demolished while graves are in use." % [super.help_text(), roundi(Defs.GRAVE_DECAY_YEARS)];
 
 # Headstone meshes, each standing on y = 0 (the ground).
 static func _shapes() -> Array[ArrayMesh]:

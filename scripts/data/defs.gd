@@ -51,6 +51,7 @@ const ITEMS:Dictionary = {
 # needs_tool: item -> minimum tool bonus to dig it at full speed; weaker or no tools dig it at HARD_ORE_UNTOOLED_SPEED
 # mine_hours: labor-hours to dig one unit of each item (a surface rock or deposit is 2.5x quicker)
 # radius:   work radius in cells (shown when placing and selecting)
+# indoor_work: the workers of this building go inside (and out of sight) while they work at it; others work beside it
 # worker_slots, profession: how many citizens of that profession work here
 # decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut, wood, shack); roof_pitch: roof height over wall height (default 0.55)
 # wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
@@ -135,6 +136,7 @@ const BUILDINGS:Dictionary = {
         },
         "controls": [
             {"id": "chop", "type": "choice", "label": "Chop trees", "options": ["Off", "Mature only", "All"], "default": 1},
+            {"id": "priority", "type": "choice", "label": "Work first", "options": ["Firewood", "Chopping"], "default": 0},
             {"id": "plant", "type": "toggle", "label": "Plant trees", "default": true},
             {"id": "convert", "type": "toggle", "label": "Make firewood", "default": true},
             {"id": "cap_firewood", "type": "cap", "label": "Firewood cap", "item": &"firewood", "default": 100, "step": 20},
@@ -185,7 +187,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Digs iron, coal and stone without running out, but 2.5 times slower than gathering at the surface, and coal takes twice as long as iron (miners without an iron or steel tool dig it at a quarter of the speed). Iron comes first, then coal, then stone, each until its cap is reached. Coal needs the Deep Shafts upgrade. No storage. Miners carry the ore to a storage building, and work the surface if there is no mine to work at.",
     },
     &"blacksmith": {
-        "wall": &"stone", "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
+        "indoor_work": true, "wall": &"stone", "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
         "shape": "house", "decor": "forge", "height": 1.9, "color": Color(0.38, 0.36, 0.36), "roof": Color(0.25, 0.22, 0.22),
         "storage": true, "capacity": 60, "accepts_items": [&"tool_wood", &"tool_iron", &"tool_steel"],
         "worker_slots": 2, "profession": "BLACKSMITH",
@@ -204,7 +206,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Makes tools that speed up work: steel first, then iron, then wooden, whichever it has the materials for. Tiers can be switched off. Stores finished tools; citizens pick them up and equip them.",
     },
     &"school": {
-        "wall": &"plaster", "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
+        "indoor_work": true, "wall": &"plaster", "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
         "shape": "house", "decor": "school", "height": 2.2, "color": Color(0.72, 0.64, 0.46), "roof": Color(0.34, 0.3, 0.42),
         "worker_slots": 1, "profession": "TEACHER", "school_capacity": 12,
         "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",

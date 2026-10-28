@@ -17,7 +17,7 @@ func _ready() -> void:
     var th:Building = world.town_hall;
     var shacks:Callable = func() -> int:
         return world.buildings.filter(func(b:Building) -> bool: return b.def.get("shack", false)).size();
-    _expect("eight homeless", world.families.homeless_count() == 8);
+    _expect("all settlers homeless", world.families.homeless_count() == World.START_PAWNS);
     world.place_building(&"house", th.origin + Vector2i(-8, 0), Vector2i(3, 3));    # sites: 6 beds each
     world.place_building(&"house", th.origin + Vector2i(-12, 0), Vector2i(3, 3));
     world.families._build_shacks();

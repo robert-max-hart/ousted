@@ -21,9 +21,9 @@ const BUSH_LOBES:Array = [
     [Vector3(0.05, 0.2, -0.33), 0.27, 0.88], [Vector3(-0.1, 0.22, 0.34), 0.26, 0.92], [Vector3(0.12, 0.5, 0.0), 0.22, 1.1],
 ];
 const HAZEL_LOBES:Array = [
-    [Vector3(0, 0.75, 0), 0.4, 1.0], [Vector3(0.42, 0.55, 0.12), 0.34, 0.9], [Vector3(-0.4, 0.6, -0.1), 0.35, 0.94],
-    [Vector3(0.05, 0.5, -0.45), 0.32, 0.88], [Vector3(-0.08, 0.52, 0.44), 0.33, 0.92], [Vector3(0.1, 1.05, 0.05), 0.28, 1.08],
-    [Vector3(0.3, 0.95, -0.25), 0.24, 1.04],
+    [Vector3(0, 1.15, 0), 0.34, 1.0], [Vector3(0.34, 0.9, 0.1), 0.28, 0.9], [Vector3(-0.34, 0.95, -0.1), 0.29, 0.94],
+    [Vector3(0.05, 0.85, -0.36), 0.27, 0.88], [Vector3(-0.08, 0.88, 0.36), 0.27, 0.92], [Vector3(0.08, 1.6, 0.05), 0.26, 1.1],
+    [Vector3(0.25, 1.45, -0.2), 0.22, 1.05], [Vector3(-0.2, 1.4, 0.15), 0.22, 1.02],
 ];
 
 const BUSH_BY_SEASON:Array[Color] = [
@@ -176,16 +176,16 @@ func _ready() -> void:
         stump.rings = 1;
         add_part(picked, stump, Transform3D(Basis(), at + Vector3(0, 0.02, 0)), stem_mat, Color(0.8, 0.75, 0.65));
     var hazel:ArrayMesh = ArrayMesh.new();
-    var hazel_mat:StandardMaterial3D = _make_material(Color(0.5, 0.52, 0.2));
-    for k in 3:                                  # several stems rising from one stool
+    var hazel_mat:StandardMaterial3D = _make_material(Color(0.6, 0.58, 0.2));
+    for k in 5:                                  # several tall stems rising from one stool
         var stem:CylinderMesh = CylinderMesh.new();
         stem.top_radius = 0.025;
         stem.bottom_radius = 0.05;
-        stem.height = 0.8;
+        stem.height = 1.3;
         stem.radial_segments = 4;
         stem.rings = 1;
         var tilt:Basis = Basis(Vector3.UP, k * 2.1) * Basis(Vector3.RIGHT, 0.28);
-        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.4, 0)), trunk_mat);
+        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.65, 0)), trunk_mat);
     add_lobes(hazel, HAZEL_LOBES, hazel_mat);
 
     var berry_shape:SphereMesh = SphereMesh.new();

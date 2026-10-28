@@ -71,6 +71,7 @@ var _idle_mark      :Label3D;                 # a small "idle" tag over a citize
 var _anim_t         :float = 0.0;
 var _work_now       :bool = false;            # what the last frame did, for the animation
 var _move_now       :bool = false;
+var _inside_work    :Building = null;         # a workplace this citizen is working inside of (out of sight), see Defs "indoor_work"
 var _carry_mesh     :MeshInstance3D;
 var _carry_mat      :StandardMaterial3D;
 
@@ -436,6 +437,30 @@ func end_task(success:bool) -> void:
     task = null;
     _path.clear();
     t.finish(self, success);
+    _leave_workplace();
+
+# Working at a building that is worked in (the smithy, the school): step inside while the work lasts.
+func _enter_workplace() -> void:
+    var b:Variant = task.workplace;
+    if _inside_work != null or indoors or not (b is Building) or not World.alive(b) or not (b as Building).def.get("indoor_work", false):
+        return;
+    var wp:Building = b;
+    if not wp.is_complete() or not wp.rect().grow(2).has_point(cell()):
+        return;
+    _inside_work = wp;
+    visible = false;
+    position = world.terrain.cell_center(wp.origin + wp.size / 2);
+
+func _leave_workplace() -> void:
+    if _inside_work == null:
+        return;
+    _inside_work = null;
+    if indoors:
+        return;
+    visible = true;
+    var c:Vector2i = world.nav.nearest_walkable(cell(), 8);
+    if c != NavGrid.NO_CELL:
+        position = world.terrain.cell_center(c);
 
 func _fail_task() -> void:
     if task.target != null:
@@ -452,6 +477,7 @@ func _run_task(move_dt:float, dh:float) -> void:
         Task.Step.MOVE:
             if not step.has("started"):
                 step["started"] = true;
+                _leave_workplace();
                 if not _plan_path(step):
                     _fail_task();
                     return;
@@ -459,6 +485,7 @@ func _run_task(move_dt:float, dh:float) -> void:
             if _follow_path(move_dt):
                 task.index += 1;
         Task.Step.WORK:
+            _enter_workplace();
             var working:bool = not NON_WORK_KINDS.has(task.kind);
             _work_now = working and is_laboring() and task.kind != &"teach";
             var speed:float = (1.0 + tool_bonus()) * work_efficiency() if working else 1.0;
@@ -588,7 +615,10 @@ func _animate(delta:float) -> void:
     _move_now = false;
     _prop.visible = work;
     _idle_mark.visible = is_idle();
-    if work:
+    if sleeping and not indoors:         # out in the open (homeless): lie down, with a slow breath
+        _rig.rotation.x = lerpf(_rig.rotation.x, -PI * 0.5, 0.15);
+        _rig.position.y = lerpf(_rig.position.y, 0.22 + 0.01 * sin(_anim_t * 2.0), 0.15);
+    elif work:
         var swing:float = sin(_anim_t * 7.0);
         _rig.rotation.x = 0.28 + 0.14 * swing;
         _rig.position.y = -0.04 * absf(swing);

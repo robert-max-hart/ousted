@@ -14,7 +14,9 @@ func woodcutter_task(p:Pawn) -> Task:
     for b in sites:
         if workers_at(b) >= b.def.get("worker_slots", 1):
             continue;
-        for job in [_chop_task, _forge_task, _stock_inputs_task, _plant_task]:
+        var order:Array = [_chop_task, _forge_task, _stock_inputs_task, _plant_task] if b.settings.get("priority", 0) == 1 \
+            else [_forge_task, _stock_inputs_task, _chop_task, _plant_task];       # firewood first: split and fetch logs before felling more
+        for job in order:
             var t:Task = (job as Callable).call(p, b);
             if t != null:
                 t.workplace = b;

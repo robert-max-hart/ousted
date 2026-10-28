@@ -25,8 +25,9 @@ func _ready() -> void:
     Engine.time_scale = 4.0;
     GameClock.set_speed(3);
     var th:Building = world.town_hall;
-    for i in 0 if OS.get_cmdline_user_args().has("bare") else (1 if OS.get_cmdline_user_args().has("tight") else 3):
-        world.place_building(&"house", th.origin + Vector2i(-8 - 4 * i, 0), Vector2i(3, 3), true);
+    var house_count:int = 12 if OS.get_cmdline_user_args().has("many") else 3;
+    for i in 0 if OS.get_cmdline_user_args().has("bare") else (1 if OS.get_cmdline_user_args().has("tight") else house_count):
+        world.place_building(&"house", th.origin + Vector2i(-8 - 4 * (i % 6), 5 * (i / 6) * -1 if i >= 6 else 0), Vector2i(3, 3), true);
     if OS.get_cmdline_user_args().has("yard"):
         world.place_building(&"graveyard", th.origin + Vector2i(6, 6), Vector2i(6, 4), true);
     world.place_building(&"school", th.origin + Vector2i(8, -8), Vector2i(4, 4), true);
@@ -48,6 +49,11 @@ func _process(_delta:float) -> void:
     if d % GameClock.DAYS_PER_SEASON == 0:
         _report(d);
     if d >= years * GameClock.DAYS_PER_YEAR:
+        var couples:int = 0;
+        for p in world.pawns:
+            if p.partner != null:
+                couples += 1;
+        print("END: %d citizens, %d paired, %d births" % [world.pawns.size(), couples, world.ledger.births_today]);
         get_tree().quit();
 
 func _report(d:int) -> void:

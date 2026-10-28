@@ -44,11 +44,11 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
     for rn in world.nodes:
         if rn.reserved_by != null or (rn.amount <= 0 and not rn.clearing) or not pred.call(rn) or p.has_failed(rn):
             continue;
-        if rn.amount <= 0:
-            pass;       # nothing to carry, so no storage is needed to clear it
+        if rn.amount <= 0 or rn.clearing:
+            pass;       # nothing to carry, or in the way and cleared whatever the stores can take (see below)
         elif not room.has(rn.item):
             room[rn.item] = Stock.has_room_for(rn.item);
-        if rn.amount > 0 and not room[rn.item]:
+        if rn.amount > 0 and not rn.clearing and not room[rn.item]:
             continue;
         var d:float = pc.distance_squared_to(Vector2(rn.cell) + Vector2(0.5, 0.5));
         if d < best_d:
@@ -59,6 +59,7 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
     var rn:ResourceNode = best;
     rn.reserved_by = p;
     var st:Dictionary = {"acc": 0.0, "picked": false};
+    var discard:bool = rn.clearing and rn.amount > 0 and not Stock.has_room_for(rn.item);      # no room for the yield: it is thrown away
     var verb:String = rn.def.get("verb", "Gathering");
     var t:Task = Task.new(&"harvest", "%s (%s)" % [verb, rn.display_name()]);
     t.job = _node_job(rn);
@@ -67,9 +68,13 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
     t.work(func(pw:Pawn, dh:float) -> bool:
         if rn.removed:
             return true;
-        if rn.amount <= 0:
+        if rn.amount <= 0 or discard:
             st["acc"] += dh;                 # an empty bush in the way: a moment's work to pull it up
-            return st["acc"] >= rn.work_per_unit;
+            if st["acc"] >= rn.work_per_unit:
+                rn.amount = 0;
+                world.node_changed(rn);
+                return true;
+            return false;
         st["acc"] += dh;
         while st["acc"] >= rn.work_per_unit and rn.amount > 0 and pw.carry_amount < Pawn.CARRY_CAP:
             st["acc"] -= rn.work_per_unit;

@@ -14,12 +14,13 @@ var _key        :String = "";
 var _mat        :Material;
 
 # Shows the ghost for def_id at origin with the given tint, rebuilding the model when the building or its size changes.
-func show_at(world:World, def_id:StringName, origin:Vector2i, size:Vector2i, tint:Material) -> void:
-    var key:String = "%s %s" % [def_id, size];
+func show_at(world:World, def_id:StringName, origin:Vector2i, size:Vector2i, tint:Material, facing:int = 0) -> void:
+    var key:String = "%s %s %d" % [def_id, size, facing];
     if key != _key or _model == null:
         _clear();
         _key = key;
         _model = Building.new();
+        _model.facing = facing;
         _model.setup(world, def_id, origin, size);
         _model.state = Building.State.COMPLETE;
         _model._update_visual();
