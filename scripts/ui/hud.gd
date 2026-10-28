@@ -39,6 +39,9 @@ var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the 
 var _ledger_btn :Button;
 var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
+var _menu       :Control;            # the Esc menu: a dimmed full-screen layer with a centred panel
+var _menu_resume_speed:int = 1;
+
 var _filter_box :VBoxContainer;
 var _controls_box:VBoxContainer;
 var _info_scroll:ScrollContainer;
@@ -52,6 +55,8 @@ var _refresh    :float = 0.0;
 
 const FONT_SIZE:int = 13;         # the whole HUD's text size (Godot's default is 16)
 const TITLE_FONT_SIZE:int = 17;
+const TITLE_SCENE:String = "res://scenes/title.tscn";
+const LOG_FONT_SIZE:int = 11;     # the event log is secondary text
 
 func _ready() -> void:
     var root:Control = Control.new();
@@ -64,8 +69,10 @@ func _ready() -> void:
     _build_top_bar(root);
     _build_toolbar(root);
     _build_jobs_panel(root);
+    _build_policies_panel(root);
     _build_info_panel(root);
     _build_log(root);
+    _build_menu(root);
     _size_label = Label.new();
     _size_label.visible = false;
     _size_label.mouse_filter = Control.MOUSE_FILTER_IGNORE;
@@ -105,6 +112,7 @@ func notify(msg:String) -> void:
     l.text = "[%s %s] %s" % [GameClock.date_string(), GameClock.time_string(), msg];
     l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
     l.custom_minimum_size.x = LOG_WIDTH - 24.0;
+    l.add_theme_font_size_override("font_size", LOG_FONT_SIZE);
     _log.add_child(l);
     while _log.get_child_count() > LOG_LINES:
         _log.get_child(0).free();
@@ -146,6 +154,8 @@ func _refresh_all() -> void:
         var short:String = " (want %d)" % want if prof != JobManager.Profession.LABORER and want > have else "";
         var slots:int = w.jobs.total_slots(prof) if prof != JobManager.Profession.LABORER else 0;
         var shown:String = "%d/%d" % [have, slots] if slots > 0 else str(have);       # workers over positions, where there are buildings
+        if prof == JobManager.Profession.LABORER:
+            shown = str(_working_laborers(w));
         _jobs_rows[prof].text = "%s: %s%s" % [JobManager.PROFESSION_NAMES[prof], shown, short];
         var open:int = w.jobs.open_slots(prof) if prof != JobManager.Profession.LABORER else 0;
         open = open if have == 0 else 0;       # only a profession with nobody at all is flagged
@@ -155,6 +165,14 @@ func _refresh_all() -> void:
     var tools:PlayerTools = w.tools;
     _hint.text = tools.hint + ("   " + tools.error if tools.error != "" else "");
     _refresh_info();
+
+# Laborers for the list: children count only while they are doing labor (a student is not one), babies never.
+func _working_laborers(w:World) -> int:
+    var n:int = 0;
+    for p in w.pawns:
+        if p.profession == JobManager.Profession.LABORER and (p.is_adult() or (not p.is_baby() and p.is_laboring())):
+            n += 1;
+    return n;
 
 func _refresh_info() -> void:
     var obj:Variant = World.instance.tools.selected;
@@ -422,7 +440,7 @@ func _on_info_button() -> void:
 # Construction
 
 func _build_top_bar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root, &"top");
+    var panel:PanelContainer = _panel(root);
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);
     var row:HBoxContainer = HBoxContainer.new();
     row.add_theme_constant_override("separation", 12);
@@ -439,7 +457,16 @@ func _build_top_bar(root:Control) -> void:
     _stock.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS;
     _stock.mouse_filter = Control.MOUSE_FILTER_PASS;
     row.add_child(_stock);
-    var labels:Array[String] = ["||", "1x", "2x", "5x"];
+    _policies_btn = Button.new();
+    _policies_btn.text = "Policies";
+    _policies_btn.toggle_mode = true;
+    _policies_btn.focus_mode = Control.FOCUS_NONE;
+    row.add_child(_policies_btn);
+    var do_save:Callable = func() -> void: SaveGame.save(World.instance);
+    var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
+    row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
+    row.add_child(_save_button("Load", "Load the quicksave (F9)", do_load));
+    var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
     for i in labels.size():
         var b:Button = Button.new();
         b.text = labels[i];
@@ -459,7 +486,7 @@ func _save_button(text:String, tip:String, action:Callable) -> Button:
     return b;
 
 func _build_toolbar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root, &"toolbar");
+    var panel:PanelContainer = _panel(root);
     _toolbar = panel;
     panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE);
     panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
@@ -494,7 +521,7 @@ func _build_toolbar(root:Control) -> void:
         _cat_btns.append(cb);
         for id in Defs.BUILD_CATEGORIES[ci][1]:
             var def:Dictionary = Defs.BUILDINGS[id];
-            var b:Button = _tool_button(_build_row, group, def["name"], "%s\nCost: %s" % [def["desc"], Defs.cost_string(def["cost"])]);
+            var b:Button = _tool_button(_build_row, group, def["name"], "Cost: %s" % Defs.cost_string(def["cost"]));
             b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
             _tool_btns[String(id)] = b;
     (_tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
@@ -562,27 +589,76 @@ func _build_jobs_panel(root:Control) -> void:
             b.pressed.connect(jobs.change_profession.bind(prof, d));
             row.add_child(b);
         row.add_child(flag);
-    _build_policies(body);
-    var save_row:HBoxContainer = HBoxContainer.new();
-    body.add_child(save_row);
-    var do_save:Callable = func() -> void: SaveGame.save(World.instance);
-    var do_load:Callable = func() -> void: SaveGame.load_slot(World.instance);
-    save_row.add_child(_save_button("Save", "Save the game to the quicksave slot (F5)", do_save));
-    save_row.add_child(_save_button("Load", "Load the quicksave (F9)", do_load));
 
-# A "Policies" button that opens the list of colony-wide rules as check boxes.
-func _build_policies(col:VBoxContainer) -> void:
+# The colony-wide rules as check boxes in a panel of their own, opened by the top bar's Policies button.
+func menu_open() -> bool:
+    return _menu.visible;
+
+# Opening the menu pauses the game; closing it resumes at the speed it had.
+func toggle_menu() -> void:
+    if _menu.visible:
+        _menu.visible = false;
+        GameClock.set_speed(_menu_resume_speed);
+    else:
+        _menu_resume_speed = GameClock.speed_index;
+        GameClock.set_speed(0);
+        _menu.visible = true;
+
+func _build_menu(root:Control) -> void:
+    _menu = Control.new();
+    _menu.set_anchors_preset(Control.PRESET_FULL_RECT);
+    _menu.mouse_filter = Control.MOUSE_FILTER_STOP;       # nothing under the menu gets clicked
+    _menu.visible = false;
+    root.add_child(_menu);
+    var dim:ColorRect = ColorRect.new();
+    dim.color = Color(0.0, 0.0, 0.0, 0.45);
+    dim.set_anchors_preset(Control.PRESET_FULL_RECT);
+    dim.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _menu.add_child(dim);
+    var center:CenterContainer = CenterContainer.new();
+    center.set_anchors_preset(Control.PRESET_FULL_RECT);
+    center.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _menu.add_child(center);
+    var panel:PanelContainer = _panel(center);
+    var col:VBoxContainer = VBoxContainer.new();
+    col.custom_minimum_size.x = 220;
+    col.add_theme_constant_override("separation", 6);
+    panel.add_child(col);
+    var title:Label = Label.new();
+    title.text = "Paused";
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
+    title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE);
+    col.add_child(title);
+    var seed_label:Label = Label.new();
+    seed_label.text = "Map seed: %d" % World.instance.world_seed;
+    seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
+    col.add_child(seed_label);
+    var items:Array = [
+        ["Resume", toggle_menu],
+        ["Save (F5)", func() -> void: SaveGame.save(World.instance)],
+        ["Load (F9)", func() -> void: toggle_menu(); SaveGame.load_slot(World.instance)],
+        ["Quit to title", func() -> void: get_tree().change_scene_to_file(TITLE_SCENE)],
+        ["Quit game", func() -> void: get_tree().quit()],
+    ];
+    for item in items:
+        var b:Button = Button.new();
+        b.text = item[0];
+        b.focus_mode = Control.FOCUS_NONE;
+        b.pressed.connect(item[1]);
+        col.add_child(b);
+
+func _build_policies_panel(root:Control) -> void:
+    var panel:PanelContainer = _panel(root, &"policies");
+    panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
+    panel.offset_left = 200;
+    panel.offset_top = 48;
+    panel.visible = false;
     var box:VBoxContainer = VBoxContainer.new();
-    box.visible = false;
-    var toggle:Button = Button.new();
-    toggle.text = "Policies";
-    toggle.tooltip_text = "Colony-wide rules";
-    toggle.toggle_mode = true;
-    toggle.focus_mode = Control.FOCUS_NONE;
-    toggle.toggled.connect(func(on:bool) -> void: box.visible = on);
-    _policies_btn = toggle;
-    col.add_child(toggle);
-    col.add_child(box);
+    panel.add_child(box);
+    var title:Label = Label.new();
+    title.text = "Policies";
+    box.add_child(title);
+    _policies_btn.toggled.connect(func(on:bool) -> void: panel.visible = on);
     var policies:Policies = World.instance.policies;
     for id in Defs.POLICIES:
         var check:CheckBox = CheckBox.new();

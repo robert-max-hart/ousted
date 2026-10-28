@@ -137,6 +137,12 @@ func select(obj:Variant) -> void:
 
 func _unhandled_input(event:InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
+        var hud:HUD = World.instance.hud;
+        if (event as InputEventKey).keycode == KEY_ESCAPE and (hud.menu_open() or (mode == Mode.SELECT and selected == null)):
+            hud.toggle_menu();       # nothing to cancel: Esc opens or closes the menu
+            return;
+        if hud.menu_open():
+            return;
         match (event as InputEventKey).keycode:
             KEY_SPACE:
                 GameClock.toggle_pause();

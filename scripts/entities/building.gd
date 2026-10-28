@@ -234,7 +234,10 @@ func cancel_input_incoming(item:StringName, n:int) -> void:
     input_incoming[item] = maxi(0, input_incoming.get(item, 0) - n);
 
 func recipe_enabled(item:StringName) -> bool:
-    var toggle:String = def["recipes"][item].get("toggle", "make_%s" % item);
+    var recipe:Dictionary = def["recipes"][item];
+    if recipe.get("off_at_zero", false) and production_cap(item) <= 0:
+        return false;
+    var toggle:String = recipe.get("toggle", "make_%s" % item);
     return settings.get(toggle, true) and production_allowed(item);
 
 func has_inputs(recipe:Dictionary) -> bool:

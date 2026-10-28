@@ -286,8 +286,6 @@ func _free_house_beds() -> int:
 # waits if the houses being built will hold everyone still homeless, else a new shack site next to them (the
 # usual builders put it up).
 func _build_shacks() -> void:
-    if not world.policies.is_on(&"build_shacks"):
-        return;
     for p in world.pawns:
         if p.home != null or not p.is_adult() or p.homeless_hours < Defs.SHACK_AFTER_HOURS:
             continue;

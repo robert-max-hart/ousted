@@ -45,7 +45,7 @@ const ITEMS:Dictionary = {
 # locked_until: item -> upgrade id that must be built before the building handles that item (mine: coal)
 # inputs:   production buildings keep their own input inventory: item -> how many to keep stocked.
 #           Inputs are not part of the colony stock. Citizens fetch them from storage.
-# recipes:  output item -> {inputs: item -> n per craft, hours: labor-hours per craft, yield: units made per craft
+# recipes:  (off_at_zero: a cap of 0 switches the recipe off) output item -> {inputs: item -> n per craft, hours: labor-hours per craft, yield: units made per craft
 #           (default 1), batch: crafts per task (default 1), toggle: id of the on/off control (default "make_<item>")}.
 #           Recipes are tried in the order written, so list the preferred one first.
 # needs_tool: item -> minimum tool bonus to dig it at full speed; weaker or no tools dig it at HARD_ORE_UNTOOLED_SPEED
@@ -132,7 +132,7 @@ const BUILDINGS:Dictionary = {
             &"firewood": {"inputs": {&"wood": 1}, "yield": 5, "hours": 0.5, "batch": 2, "toggle": "convert"},
         },
         "controls": [
-            {"id": "chop", "type": "choice", "label": "Chop trees", "options": ["Off", "Mature only", "All"], "default": 2},
+            {"id": "chop", "type": "choice", "label": "Chop trees", "options": ["Off", "Mature only", "All"], "default": 1},
             {"id": "plant", "type": "toggle", "label": "Plant trees", "default": true},
             {"id": "convert", "type": "toggle", "label": "Make firewood", "default": true},
             {"id": "cap_firewood", "type": "cap", "label": "Firewood cap", "item": &"firewood", "default": 100, "step": 20},
@@ -190,17 +190,14 @@ const BUILDINGS:Dictionary = {
         "produces": [&"tool_steel", &"tool_iron", &"tool_wood"],
         "inputs": {&"wood": 4, &"iron": 3, &"coal": 3},
         "recipes": {
-            &"tool_steel": {"inputs": {&"wood": 1, &"iron": 1, &"coal": 1}, "hours": 2.0},
-            &"tool_iron":  {"inputs": {&"wood": 1, &"iron": 1}, "hours": 1.0},
-            &"tool_wood":  {"inputs": {&"wood": 1}, "hours": 0.5},
+            &"tool_steel": {"off_at_zero": true, "inputs": {&"wood": 1, &"iron": 1, &"coal": 1}, "hours": 2.0},
+            &"tool_iron":  {"off_at_zero": true, "inputs": {&"wood": 1, &"iron": 1}, "hours": 1.0},
+            &"tool_wood":  {"off_at_zero": true, "inputs": {&"wood": 1}, "hours": 0.5},
         },
         "controls": [
-            {"id": "make_tool_steel", "type": "toggle", "label": "Make steel tools", "default": true},
-            {"id": "cap_tool_steel", "type": "cap", "label": "Steel tool cap", "item": &"tool_steel", "default": 5, "step": 5},
-            {"id": "make_tool_iron", "type": "toggle", "label": "Make iron tools", "default": true},
-            {"id": "cap_tool_iron", "type": "cap", "label": "Iron tool cap", "item": &"tool_iron", "default": 5, "step": 5},
-            {"id": "make_tool_wood", "type": "toggle", "label": "Make wooden tools", "default": true},
-            {"id": "cap_tool_wood", "type": "cap", "label": "Wooden tool cap", "item": &"tool_wood", "default": 5, "step": 5},
+            {"id": "cap_tool_steel", "type": "cap", "label": "Steel tool cap", "item": &"tool_steel", "default": 5, "step": 5, "zero_label": "Off"},
+            {"id": "cap_tool_iron", "type": "cap", "label": "Iron tool cap", "item": &"tool_iron", "default": 5, "step": 5, "zero_label": "Off"},
+            {"id": "cap_tool_wood", "type": "cap", "label": "Wooden tool cap", "item": &"tool_wood", "default": 5, "step": 5, "zero_label": "Off"},
         ],
         "desc": "Makes tools that speed up work: steel first, then iron, then wooden, whichever it has the materials for. Tiers can be switched off. Stores finished tools; citizens pick them up and equip them.",
     },
@@ -449,10 +446,6 @@ static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
 # Policies (decided 2026-10-23): colony-wide on/off rules the player sets in the HUD, saved with the game.
 # Each is id -> {name, desc, default}. Add a rule here, then read it with World.instance.policies.is_on(id).
 const POLICIES:Dictionary = {
-    &"build_shacks": {
-        "name": "Homeless build shacks", "default": true,
-        "desc": "A citizen with no home for a few hours gets a shack (3 wood, lost if demolished). Off, they sleep outside until a house has room.",
-    },
     &"clear_shacks": {
         "name": "Clear empty shacks", "default": false,
         "desc": "Pull down shacks that nobody lives in any more (nothing is refunded). Off, they stay until you demolish them: shacks are a nuisance for not having built enough houses.",

@@ -35,12 +35,7 @@ func _ready() -> void:
     # too soon
     world.families._build_shacks();
     _expect("no shack before %d hours homeless" % Defs.SHACK_AFTER_HOURS, world.buildings.all(func(x:Building) -> bool: return not x.def.get("shack", false)));
-    # the policy off: still none
-    world.policies.set_on(&"build_shacks", false);
     a.homeless_hours = 100.0;
-    world.families._build_shacks();
-    _expect("the policy off builds nothing", a.home == null);
-    world.policies.set_on(&"build_shacks", true);
     world.families._build_shacks();
     _expect("a homeless citizen gets a shack", a.home != null and a.home.def.get("shack", false) and a.home.residents == [a]);
     shack = a.home;
@@ -90,7 +85,6 @@ func _ready() -> void:
     for p in world.pawns:
         if p != baby:
             p.hunger = 1.0; p.thirst = 1.0; p.energy = 1.0; p.homeless_hours = 0.0;
-    world.policies.set_on(&"build_shacks", false);
     _start = GameClock.total_hours;
     GameClock.set_speed(3);
     _stage = 1;
