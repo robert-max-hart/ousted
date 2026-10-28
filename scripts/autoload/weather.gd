@@ -72,6 +72,52 @@ func restore_state(d:Dictionary) -> void:
     _day_offset = d["day_offset"];
     _update_temperature();
 
+# The climate's mean temperature this many hours from now (no daily swing, rain or today's random offset).
+func climate_at(hours_ahead:float) -> float:
+    var sf:float = fmod((GameClock.total_hours + hours_ahead) / (GameClock.HOURS_PER_DAY * GameClock.DAYS_PER_SEASON), 4.0) - 0.5;
+    var i:int = floori(sf);
+    var t:float = sf - i;
+    return lerpf(SEASON_TEMP[posmod(i, 4)], SEASON_TEMP[posmod(i + 1, 4)], t);
+
+const SOW_FROST_MARGIN:float = 3.0;       # the daily swing dips below the mean: keep this clear of the crop's frost limit
+const SOW_WATER_FACTOR:float = 0.8;       # soil moisture slows growth a little: assume this share of full speed
+const SOW_LOOKAHEAD_DAYS:int = 90;
+var _sow_cache:Dictionary = {};           # crop name + day -> bool
+
+# Whether a crop sown now would ripen before the climate freezes it: warm enough today, and following the
+# climate forward day by day (growth as in Field._growth_rate), it ripens before the mean temperature comes
+# within SOW_FROST_MARGIN of its frost limit. Nothing here names a season, so it holds for any climate.
+func can_sow(crop:Dictionary) -> bool:
+    var key:String = "%s %d" % [crop["name"], GameClock.day_index()];
+    if _sow_cache.has(key):
+        return _sow_cache[key];
+    var ok:bool = false;
+    if mean_temperature() >= crop["min_temp"]:
+        var progress:float = 0.0;
+        ok = true;
+        for day in SOW_LOOKAHEAD_DAYS:
+            var t:float = climate_at((day + 0.5) * GameClock.HOURS_PER_DAY);
+            if t < crop["frost_temp"] + SOW_FROST_MARGIN:
+                ok = false;
+                break;
+            if t >= crop["min_temp"]:
+                progress += clampf((t - crop["min_temp"]) / 8.0, 0.3, 1.0) * SOW_WATER_FACTOR / crop["grow_days"];
+            if progress >= 1.0:
+                break;
+        ok = ok and progress >= 1.0;
+    if _sow_cache.size() > 200:
+        _sow_cache.clear();
+    _sow_cache[key] = ok;
+    return ok;
+
+# Why a crop can't be sown now: "" if it can, else a short reason.
+func sow_block_reason(crop:Dictionary) -> String:
+    if mean_temperature() < crop["min_temp"]:
+        return "too cold to sow (needs %d C)" % crop["min_temp"];
+    if not can_sow(crop):
+        return "too late: frost would come before it ripens";
+    return "";
+
 # Mean temperature for the current day (no daily swing / rain).
 func mean_temperature() -> float:
     # SEASON_TEMP values sit at the middle of each season; blend between them

@@ -196,9 +196,9 @@ func is_empty() -> bool:
 func spoil_mult() -> float:
     return def.get("spoil_mult", 1.0);
 
-# Spoils stored food for `hours` game hours at the current temperature. Returns units lost.
+# Spoils stored food for `hours` game hours at the current temperature. Returns units lost (and adds them, by item, to tally).
 # Units promised to a pawn who is on the way to collect them are spared.
-func spoil_tick(hours:float) -> int:
+func spoil_tick(hours:float, tally:Dictionary = {}) -> int:
     var lost:int = 0;
     var k:float = Defs.spoil_temp_factor(Weather.temperature) * spoil_mult() * hours;
     for item in stored.keys():
@@ -211,6 +211,7 @@ func spoil_tick(hours:float) -> int:
             _spoil_acc[item] -= whole;
             take(item, whole);
             lost += whole;
+            tally[item] = tally.get(item, 0) + whole;
     return lost;
 
 # Production cap for an output item: 0 means no cap. The cap compares against the colony-wide stock.

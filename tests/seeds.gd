@@ -44,20 +44,15 @@ func _ready() -> void:
     _expect("a found crop can be sown", f.set_crop(&"pumpkin"));
     _expect("nothing is left to find", world.seeds.on_forage(world, 1.0) == &"");
 
-    # a spring-sowing crop is likelier to be found in spring than a crop sown only in summer/autumn
-    var spring_first:int = 0;
-    var autumn_first:int = 0;
+    # a crop that can be sown right now is likelier to be found than one that can't (mid summer: only radishes and lettuce can)
+    var sowable_first:int = 0;
+    GameClock.total_hours = (GameClock.DAYS_PER_SEASON + 4) * GameClock.HOURS_PER_DAY + 12.0;
+    Weather._day_offset = 0.0;
     for run in 300:
         var s2:Seeds = Seeds.new();       # hard: only wheat known
-        GameClock.total_hours = 0.0 * 24 + 12.0;
-        var first_spring:StringName = s2.on_forage(world, 1.0);
-        spring_first += 1 if (Defs.CROPS[first_spring]["sow"] as Array).has(0) else 0;
-        var s3:Seeds = Seeds.new();
-        GameClock.total_hours = 2.0 * 8.0 * 24 + 12.0;       # autumn
-        var first_autumn:StringName = s3.on_forage(world, 1.0);
-        autumn_first += 1 if (Defs.CROPS[first_autumn]["sow"] as Array).has(2) else 0;
-    _expect("in spring spring crops dominate (%d/300)" % spring_first, spring_first > 180);
-    _expect("in autumn the autumn crops are likelier than their share (%d/300)" % autumn_first, autumn_first > 150);
+        var first:StringName = s2.on_forage(world, 1.0);
+        sowable_first += 1 if Weather.can_sow(Defs.CROPS[first]) else 0;
+    _expect("in mid summer the crops that can be sown are likelier (%d/300, 2 of 7 by share)" % sowable_first, sowable_first > 140);
 
     # saving
     var data:Dictionary = world.serialize();

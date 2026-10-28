@@ -57,7 +57,7 @@ func take(n:int) -> int:
 
 # Food left on the ground is a penalty for missing storage: it spoils this many times faster than
 # in ordinary storage. Returns units lost.
-func spoil_tick(hours:float) -> int:
+func spoil_tick(hours:float, tally:Dictionary = {}) -> int:
     var rate:float = Defs.spoil_per_hour(item);
     if rate <= 0.0 or amount <= 0:
         return 0;
@@ -66,6 +66,7 @@ func spoil_tick(hours:float) -> int:
     if whole > 0:
         _spoil_acc -= whole;
         take(whole);
+        tally[item] = tally.get(item, 0) + whole;
     return whole;
 
 func _update_visual() -> void:

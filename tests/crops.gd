@@ -17,9 +17,9 @@ func _ready() -> void:
     var ok:bool = true;
     for id in Defs.CROPS:
         var c:Dictionary = Defs.CROPS[id];
-        for key in ["name", "item", "grow_days", "min_temp", "frost_temp", "sow", "yield", "fertility", "color", "desc"]:
+        for key in ["name", "item", "grow_days", "min_temp", "frost_temp", "yield", "fertility", "color", "desc"]:
             ok = ok and c.has(key);
-        ok = ok and Defs.is_food(c["item"]) and c["frost_temp"] < c["min_temp"] and not (c["sow"] as Array).is_empty();
+        ok = ok and Defs.is_food(c["item"]) and c["frost_temp"] < c["min_temp"];
         if c.has("harvests"):
             ok = ok and c["regrow_days"] < c["grow_days"];
     _expect("all %d crops are well formed and give a food item" % Defs.CROPS.size(), ok and Defs.CROPS.size() >= 8);
@@ -33,13 +33,14 @@ func _ready() -> void:
     Weather._day_offset = 0.0;        # the day's random swing would make the thresholds vary
     GameClock.total_hours = 1.0;
     _expect("first day of spring (about 3 C): radishes (1 C) and barley (2 C) can be sown", can.call(&"radish") and can.call(&"barley"));
-    _expect("but wheat (4 C), potatoes (6 C) and pumpkins (10 C) can't", not can.call(&"wheat") and not can.call(&"potato") and not can.call(&"pumpkin"));
-    GameClock.total_hours = 4.0 * GameClock.HOURS_PER_DAY;
-    _expect("mid spring (about 11 C) every spring crop can, pumpkins included", can.call(&"wheat") and can.call(&"potato") and can.call(&"pumpkin"));
+    _expect("but wheat (4 C), potatoes (6 C) and pumpkins (9 C) can't: too cold", not can.call(&"wheat") and not can.call(&"potato") and not can.call(&"pumpkin"));
+    GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 12.0;
+    _expect("late in the first week of spring every warm-season crop can, pumpkins included", can.call(&"wheat") and can.call(&"potato") and can.call(&"pumpkin"));
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 4) * GameClock.HOURS_PER_DAY + 12.0;      # mid summer
-    _expect("summer: radishes and wheat can, barley (spring only) can't", can.call(&"radish") and can.call(&"wheat") and not can.call(&"barley"));
+    _expect("mid summer: radishes can; wheat, barley and pumpkins are too late (frost would come first)", can.call(&"radish") and not can.call(&"wheat") and not can.call(&"barley") and not can.call(&"pumpkin"));
+    _expect("and the field says why", Weather.sow_block_reason(Defs.CROPS[&"wheat"]).begins_with("too late"));
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 2 + 1) * GameClock.HOURS_PER_DAY;      # early autumn
-    _expect("autumn: radishes can, wheat can't", can.call(&"radish") and not can.call(&"wheat"));
+    _expect("early autumn: wheat is too late", not can.call(&"wheat"));
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 3 + 4) * GameClock.HOURS_PER_DAY;      # winter
     var any:bool = false;
     for id in Defs.CROPS:

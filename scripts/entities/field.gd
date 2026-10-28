@@ -6,10 +6,16 @@
 # ----------------------------------------------------------------
 class_name Field extends Building;
 
-enum Plot { FALLOW, PLANTED, RIPE, DEAD };
+# FROZEN: a growing crop that a frost has stopped. It can still be harvested for part of its yield for a day
+# (SALVAGE_HOURS), then it is lost. Added last so saved plot states keep their numbers.
+enum Plot { FALLOW, PLANTED, RIPE, DEAD, FROZEN };
 
 const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25};
 const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"plant": 2};     # ripe crops are gathered before anything is sown
+const SALVAGE_HOURS     :float = 24.0;     # a frozen crop can be harvested this long before it is lost
+const SALVAGE_MIN_GROWTH:float = 0.25;     # a crop grown less than this is not worth harvesting (frozen ones are cleared)
+const EARLY_SHARE       :float = 0.7;      # an early harvest gives the share grown, times this
+const FROZEN_SHARE      :float = 0.7;      # a frost-damaged harvest gives the share grown, times this
 const NEAR_WATER_RANGE  :int = 4;
 const FALLOW_RECOVERY   :float = 0.01;     # fertility per day when unplanted
 
@@ -17,6 +23,8 @@ var crop_id     :StringName = &"wheat";
 var plot_state  :PackedByteArray;
 var plot_crop   :Array[StringName] = [];    # what was planted (crop may change mid-season)
 var growth      :PackedFloat32Array;
+var frozen_hours :PackedFloat32Array;       # hours each FROZEN plot has been frozen
+var harvest_early:bool = false;             # the player ordered every growing plot harvested now (see Field.apply)
 var cuts        :PackedByteArray;           # harvests taken from the current sowing (multi-harvest crops)
 var moisture    :PackedFloat32Array;
 var near_water  :PackedByteArray;
@@ -34,6 +42,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     plot_state.resize(n);
     growth.resize(n);
     cuts.resize(n);
+    frozen_hours.resize(n);
     moisture.resize(n);
     near_water.resize(n);
     reserved.resize(n);
@@ -86,9 +95,7 @@ func _set_fertility(i:int, v:float) -> void:
     world.soil_fertility[world.terrain.index(plot_cell(i))] = clampf(v, 0.0, 1.0);
 
 func can_plant() -> bool:
-    if not crop()["sow"].has(GameClock.season()):
-        return false;
-    return Weather.mean_temperature() >= crop()["min_temp"];
+    return Weather.can_sow(crop());
 
 func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();
@@ -97,6 +104,8 @@ func to_dict() -> Dictionary:
     d["plot_crop"] = Array(plot_crop);
     d["growth"] = growth;
     d["cuts"] = cuts;
+    d["frozen_hours"] = frozen_hours;
+    d["harvest_early"] = harvest_early;
     d["moisture"] = moisture;
     return d;
 
@@ -109,6 +118,9 @@ func restore_dict(d:Dictionary) -> void:
     growth = d["growth"];
     cuts = d.get("cuts", PackedByteArray());
     cuts.resize(plot_count());
+    frozen_hours = d.get("frozen_hours", PackedFloat32Array());
+    frozen_hours.resize(plot_count());
+    harvest_early = d.get("harvest_early", false);
     moisture = d["moisture"];
     _visual_dirty = true;
 
@@ -121,7 +133,7 @@ func restore_dict(d:Dictionary) -> void:
 func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable()) -> Dictionary:
     if state != State.COMPLETE:
         return {};
-    var plantable:bool = can_plant();
+    var plantable:bool = can_plant() and not harvest_early;
     var best:int = -1;
     var best_action:StringName = &"";
     var best_d:float = INF;
@@ -134,6 +146,14 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
                 if has_room.is_valid() and not has_room.call(Defs.CROPS[plot_crop[i]]["item"]):
                     continue;
                 action = &"harvest";
+            Plot.PLANTED:
+                if harvest_early and growth[i] >= SALVAGE_MIN_GROWTH and (not has_room.is_valid() or has_room.call(Defs.CROPS[plot_crop[i]]["item"])):
+                    action = &"harvest";
+            Plot.FROZEN:
+                if growth[i] < SALVAGE_MIN_GROWTH:
+                    action = &"clear";
+                elif not has_room.is_valid() or has_room.call(Defs.CROPS[plot_crop[i]]["item"]):
+                    action = &"harvest";
             Plot.DEAD:
                 action = &"clear";
             Plot.FALLOW:
@@ -142,6 +162,8 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
         if action == &"" or (only_action != &"" and action != only_action):
             continue;
         var d:float = ACTION_PRIORITY[action] * 1.0e6 + Vector2(plot_cell(i) - from).length_squared();
+        if plot_state[i] == Plot.FROZEN:
+            d -= 2.0e6;       # the clock is running on a frozen crop: before anything else
         if d < best_d:
             best_d = d;
             best = i;
@@ -160,13 +182,16 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
                 growth[i] = 0.0;
                 cuts[i] = 0;
         &"harvest":
-            if plot_state[i] == Plot.RIPE:
+            var st:int = plot_state[i];
+            if st == Plot.RIPE or st == Plot.FROZEN or (st == Plot.PLANTED and harvest_early and growth[i] >= SALVAGE_MIN_GROWTH):
                 var c:Dictionary = Defs.CROPS[plot_crop[i]];
-                var amount:int = maxi(1, roundi(c["yield"] * lerpf(0.4, 1.3, fertility(i))));
+                # ripe: all of it; early or frost-damaged: the share that has grown, less a little
+                var share:float = 1.0 if st == Plot.RIPE else minf(1.0, growth[i]) * (FROZEN_SHARE if st == Plot.FROZEN else EARLY_SHARE);
+                var amount:int = maxi(1, roundi(c["yield"] * lerpf(0.4, 1.3, fertility(i)) * share));
                 pawn.add_carry(c["item"], amount);
-                _set_fertility(i, fertility(i) + c["fertility"]);
+                _set_fertility(i, fertility(i) + c["fertility"] * share);
                 cuts[i] += 1;
-                if cuts[i] < c.get("harvests", 1):
+                if st == Plot.RIPE and cuts[i] < c.get("harvests", 1):
                     plot_state[i] = Plot.PLANTED;       # keeps producing: ripe again after regrow_days
                     growth[i] = 1.0 - c["regrow_days"] / c["grow_days"];
                 else:
@@ -186,6 +211,7 @@ func on_hour() -> void:
         return;
     var temp:float = Weather.temperature;
     var killed:int = 0;
+    var frozen:int = 0;
     for i in plot_count():
         # soil moisture: rain wets, warmth dries, nearby water keeps it up
         var m:float = moisture[i];
@@ -199,20 +225,39 @@ func on_hour() -> void:
             Plot.PLANTED:
                 var c:Dictionary = Defs.CROPS[plot_crop[i]];
                 if temp < c["frost_temp"]:
-                    plot_state[i] = Plot.DEAD;
-                    killed += 1;
+                    plot_state[i] = Plot.FROZEN if growth[i] >= SALVAGE_MIN_GROWTH else Plot.DEAD;
+                    frozen_hours[i] = 0.0;
+                    if plot_state[i] == Plot.FROZEN:
+                        frozen += 1;
+                    else:
+                        killed += 1;
                     continue;
                 growth[i] += _growth_rate(c, temp, moisture[i]);
                 if growth[i] >= 1.0:
                     plot_state[i] = Plot.RIPE;
+            Plot.FROZEN:
+                frozen_hours[i] += 1.0;
+                if frozen_hours[i] >= SALVAGE_HOURS:
+                    plot_state[i] = Plot.DEAD;
+                    killed += 1;
             Plot.RIPE:
                 # ripe crops left out in a hard freeze rot
                 if temp < Defs.CROPS[plot_crop[i]]["frost_temp"] - 4.0:
                     plot_state[i] = Plot.DEAD;
                     killed += 1;
+    if harvest_early and not _has_growing_plots():
+        harvest_early = false;       # everything has been taken: sowing can start again
+    if frozen > 0:
+        world.notify("Frost has stopped %d crop plots in a field. Harvest them within a day to save part of the crop." % frozen);
     if killed > 0:
         world.notify("Frost killed %d crop plots in a field." % killed);
     _visual_dirty = true;
+
+func _has_growing_plots() -> bool:
+    for i in plot_count():
+        if plot_state[i] == Plot.PLANTED and growth[i] >= SALVAGE_MIN_GROWTH:
+            return true;
+    return false;
 
 func on_day() -> void:
     for i in plot_count():
@@ -249,7 +294,7 @@ func farmer_positions() -> int:
 func info_text() -> String:
     if state != State.COMPLETE:
         return super.info_text();
-    var counts:Array[int] = [0, 0, 0, 0];
+    var counts:Array[int] = [0, 0, 0, 0, 0];
     var fert:float = 0.0;
     var moist:float = 0.0;
     for i in plot_count():
@@ -259,15 +304,19 @@ func info_text() -> String:
     var n:float = plot_count();
     var c:Dictionary = crop();
     var s:String = "Crop: %s\n" % c["name"];
-    s += "Fallow %d, Growing %d, Ripe %d, Dead %d\n" % counts;
+    s += "Fallow %d, Growing %d, Ripe %d, Dead %d, Frozen %d\n" % counts;
+    if harvest_early:
+        s += "Harvesting early: growing plots are taken for part of the crop, and nothing is sown meanwhile.\n";
+    if counts[Plot.FROZEN] > 0:
+        s += "Frozen plots can be harvested for part of the crop for a day, then they are lost.\n";
     s += "Needs %d farmer%s (one per %d plots)\n" % [farmer_positions(), "" if farmer_positions() == 1 else "s", Defs.PLOTS_PER_FARMER];
     s += "Soil fertility: %d%%\n" % roundi(fert / n * 100.0);
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
-    s += "Sow in %s above %d C; frost below %d C kills it.\n" % [Defs.sow_text(crop_id), c["min_temp"], c["frost_temp"]];
+    s += "Sows %s.\n" % Defs.sow_text(crop_id);
+    var why:String = Weather.sow_block_reason(c);
+    s += "Sowing now: %s\n" % ("yes" if why == "" else "no, " + why);
     if c.has("harvests"):
         s += "Gives up to %d cuttings from one sowing.\n" % c["harvests"];
-    if not can_plant() and counts[Plot.FALLOW] > 0:
-        s += "Not the sowing season for this crop, or too cold.\n";
     return s;
 
 func _rebuild_crops() -> void:
@@ -296,6 +345,10 @@ func _rebuild_crops() -> void:
                     h = 1.0;
                     wide = 1.0;
                     col = c["color"];
+                Plot.FROZEN:
+                    h = 0.2 + growth[i] * 0.8;
+                    wide = 0.45 + growth[i] * 0.55;
+                    col = Color(0.72, 0.84, 0.9);       # white with frost
                 _:
                     h = 0.3;
                     wide = 0.8;

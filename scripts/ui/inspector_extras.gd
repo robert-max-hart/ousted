@@ -11,6 +11,8 @@
 class_name InspectorExtras extends VBoxContainer;
 
 var _mark_btn   :Button;
+var _early_btn  :Button;
+var _field      :Field;
 var _workers_box:VBoxContainer;
 var _workers_sig:String = "";
 var _node       :ResourceNode;
@@ -21,12 +23,18 @@ func _init() -> void:
     _mark_btn.visible = false;
     _mark_btn.pressed.connect(_on_mark);
     add_child(_mark_btn);
+    _early_btn = Button.new();
+    _early_btn.focus_mode = Control.FOCUS_NONE;
+    _early_btn.visible = false;
+    _early_btn.pressed.connect(_on_early);
+    add_child(_early_btn);
     _workers_box = VBoxContainer.new();
     _workers_box.visible = false;
     add_child(_workers_box);
 
 func refresh(obj:Variant) -> void:
     _refresh_mark(obj);
+    _refresh_early(obj);
     _refresh_workers(obj);
 
 func _refresh_mark(obj:Variant) -> void:
@@ -41,6 +49,20 @@ func _on_mark() -> void:
     if _node != null and World.alive(_node):
         World.instance.set_designated(_node, not _node.designated);
         _refresh_mark(_node);
+
+# A field's "harvest now": a cold snap is coming, or the season is ending, so take what has grown.
+func _refresh_early(obj:Variant) -> void:
+    _field = obj as Field if obj is Field else null;
+    _early_btn.visible = _field != null and _field.is_complete();
+    if not _early_btn.visible:
+        return;
+    _early_btn.text = "Stop harvesting early" if _field.harvest_early else "Harvest everything now";
+    _early_btn.tooltip_text = "Farmers take every growing plot for 70% of the share that has grown, and nothing is sown until they are done. Use it when a frost is coming: a frozen crop gives the same 70% but is lost after a day.";
+
+func _on_early() -> void:
+    if _field != null and World.alive(_field):
+        _field.harvest_early = not _field.harvest_early;
+        _refresh_early(_field);
 
 func _refresh_workers(obj:Variant) -> void:
     var b:Building = obj as Building if obj is Building else null;

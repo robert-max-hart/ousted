@@ -10,7 +10,7 @@
 class_name Seeds extends RefCounted;
 
 const FIND_CHANCE     :float = 0.002;  # per finished foraging trip: a small bonus, the trader is meant to be the main source (see tests/seed_probe)
-const IN_SEASON_WEIGHT:float = 3.0;    # a crop that can be sown right now is this much likelier to be found
+const IN_SEASON_WEIGHT:float = 3.0;    # a crop that can be sown right now (Weather.can_sow) is this much likelier to be found
 
 var known:Dictionary = {};     # crop id -> true
 var trips:int = 0;             # foraging trips finished so far (a statistic for tuning FIND_CHANCE; not saved)
@@ -56,12 +56,11 @@ func on_forage(world:World, chance:float = FIND_CHANCE) -> StringName:
     var left:Array[StringName] = locked();
     if left.is_empty() or world.rng.randf() >= chance:
         return &"";
-    var season:int = GameClock.season();
     var weights:Array[float] = [];
     var total:float = 0.0;
     for id in left:
         var c:Dictionary = Defs.CROPS[id];
-        var w:float = c.get("find_weight", 1.0) * (IN_SEASON_WEIGHT if (c["sow"] as Array).has(season) else 1.0);
+        var w:float = c.get("find_weight", 1.0) * (IN_SEASON_WEIGHT if Weather.can_sow(c) else 1.0);
         weights.append(w);
         total += w;
     var roll:float = world.rng.randf() * total;

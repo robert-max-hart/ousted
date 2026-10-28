@@ -438,7 +438,7 @@ func _on_info_button() -> void:
             var c:Dictionary = Defs.CROPS[id];
             var btn:Button = Button.new();
             var known:bool = World.instance.seeds.has(id);
-            btn.text = "%s: %d days, sow %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)] if known else "%s: no seeds yet" % c["name"];
+            btn.text = "%s: %d days, sows %s" % [c["name"], roundi(c["grow_days"]), Defs.sow_text(id)] if known else "%s: no seeds yet" % c["name"];
             btn.tooltip_text = c["desc"] if known else "Citizens picking wild food may find its seeds while picking wild food.";
             btn.disabled = not known;
             btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;

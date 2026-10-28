@@ -258,51 +258,52 @@ const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpi
 # min_temp:   no growth below this; also the planting threshold
 # frost_temp: unripe crops die below this
 # fertility:  soil fertility change per harvest (negative = depletes)
-# sow:        seasons it can be planted in (0 spring, 1 summer, 2 autumn, 3 winter), as well as being above min_temp
+# Sowing has no season list: a crop is sown when the temperature is at least min_temp and the climate ahead lets it ripen
+#             before frost (Weather.can_sow), so maps with other climates need no changes here.
 # find_weight: optional. How likely its seed is to be found by foragers (default 1; rarer below)
 # harvests:   optional. A crop that keeps producing: it can be harvested this many times per sowing, regrowing in
 #             regrow_days after each harvest, and then the plot is fallow again. Without it, one harvest per sowing.
 # desc:       one line shown when picking the crop
 const CROPS:Dictionary = {
     &"wheat": {
-        "name": "Wheat", "item": &"wheat", "grow_days": 9.0, "min_temp": 4.0, "frost_temp": -2.0, "sow": [0, 1],
+        "name": "Wheat", "item": &"wheat", "grow_days": 9.0, "min_temp": 4.0, "frost_temp": -2.0,
         "yield": 3, "fertility": -0.15, "color": Color(0.88, 0.75, 0.3),
         "desc": "The staple grain. Slow, and a heavy feeder.",
     },
     &"beans": {
-        "name": "Beans", "item": &"beans", "grow_days": 7.0, "min_temp": 8.0, "frost_temp": 0.5, "sow": [0, 1],
+        "name": "Beans", "item": &"beans", "grow_days": 7.0, "min_temp": 8.0, "frost_temp": 0.5,
         "yield": 2, "fertility": 0.1, "color": Color(0.35, 0.55, 0.25),
         "desc": "Puts nitrogen back into the soil. Wants warm weather.",
     },
     &"radish": {
-        "name": "Radishes", "item": &"radish", "grow_days": 4.0, "min_temp": 1.0, "frost_temp": -4.0, "sow": [0, 1, 2],
+        "name": "Radishes", "item": &"radish", "grow_days": 4.0, "min_temp": 1.0, "frost_temp": -4.0,
         "yield": 3, "fertility": -0.04, "color": Color(0.85, 0.25, 0.3),
         "desc": "Very quick and hardy, so the first food of spring, but small and not filling.",
     },
     &"lettuce": {
-        "name": "Lettuce", "item": &"lettuce", "grow_days": 5.0, "min_temp": 3.0, "frost_temp": -2.0, "sow": [0, 1, 2],
+        "name": "Lettuce", "item": &"lettuce", "grow_days": 5.0, "min_temp": 3.0, "frost_temp": -2.0,
         "yield": 2, "fertility": -0.04, "color": Color(0.5, 0.8, 0.35), "harvests": 4, "regrow_days": 3.0,
         "desc": "Cuts four times from one sowing. Spoils quickly.",
     },
     &"barley": {
-        "name": "Barley", "item": &"barley", "grow_days": 8.0, "min_temp": 2.0, "frost_temp": -5.0, "sow": [0],
+        "name": "Barley", "item": &"barley", "grow_days": 8.0, "min_temp": 2.0, "frost_temp": -5.0,
         "yield": 3, "fertility": -0.12, "color": Color(0.8, 0.7, 0.4),
         "desc": "A hardy grain that starts in the cold and shrugs off frost. Spring only.",
     },
     &"potato": {
-        "name": "Potatoes", "item": &"potato", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0, "sow": [0],
+        "name": "Potatoes", "item": &"potato", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0,
         "yield": 6, "fertility": -0.2, "color": Color(0.7, 0.55, 0.35), "find_weight": 0.7,
         "desc": "A big harvest and very filling, but slow, frost-tender and very hard on the soil.",
     },
     &"cabbage": {
-        "name": "Cabbage", "item": &"cabbage", "grow_days": 10.0, "min_temp": 3.0, "frost_temp": -4.0, "sow": [0, 1],
+        "name": "Cabbage", "item": &"cabbage", "grow_days": 10.0, "min_temp": 3.0, "frost_temp": -4.0,
         "yield": 3, "fertility": -0.15, "color": Color(0.55, 0.75, 0.45),
         "desc": "Cool-season, keeps well, adds variety to the diet.",
     },
     &"pumpkin": {
-        "name": "Pumpkins", "item": &"pumpkin", "grow_days": 16.0, "min_temp": 10.0, "frost_temp": 2.0, "sow": [0],
+        "name": "Pumpkins", "item": &"pumpkin", "grow_days": 8.0, "min_temp": 9.0, "frost_temp": 2.0,
         "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15), "find_weight": 0.5,
-        "desc": "One huge, slow harvest a year, which needs a warm season.",
+        "desc": "One huge harvest a year. It needs the warm months, so sow it as soon as the spring warms.",
     },
 };
 
@@ -489,12 +490,10 @@ const HARD_ORE_UNTOOLED_SPEED:float = 0.25;
 const MINE_BATCH        :int = 4;       # units dug per task
 
 # A crop's season window as words, such as "Spring to Autumn" or "Spring".
+# How a crop's sowing rule reads in the crop list and the field inspector.
 static func sow_text(crop_id:StringName) -> String:
-    var seasons:Array = CROPS[crop_id]["sow"];
-    var names:Array[String] = ["Spring", "Summer", "Autumn", "Winter"];
-    if seasons.size() == 1:
-        return names[seasons[0]];
-    return "%s to %s" % [names[seasons[0]], names[seasons[seasons.size() - 1]]];
+    var c:Dictionary = CROPS[crop_id];
+    return "from %d C, frost below %d C kills it" % [c["min_temp"], c["frost_temp"]];
 
 static func is_food(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].get("food", false);

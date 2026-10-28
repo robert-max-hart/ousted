@@ -64,6 +64,8 @@ var death_log   :Array = [];        # {name, age, cause, when, profession}, olde
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
 var _storage_warned:bool = false;
 var _spoiled_today:int = 0;
+var _spoiled_stored:Dictionary = {};        # item -> units that spoiled in storage today
+var _spoiled_ground:Dictionary = {};        # item -> units that spoiled lying on the ground today
 
 static func alive(o:Variant) -> bool:
     return o != null and is_instance_valid(o) and not o.removed;
@@ -959,15 +961,33 @@ func _on_hour(_h:int) -> void:
     for b in buildings:
         b.on_hour();
         if b.is_storage():
-            _spoiled_today += b.spoil_tick(1.0);
+            _spoiled_today += b.spoil_tick(1.0, _spoiled_stored);
     for pl in piles.duplicate():
-        _spoiled_today += pl.spoil_tick(1.0);
+        _spoiled_today += pl.spoil_tick(1.0, _spoiled_ground);
         if pl.amount <= 0 and not pl.removed and pl.reserved_by == null:
             remove_pile(pl);
             pl.queue_free();
     _update_wetness();
     _grow_trees();
     _check_storage_full();
+
+# "Spoiled yesterday: 9 berries, 4 lettuce (3 berries were lying on the ground)", the biggest losses first.
+func _spoilage_report() -> String:
+    var total:Dictionary = _spoiled_stored.duplicate();
+    for item in _spoiled_ground:
+        total[item] = total.get(item, 0) + _spoiled_ground[item];
+    var items:Array = total.keys();
+    items.sort_custom(func(a:StringName, b:StringName) -> bool: return total[a] > total[b]);
+    var parts:PackedStringArray = [];
+    for item in items:
+        parts.append("%d %s" % [total[item], Defs.item_name(item).to_lower()]);
+    var s:String = "Spoiled yesterday: %s" % ", ".join(parts);
+    if not _spoiled_ground.is_empty():
+        var ground:PackedStringArray = [];
+        for item in _spoiled_ground:
+            ground.append("%d %s" % [_spoiled_ground[item], Defs.item_name(item).to_lower()]);
+        s += " (on the ground: %s)" % ", ".join(ground);
+    return s + ".";
 
 # Warns once when all storage fills up; re-arms after it drops below 90%.
 func _check_storage_full() -> void:
@@ -998,8 +1018,10 @@ func _on_day(_d:int) -> void:
         b.on_day();
     families.on_day();
     if _spoiled_today >= 5:
-        notify("%d units of food spoiled yesterday." % _spoiled_today);
+        notify(_spoilage_report());
     _spoiled_today = 0;
+    _spoiled_stored.clear();
+    _spoiled_ground.clear();
     var s:int = GameClock.season();
     var day:int = GameClock.day_index();
     var regrown:bool = false;
