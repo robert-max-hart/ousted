@@ -65,6 +65,11 @@ var _path           :Array[Vector2i] = [];
 var _path_i         :int = 0;
 var _failed         :Dictionary = {};       # target -> game hour it can be retried
 var _need_block_until:float = -1.0;
+var _rig            :Node3D;                  # the body and head, tilted to work and bobbed to walk (visual only)
+var _prop           :Node3D;                  # a hand tool that swings while they work
+var _anim_t         :float = 0.0;
+var _work_now       :bool = false;            # what the last frame did, for the animation
+var _move_now       :bool = false;
 var _carry_mesh     :MeshInstance3D;
 var _carry_mat      :StandardMaterial3D;
 
@@ -138,6 +143,7 @@ func restore(w:World, d:Dictionary) -> void:
     _update_carry_visual();
 
 func _process(delta:float) -> void:
+    _animate(delta);
     var dh:float = GameClock.game_hours(delta);
     if dh <= 0.0:
         return;
@@ -448,10 +454,12 @@ func _run_task(move_dt:float, dh:float) -> void:
                 if not _plan_path(step):
                     _fail_task();
                     return;
+            _move_now = true;
             if _follow_path(move_dt):
                 task.index += 1;
         Task.Step.WORK:
             var working:bool = not NON_WORK_KINDS.has(task.kind);
+            _work_now = working and is_laboring() and task.kind != &"teach";
             var speed:float = (1.0 + tool_bonus()) * work_efficiency() if working else 1.0;
             if working:
                 _wear_tool(dh);
@@ -565,7 +573,30 @@ func _bar(v:float) -> String:
     var n:int = roundi(v * 10.0);
     return "[%s%s] %d%%" % ["#".repeat(n), "-".repeat(10 - n), roundi(v * 100.0)];
 
+# Working: lean into it and swing a tool. Walking: a small bob. Runs at the game speed (up to 3x, faster looks frantic).
+func _animate(delta:float) -> void:
+    var speed:float = minf(GameClock.speed(), 3.0);
+    _anim_t += delta * speed;
+    var work:bool = _work_now and speed > 0.0;
+    var move:bool = _move_now and speed > 0.0;
+    _work_now = false;
+    _move_now = false;
+    _prop.visible = work;
+    if work:
+        var swing:float = sin(_anim_t * 7.0);
+        _rig.rotation.x = 0.28 + 0.14 * swing;
+        _rig.position.y = -0.04 * absf(swing);
+        _prop.rotation.x = -0.4 - 0.9 * swing;
+    elif move:
+        _rig.rotation.x = 0.0;
+        _rig.position.y = 0.05 * absf(sin(_anim_t * 9.0));
+    else:
+        _rig.rotation.x = lerpf(_rig.rotation.x, 0.0, 0.3);
+        _rig.position.y = lerpf(_rig.position.y, 0.0, 0.3);
+
 func _build_visual(rng:RandomNumberGenerator) -> void:
+    _rig = Node3D.new();
+    add_child(_rig);
     var body:MeshInstance3D = MeshInstance3D.new();
     var capsule:CapsuleMesh = CapsuleMesh.new();
     capsule.radius = 0.2;
@@ -578,7 +609,7 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
         shirts = [Color(0.6, 0.3, 0.4), Color(0.55, 0.45, 0.6), Color(0.65, 0.5, 0.3), Color(0.35, 0.5, 0.55)];
     body_mat.albedo_color = shirts[rng.randi() % shirts.size()];
     body.material_override = body_mat;
-    add_child(body);
+    _rig.add_child(body);
 
     var head:MeshInstance3D = MeshInstance3D.new();
     var sphere:SphereMesh = SphereMesh.new();
@@ -589,7 +620,30 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
     var skin:StandardMaterial3D = StandardMaterial3D.new();
     skin.albedo_color = Color(0.93, 0.78, 0.65).darkened(rng.randf() * 0.4);
     head.material_override = skin;
-    add_child(head);
+    _rig.add_child(head);
+
+    _prop = Node3D.new();                        # a pick or hammer: a handle with a head, held out at the shoulder
+    _prop.position = Vector3(0.26, 0.85, 0.05);
+    var handle:MeshInstance3D = MeshInstance3D.new();
+    var stick:BoxMesh = BoxMesh.new();
+    stick.size = Vector3(0.05, 0.05, 0.55);
+    handle.mesh = stick;
+    handle.position = Vector3(0, 0, 0.27);
+    var wood:StandardMaterial3D = StandardMaterial3D.new();
+    wood.albedo_color = Color(0.45, 0.32, 0.2);
+    handle.material_override = wood;
+    _prop.add_child(handle);
+    var blade:MeshInstance3D = MeshInstance3D.new();
+    var iron:BoxMesh = BoxMesh.new();
+    iron.size = Vector3(0.22, 0.07, 0.08);
+    blade.mesh = iron;
+    blade.position = Vector3(0, 0, 0.55);
+    var metal:StandardMaterial3D = StandardMaterial3D.new();
+    metal.albedo_color = Color(0.45, 0.46, 0.5);
+    blade.material_override = metal;
+    _prop.add_child(blade);
+    _prop.visible = false;
+    _rig.add_child(_prop);
 
     _carry_mesh = MeshInstance3D.new();
     var box:BoxMesh = BoxMesh.new();
@@ -599,7 +653,7 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
     _carry_mat = StandardMaterial3D.new();
     _carry_mesh.material_override = _carry_mat;
     _carry_mesh.visible = false;
-    add_child(_carry_mesh);
+    _rig.add_child(_carry_mesh);
 
 func _update_carry_visual() -> void:
     _carry_mesh.visible = carry_amount > 0;

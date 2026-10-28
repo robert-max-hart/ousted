@@ -52,7 +52,7 @@ const ITEMS:Dictionary = {
 # mine_hours: labor-hours to dig one unit of each item (a surface rock or deposit is 2.5x quicker)
 # radius:   work radius in cells (shown when placing and selecting)
 # worker_slots, profession: how many citizens of that profession work here
-# decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut); roof_pitch: roof height over wall height (default 0.55)
+# decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut, wood, shack); roof_pitch: roof height over wall height (default 0.55)
 # wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
@@ -125,7 +125,7 @@ const BUILDINGS:Dictionary = {
     },
     &"woodcutter": {
         "name": "Woodcutter", "size": Vector2i(3, 3), "cost": {&"wood": 10, &"stone": 2}, "work": 10.0,
-        "shape": "house", "height": 1.8, "color": Color(0.5, 0.38, 0.26), "roof": Color(0.3, 0.36, 0.2),
+        "shape": "house", "decor": "wood", "height": 1.8, "color": Color(0.5, 0.38, 0.26), "roof": Color(0.3, 0.36, 0.2),
         "storage": true, "capacity": 120, "accepts_items": [&"firewood"],
         "radius": 15.0, "worker_slots": 2, "profession": "WOODCUTTER",
         "produces": [&"firewood"],
@@ -211,7 +211,7 @@ const BUILDINGS:Dictionary = {
     },
     &"shack": {
         "name": "Shack", "size": Vector2i(2, 2), "cost": {&"wood": 3}, "work": 1.0,
-        "shape": "house", "height": 1.3, "color": Color(0.5, 0.42, 0.32), "roof": Color(0.36, 0.3, 0.22),
+        "shape": "house", "decor": "shack", "roof_pitch": 0.3, "height": 1.3, "color": Color(0.5, 0.42, 0.32), "roof": Color(0.36, 0.3, 0.22),
         "beds": 2, "shack": true, "no_refund": true, "relocatable": false,
         "desc": "A bare shelter for two, put up by the homeless. It keeps a little warmth in, counts as being homeless for happiness, and demolishing it returns nothing.",
     },

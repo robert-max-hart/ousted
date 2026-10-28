@@ -8,26 +8,25 @@ class_name Graveyard extends Building;
 
 var graves      :Array = [];       # per square: null, or {name, age, cause, buried_hour}
 var reserved    :Array = [];       # Pawn or null per square, for someone on the way with a body
-var _stones     :MultiMeshInstance3D;
+var _stones     :Array[MultiMeshInstance3D] = [];       # one layer per headstone shape: slab, rounded, cross
 var _visual_dirty:bool = true;
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     super.setup(w, id, o, s);
     graves.resize(plot_count());
     reserved.resize(plot_count());
-    var mm:MultiMesh = MultiMesh.new();
-    mm.transform_format = MultiMesh.TRANSFORM_3D;
-    var box:BoxMesh = BoxMesh.new();
-    box.size = Vector3(0.4, 0.7, 0.12);
-    mm.mesh = box;
-    var mat:StandardMaterial3D = StandardMaterial3D.new();
-    mat.albedo_color = Color(0.62, 0.62, 0.64);
-    mat.roughness = 1.0;
-    _stones = MultiMeshInstance3D.new();
-    _stones.multimesh = mm;
-    _stones.material_override = mat;
-    _stones.top_level = true;       # stones are placed in world space
-    add_child(_stones);
+    var mat:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.72, 0.72, 0.74));
+    mat.uv1_world_triplanar = true;
+    for shape in _shapes():
+        var mm:MultiMesh = MultiMesh.new();
+        mm.transform_format = MultiMesh.TRANSFORM_3D;
+        mm.mesh = shape;
+        var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
+        mmi.multimesh = mm;
+        mmi.material_override = mat;
+        mmi.top_level = true;       # stones are placed in world space
+        add_child(mmi);
+        _stones.append(mmi);
 
 func _process(_delta:float) -> void:
     if _visual_dirty:
@@ -164,14 +163,43 @@ func info_text() -> String:
         s += "Can't be demolished while graves are in use.\n";
     return s;
 
+# Headstone meshes, each standing on y = 0 (the ground).
+static func _shapes() -> Array[ArrayMesh]:
+    var mat:StandardMaterial3D = StandardMaterial3D.new();       # parts carry no look of their own: the layer's material replaces it
+    var slab:ArrayMesh = ArrayMesh.new();
+    var box:BoxMesh = BoxMesh.new();
+    box.size = Vector3(0.4, 0.7, 0.12);
+    ResourceRenderer.add_part(slab, box, Transform3D(Basis(), Vector3(0, 0.35, 0)), mat);
+    var rounded:ArrayMesh = ArrayMesh.new();
+    var body:BoxMesh = BoxMesh.new();
+    body.size = Vector3(0.38, 0.5, 0.12);
+    ResourceRenderer.add_part(rounded, body, Transform3D(Basis(), Vector3(0, 0.25, 0)), mat);
+    var top:CylinderMesh = CylinderMesh.new();
+    top.top_radius = 0.19;
+    top.bottom_radius = 0.19;
+    top.height = 0.12;
+    top.radial_segments = 10;
+    ResourceRenderer.add_part(rounded, top, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0.5, 0)), mat);
+    var cross:ArrayMesh = ArrayMesh.new();
+    var upright:BoxMesh = BoxMesh.new();
+    upright.size = Vector3(0.1, 0.8, 0.1);
+    ResourceRenderer.add_part(cross, upright, Transform3D(Basis(), Vector3(0, 0.4, 0)), mat);
+    var arm:BoxMesh = BoxMesh.new();
+    arm.size = Vector3(0.38, 0.1, 0.1);
+    ResourceRenderer.add_part(cross, arm, Transform3D(Basis(), Vector3(0, 0.55, 0)), mat);
+    return [slab, rounded, cross];
+
 func _rebuild_stones() -> void:
-    var list:Array[int] = [];
+    var by_shape:Array = [[], [], []];
     for i in plot_count():
         if graves[i] != null:
-            list.append(i);
-    var mm:MultiMesh = _stones.multimesh;
-    mm.instance_count = list.size();
-    for j in list.size():
-        var p:Vector3 = world.terrain.cell_center(plot_cell(list[j]));
-        p.y += 0.35;
-        mm.set_instance_transform(j, Transform3D(Basis(), p));
+            var c:Vector2i = plot_cell(i);
+            by_shape[hash(Vector2i(c.x * 7 + 3, c.y * 13 + 1)) % 3].append(c);       # the same grave always gets the same stone
+    for s in _stones.size():
+        var list:Array = by_shape[s];
+        var mm:MultiMesh = _stones[s].multimesh;
+        mm.instance_count = list.size();
+        for j in list.size():
+            var c:Vector2i = list[j];
+            var yaw:float = (float(hash(c) & 0xff) / 255.0 - 0.5) * 0.4;
+            mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw), world.terrain.cell_center(c)));

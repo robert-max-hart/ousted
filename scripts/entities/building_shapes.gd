@@ -177,6 +177,25 @@ static func decorate(b:Building, kind:String) -> void:
             _pyramid(b, 0.62, 0.7, _roof_mat(b), Vector3(0, peak + 0.5, 0));
             _box(b, Vector3(1.8, 0.12, 0.6), plaster, Vector3(0, 0.06, front + 0.3));
             _box(b, Vector3(1.0, 0.55, 0.05), _colour(Color(0.16, 0.3, 0.2)), Vector3(-body.x * 0.28, h * 0.58, front + 0.03));
+        "wood":
+            var bark:StandardMaterial3D = _colour(Color(0.42, 0.3, 0.19));
+            var cut:StandardMaterial3D = _colour(Color(0.78, 0.62, 0.4));
+            for row in 3:       # a stack of logs along the side wall, end grain facing out
+                for k in 4 - row:
+                    var lx:float = body.x * 0.5 + 0.3 + row * 0.2;
+                    var ly:float = 0.17 + row * 0.3;
+                    var lz:float = -body.y * 0.3 + (k + row * 0.5) * 0.36;
+                    _cyl(b, 0.16, 0.16, 0.9, bark, Vector3(lx, ly, lz), 8, Vector3(0, 0, PI * 0.5));
+                    _cyl(b, 0.13, 0.13, 0.02, cut, Vector3(lx + 0.46, ly, lz), 8, Vector3(0, 0, PI * 0.5));
+            _cyl(b, 0.3, 0.32, 0.45, bark, Vector3(-body.x * 0.3, 0.22, front + 0.6), 10);
+            _box(b, Vector3(0.06, 0.55, 0.06), _colour(TIMBER), Vector3(-body.x * 0.3 + 0.1, 0.72, front + 0.6), Vector3(0, 0, 0.5));
+            _box(b, Vector3(0.22, 0.14, 0.05), _colour(IRON), Vector3(-body.x * 0.3 + 0.2, 0.95, front + 0.6), Vector3(0, 0, 0.5));
+        "shack":
+            var plank:StandardMaterial3D = _colour(Color(0.5, 0.4, 0.28));
+            for k in 3:       # spare boards leaning on the side wall
+                _box(b, Vector3(0.14, 1.0, 0.03), plank, Vector3(-body.x * 0.5 - 0.22 - k * 0.05, 0.5, -body.y * 0.1 + k * 0.17), Vector3(0, 0, 0.32 + k * 0.05));
+            _cyl(b, 0.2, 0.22, 0.45, _colour(Color(0.4, 0.3, 0.2)), Vector3(body.x * 0.5 + 0.28, 0.22, front * 0.4), 8);
+            _cyl(b, 0.2, 0.2, 0.03, _colour(IRON), Vector3(body.x * 0.5 + 0.28, 0.45, front * 0.4), 8);
         "hut":
             var rack:StandardMaterial3D = _colour(TIMBER);
             var rz:float = front + 0.75;

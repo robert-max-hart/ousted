@@ -340,6 +340,12 @@ func _build_chunk(ci:int) -> void:
                 for j in 4:       # packed earth is mottled: each corner a little lighter or darker
                     var speck:float = float((((x * 2 + (j & 1)) * 73856093) ^ ((z * 2 + (j >> 1)) * 19349663)) & 1023) / 1023.0;
                     colors[v + j] = Color(own.r * (0.88 + speck * 0.24), own.g * (0.88 + speck * 0.24), own.b * (0.9 + speck * 0.2));
+            elif overlay[index(cell)] == Overlay.TILLED or overlay[index(cell)] == Overlay.SITE:
+                for j in 4:       # ploughed ground: a ridge along each row's top edge and a furrow along its bottom, with some mottling
+                    var crumb:float = float((((x * 2 + (j & 1)) * 83492791) ^ ((z * 2 + (j >> 1)) * 2654435761)) & 1023) / 1023.0;
+                    var row:float = 1.0 if overlay[index(cell)] == Overlay.SITE else (1.1 if j < 2 else 0.86);
+                    var shade:float = row * (0.94 + crumb * 0.12);
+                    colors[v + j] = Color(own.r * shade, own.g * shade, own.b * shade);
             elif overlay[index(cell)] != Overlay.NONE:
                 for j in 4:
                     colors[v + j] = own;
