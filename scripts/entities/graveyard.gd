@@ -129,6 +129,7 @@ func _cremate() -> void:
         world.notify("%d old %s cremated to free graves." % [burned, "grave was" if burned == 1 else "graves were"]);
 
 func on_terrain_changed() -> void:
+    super.on_terrain_changed();
     _visual_dirty = true;
 
 func to_dict() -> Dictionary:
@@ -140,6 +141,9 @@ func restore_dict(d:Dictionary) -> void:
     super.restore_dict(d);
     graves = d["graves"];
     graves.resize(plot_count());
+    if state == State.COMPLETE:
+        for i in plot_count():
+            world.terrain.set_overlay(plot_cell(i), Terrain.Overlay.GRAVE);       # saves from before the ground was an overlay
     _visual_dirty = true;
 
 func info_text() -> String:

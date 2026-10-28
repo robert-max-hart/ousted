@@ -41,6 +41,8 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     for i in n:
         moisture[i] = 0.5;
         near_water[i] = 1 if _is_near_water(plot_cell(i)) else 0;
+    _fence = Fence.new(self, &"wood", 1);
+    add_child(_fence);
     for shape in CropMeshes.SHAPES:
         var mm:MultiMesh = MultiMesh.new();
         mm.transform_format = MultiMesh.TRANSFORM_3D;
@@ -218,6 +220,7 @@ func on_day() -> void:
             _set_fertility(i, fertility(i) + FALLOW_RECOVERY);
 
 func on_terrain_changed() -> void:
+    super.on_terrain_changed();
     _visual_dirty = true;
 
 # Growth per hour (1.0 = ripe).

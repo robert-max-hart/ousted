@@ -54,6 +54,7 @@ var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
 
 var _body       :MeshInstance3D;
 var _roof       :MeshInstance3D;
+var _fence      :Fence;                            # a fence or wall round the footprint (graveyard, stockpile, field)
 var _decor      :Array[MeshInstance3D] = [];       # extra shapes (BuildingShapes), hidden while a site
 var _body_y0    :float = 0.0;                      # where the body starts and how tall it is, for the rising frame of a site
 var _body_h     :float = 0.0;
@@ -482,7 +483,8 @@ func on_day() -> void:
     pass;
 
 func on_terrain_changed() -> void:
-    pass;
+    if _fence != null:
+        _fence.rebuild();
 
 # --------------------------------
 # Heating (housing)
@@ -770,9 +772,8 @@ func _build_visual() -> void:
             _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
             BuildingShapes.mine_extras(self);
         "graveyard":
-            var ground:BoxMesh = BoxMesh.new();
-            ground.size = Vector3(size.x - 0.1, h, size.y - 0.1);
-            _body = _add_mesh(ground, _body_mat, Vector3(0, h * 0.5, 0));
+            _fence = Fence.new(self, &"stone", 1);       # the ground itself is a terrain overlay (Terrain.Overlay.GRAVE)
+            add_child(_fence);
         "cart":
             var bed:BoxMesh = BoxMesh.new();
             bed.size = Vector3(size.x - 0.3, h * 0.5, size.y * 0.8);
@@ -791,10 +792,9 @@ func _build_visual() -> void:
             var pad:BoxMesh = BoxMesh.new();
             pad.size = Vector3(size.x - 0.3, h, size.y - 0.3);
             _body = _add_mesh(pad, _body_mat, Vector3(0, h * 0.5, 0));
-            var crate:BoxMesh = BoxMesh.new();
-            var cs:float = minf(1.0, minf(size.x, size.y) / 3.0);       # a small pile gets a small crate
-            crate.size = Vector3(0.7, 0.6, 0.7) * cs;
-            _roof = _add_mesh(crate, _flat_mat(Color(0.6, 0.45, 0.28)), Vector3(-size.x * 0.2, h + 0.3 * cs, -size.y * 0.2));
+            _fence = Fence.new(self, &"rope", 2);
+            add_child(_fence);
+            add_child(PileGoods.new(self));
         _:
             pass;
     if def.has("decor"):

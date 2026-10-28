@@ -546,6 +546,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
+    var is_ground:bool = is_field or def.get("graveyard", false);       # drawn as a terrain overlay: bare while it goes up
     if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
         terrain.flatten_rect(r);
     var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Building.new();
@@ -555,7 +556,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
             occupant[idx(c)] = b;
             if restoring:
                 continue;
-            terrain.set_overlay(c, Terrain.Overlay.SITE if is_field and not prebuilt else Terrain.Overlay.NONE);       # bare staked ground until the field is done
+            terrain.set_overlay(c, Terrain.Overlay.SITE if is_ground and not prebuilt else Terrain.Overlay.NONE);       # bare staked ground until it is done
             var rn:ResourceNode = node_at[idx(c)];
             if rn != null:
                 mark_for_clearing(rn);       # nothing vanishes at once: laborers clear it before building starts
@@ -592,7 +593,7 @@ func remove_building(b:Building, refund:bool) -> void:
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             occupant[idx(Vector2i(x, z))] = null;
-            if b is Field:
+            if b is Field or b is Graveyard:
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.NONE);
     b.removed = true;
     if tools != null and tools.selected == b:
@@ -685,6 +686,10 @@ func _finish_relocation(site:Building) -> void:
     remove_building(old, false);
 
 func on_building_completed(b:Building) -> void:
+    if b is Graveyard:
+        for z in range(b.origin.y, b.origin.y + b.size.y):
+            for x in range(b.origin.x, b.origin.x + b.size.x):
+                terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.GRAVE);
     if b is Field:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):

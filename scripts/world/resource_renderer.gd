@@ -33,6 +33,7 @@ const BUSH_BY_SEASON:Array[Color] = [
 var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
 var _markers    :MultiMeshInstance3D;
 var _canopy_mat :StandardMaterial3D;
+const PICKED_MUSHROOM:StringName = &"mushroom_picked";       # a render layer, not a resource kind
 var _bush_mat   :StandardMaterial3D;
 var _oak_leaf_mat:StandardMaterial3D;
 var _berries    :MultiMeshInstance3D;      # berries on the bushes that have fruit, one clump per bush
@@ -40,7 +41,6 @@ var _oak_leaves :MultiMeshInstance3D;      # follows the oak layer's instances, 
 var _dirty      :bool = true;
 var _preview_rect:Rect2i = Rect2i();
 var _preview_filter:Callable = Callable();
-
 func _ready() -> void:
     _canopy_mat = _make_material(CANOPY_BY_SEASON[0]);
     _bush_mat = _make_material(BUSH_BY_SEASON[0]);
@@ -118,7 +118,24 @@ func _ready() -> void:
     var rock:ArrayMesh = ArrayMesh.new();
     add_part(rock, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.55, 0.54, 0.52)));
     var ore:ArrayMesh = ArrayMesh.new();
-    add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.58, 0.36, 0.3)));
+    # an outcrop: a dark boulder with rusty iron seams breaking out of it and a few bright metallic flecks
+    add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.36, 0.35, 0.36)));
+    var rust_mat:StandardMaterial3D = _make_material(Color(0.66, 0.31, 0.16));
+    var glint_mat:StandardMaterial3D = _make_material(Color(0.72, 0.74, 0.78));
+    glint_mat.metallic = 0.7;
+    glint_mat.roughness = 0.35;
+    for k in 6:
+        var chunk:BoxMesh = BoxMesh.new();
+        var cs:float = 0.2 + 0.07 * (k % 3);
+        chunk.size = Vector3(cs, cs * 1.5, cs * 0.8);
+        var turn:Basis = Basis(Vector3.UP, k * 1.1) * Basis(Vector3.RIGHT, 0.5 + 0.15 * (k % 2)) * Basis(Vector3.FORWARD, 0.3 * (k % 3));
+        var spot:Vector3 = Vector3(sin(k * 1.9) * 0.42, 0.3 + 0.08 * (k % 3) + (0.2 if k < 2 else 0.0), cos(k * 1.9) * 0.4);
+        add_part(ore, chunk, Transform3D(turn, spot), rust_mat, Color(1.0, 0.85 + 0.05 * (k % 3), 0.85));
+    for k in 3:
+        var fleck:BoxMesh = BoxMesh.new();
+        fleck.size = Vector3(0.1, 0.1, 0.1);
+        var fturn:Basis = Basis(Vector3.UP, k * 2.3) * Basis(Vector3.RIGHT, 0.7);
+        add_part(ore, fleck, Transform3D(fturn, Vector3(sin(k * 2.6 + 0.5) * 0.5, 0.42 + 0.06 * k, cos(k * 2.6 + 0.5) * 0.45)), glint_mat);
 
     var bush:ArrayMesh = ArrayMesh.new();
     add_lobes(bush, BUSH_LOBES, _bush_mat);
@@ -137,10 +154,27 @@ func _ready() -> void:
     cap_shape.height = 0.3;
     cap_shape.radial_segments = 6;
     cap_shape.rings = 3;
-    var mushroom:ArrayMesh = ArrayMesh.new();
-    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(-0.2, 0.1, 0.1)), _make_material(Color(0.72, 0.5, 0.3)));
-    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.15, 0.1, -0.1)), _make_material(Color(0.8, 0.35, 0.25)));
-    add_part(mushroom, cap_shape, Transform3D(Basis(), Vector3(0.05, 0.1, 0.25)), _make_material(Color(0.72, 0.5, 0.3)));
+    var mushroom:ArrayMesh = ArrayMesh.new();       # ripe: stems with caps
+    var picked:ArrayMesh = ArrayMesh.new();         # picked: just the stumps left in the ground
+    var stem_mat:StandardMaterial3D = _make_material(Color(0.88, 0.84, 0.74));
+    var spots:Array = [[Vector3(-0.2, 0, 0.1), Color(0.72, 0.5, 0.3)], [Vector3(0.15, 0, -0.1), Color(0.8, 0.35, 0.25)], [Vector3(0.05, 0, 0.25), Color(0.72, 0.5, 0.3)]];
+    for spot in spots:
+        var at:Vector3 = spot[0];
+        var stem:CylinderMesh = CylinderMesh.new();
+        stem.top_radius = 0.045;
+        stem.bottom_radius = 0.06;
+        stem.height = 0.16;
+        stem.radial_segments = 5;
+        stem.rings = 1;
+        add_part(mushroom, stem, Transform3D(Basis(), at + Vector3(0, 0.08, 0)), stem_mat);
+        add_part(mushroom, cap_shape, Transform3D(Basis(), at + Vector3(0, 0.17, 0)), _make_material(spot[1]));
+        var stump:CylinderMesh = CylinderMesh.new();
+        stump.top_radius = 0.04;
+        stump.bottom_radius = 0.055;
+        stump.height = 0.04;
+        stump.radial_segments = 5;
+        stump.rings = 1;
+        add_part(picked, stump, Transform3D(Basis(), at + Vector3(0, 0.02, 0)), stem_mat, Color(0.8, 0.75, 0.65));
     var hazel:ArrayMesh = ArrayMesh.new();
     var hazel_mat:StandardMaterial3D = _make_material(Color(0.5, 0.52, 0.2));
     for k in 3:                                  # several stems rising from one stool
@@ -176,6 +210,7 @@ func _ready() -> void:
     _layers[&"ore"] = _make_layer(ore);
     _layers[&"bush"] = _make_layer(bush);
     _layers[&"mushroom"] = _make_layer(mushroom);
+    _layers[PICKED_MUSHROOM] = _make_layer(picked);
     _layers[&"hazel"] = _make_layer(hazel);
 
     var marker_shape:SphereMesh = SphereMesh.new();
@@ -232,7 +267,7 @@ func _rebuild() -> void:
         by_kind[k] = [];
     var marked:Array[ResourceNode] = [];
     for rn in world.nodes:
-        by_kind[rn.kind].append(rn);
+        by_kind[PICKED_MUSHROOM if rn.kind == &"mushroom" and rn.amount <= 0 else rn.kind].append(rn);
         if rn.designated:
             marked.append(rn);
 
