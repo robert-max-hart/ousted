@@ -36,7 +36,7 @@ func _ready() -> void:
     world.families.move_home(world.pawns[0], null);
     _expect("and go dark when empty", h._window_mat.albedo_color == dark);
     var granary_site:Building = world.place_building(&"granary", _free(&"granary", Vector2i(3, 3), th.origin + Vector2i(-10, 0)), Vector2i(3, 3), true);
-    _expect("a granary has a door but no windows", granary_site._door != null and granary_site._windows.is_empty());
+    _expect("a granary (a silo) has no windows and a body that rises", granary_site._windows.is_empty() and granary_site._body_h > 2.0);
     _granary = granary_site;
 
     # --- berries and crops

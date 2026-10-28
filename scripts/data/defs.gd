@@ -52,6 +52,7 @@ const ITEMS:Dictionary = {
 # mine_hours: labor-hours to dig one unit of each item (a surface rock or deposit is 2.5x quicker)
 # radius:   work radius in cells (shown when placing and selecting)
 # worker_slots, profession: how many citizens of that profession work here
+# decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut); roof_pitch: roof height over wall height (default 0.55)
 # wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
@@ -65,7 +66,7 @@ const ITEMS:Dictionary = {
 const BUILDINGS:Dictionary = {
     &"town_hall": {
         "wall": &"stone", "name": "Town Hall", "size": Vector2i(4, 4), "cost": {&"wood": 30, &"stone": 10}, "work": 20.0,
-        "shape": "house", "height": 3.0, "color": Color(0.62, 0.48, 0.34), "roof": Color(0.42, 0.22, 0.16),
+        "shape": "hall", "height": 3.0, "color": Color(0.62, 0.48, 0.34), "roof": Color(0.42, 0.22, 0.16),
         "water": true, "unique": true, "heated_by": &"heating",
         "upgrades": {
             &"storage": {
@@ -95,7 +96,7 @@ const BUILDINGS:Dictionary = {
     },
     &"house": {
         "wall": &"plaster", "name": "Wooden House", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 4}, "work": 24.0,
-        "shape": "house", "height": 2.2, "color": Color(0.6, 0.45, 0.3), "roof": Color(0.5, 0.3, 0.18),
+        "shape": "house", "height": 1.7, "color": Color(0.6, 0.45, 0.3), "roof": Color(0.5, 0.3, 0.18),
         "beds": 6, "fuel_capacity": 40,
         "controls": [
             {"id": "heating", "type": "toggle", "label": "Heating", "default": true},
@@ -118,7 +119,7 @@ const BUILDINGS:Dictionary = {
     },
     &"granary": {
         "name": "Granary", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 14.0,
-        "shape": "house", "height": 1.8, "color": Color(0.66, 0.55, 0.36), "roof": Color(0.45, 0.32, 0.2),
+        "shape": "silo", "height": 1.8, "color": Color(0.66, 0.55, 0.36), "roof": Color(0.45, 0.32, 0.2),
         "storage": true, "capacity": 300, "food_only": true, "spoil_mult": 0.5,
         "desc": "Stores food only. Holds 300 units. Item filters can be set in the inspector.",
     },
@@ -142,7 +143,7 @@ const BUILDINGS:Dictionary = {
     },
     &"forager": {
         "name": "Forager's Hut", "size": Vector2i(3, 3), "cost": {&"wood": 12}, "work": 8.0,
-        "shape": "house", "height": 1.6, "color": Color(0.42, 0.45, 0.28), "roof": Color(0.3, 0.38, 0.2),
+        "shape": "house", "decor": "hut", "roof_pitch": 0.95, "height": 1.5, "color": Color(0.42, 0.45, 0.28), "roof": Color(0.66, 0.58, 0.3),
         "radius": 16.0, "worker_slots": 2, "profession": "FORAGER",
         "controls": [
             {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true},
@@ -185,7 +186,7 @@ const BUILDINGS:Dictionary = {
     },
     &"blacksmith": {
         "wall": &"stone", "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
-        "shape": "house", "height": 1.9, "color": Color(0.38, 0.36, 0.36), "roof": Color(0.25, 0.22, 0.22),
+        "shape": "house", "decor": "forge", "height": 1.9, "color": Color(0.38, 0.36, 0.36), "roof": Color(0.25, 0.22, 0.22),
         "storage": true, "capacity": 60, "accepts_items": [&"tool_wood", &"tool_iron", &"tool_steel"],
         "worker_slots": 2, "profession": "BLACKSMITH",
         "produces": [&"tool_steel", &"tool_iron", &"tool_wood"],
@@ -204,7 +205,7 @@ const BUILDINGS:Dictionary = {
     },
     &"school": {
         "wall": &"plaster", "name": "School", "size": Vector2i(4, 4), "cost": {&"wood": 24, &"stone": 8}, "work": 24.0,
-        "shape": "house", "height": 2.2, "color": Color(0.72, 0.64, 0.46), "roof": Color(0.34, 0.3, 0.42),
+        "shape": "house", "decor": "school", "height": 2.2, "color": Color(0.72, 0.64, 0.46), "roof": Color(0.34, 0.3, 0.42),
         "worker_slots": 1, "profession": "TEACHER", "school_capacity": 12,
         "desc": "Children from 5 to 17 study here while a teacher is present (8:00 to 16:00), which builds general experience and makes them faster at every job. Holds 12 children and needs a teacher.",
     },

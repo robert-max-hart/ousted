@@ -2,7 +2,8 @@
 # Building gallery screenshot
 #     One of every building in two rows, for judging textures and
 #     silhouettes.
-#     godot --path . res://tests/gallery_shot.tscn -- <out_dir>
+#     godot --path . res://tests/gallery_shot.tscn -- <out_dir> [building_id [distance]]
+#     With a building id the camera closes in on that one (file <id>.png).
 # ----------------------------------------------------------------
 extends Node;
 
@@ -14,6 +15,7 @@ const ROWS:Array = [
 var world:World;
 var _out:String = "user://";
 var _frame:int = 0;
+var _name:String = "gallery";
 
 func _ready() -> void:
     SaveGame.autosave_enabled = false;
@@ -37,13 +39,21 @@ func _ready() -> void:
             var sz:Vector2i = Defs.BUILDINGS[id]["size"];
             world.place_building(id, o + Vector2i(x, r * 8), sz, true);
             x += sz.x + 2;
-    world.camera_rig.focus_on(Vector3(o.x + 14, 0, o.y + 8));
-    world.camera_rig._distance = 26.0;
-    world.camera_rig._target_distance = 26.0;
+    var focus:Vector3 = Vector3(o.x + 14, 0, o.y + 8);
+    var dist:float = 26.0;
+    if args.size() > 1:
+        _name = args[1];
+        for b in world.buildings:
+            if b.def_id == StringName(_name):
+                focus = Vector3(b.center_cell().x + 0.5, 0, b.center_cell().y + 0.5);
+        dist = args[2].to_float() if args.size() > 2 else 10.0;
+    world.camera_rig.focus_on(focus);
+    world.camera_rig._distance = dist;
+    world.camera_rig._target_distance = dist;
     world.tools.select(null);
 
 func _process(_delta:float) -> void:
     _frame += 1;
     if _frame == 20:
-        get_viewport().get_texture().get_image().save_png(_out.path_join("gallery.png"));
+        get_viewport().get_texture().get_image().save_png(_out.path_join(_name + ".png"));
         get_tree().quit();

@@ -54,6 +54,9 @@ var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
 
 var _body       :MeshInstance3D;
 var _roof       :MeshInstance3D;
+var _decor      :Array[MeshInstance3D] = [];       # extra shapes (BuildingShapes), hidden while a site
+var _body_y0    :float = 0.0;                      # where the body starts and how tall it is, for the rising frame of a site
+var _body_h     :float = 0.0;
 var _chimney    :MeshInstance3D;
 var _smoke      :CPUParticles3D;
 var _body_mat   :StandardMaterial3D;
@@ -573,8 +576,9 @@ func update_windows() -> void:
 
 func _build_chimney(h:float) -> void:
     var box:BoxMesh = BoxMesh.new();
-    var top:float = h + h * 0.6 + 0.35;
-    var base:float = h + h * 0.3;
+    var pitch:float = def.get("roof_pitch", 0.55);
+    var top:float = h + h * pitch + 0.35;
+    var base:float = h + h * pitch * 0.5;
     box.size = Vector3(0.4, top - base, 0.4);
     _chimney = _add_mesh(box, _flat_mat(Color(0.45, 0.32, 0.28)), Vector3(size.x * 0.22, (top + base) * 0.5, size.y * 0.15));
     _smoke = CPUParticles3D.new();
@@ -726,14 +730,22 @@ func _build_visual() -> void:
     var shape:String = def.get("shape", "house");
     var h:float = def.get("height", 2.0);
     _body_mat = SurfaceTextures.material(def.get("wall", &"planks"), def.get("color", Color.GRAY));
+    _body_h = h;
     match shape:
+        "silo":
+            BuildingShapes.silo(self);
+        "hall":
+            BuildingShapes.hall(self);
+            if def.has("fuel_capacity"):
+                _build_chimney(h);
         "house":
             var box:BoxMesh = BoxMesh.new();
             box.size = Vector3(size.x - 0.5, h, size.y - 0.5);
             _body = _add_mesh(box, _body_mat, Vector3(0, h * 0.5, 0));
+            var pitch:float = def.get("roof_pitch", 0.55);
             var prism:PrismMesh = PrismMesh.new();
-            prism.size = Vector3(size.x - 0.1, h * 0.6, size.y - 0.2);
-            _roof = _add_mesh(prism, SurfaceTextures.material(&"shingle", def.get("roof", Color.DARK_RED)), Vector3(0, h + h * 0.3, 0));
+            prism.size = Vector3(size.x - 0.1, h * pitch, size.y - 0.2);
+            _roof = _add_mesh(prism, SurfaceTextures.material(&"shingle", def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
             _build_door(Vector2(size.x - 0.5, size.y - 0.5), h);
             if def.has("fuel_capacity"):
                 _build_chimney(h);
@@ -756,9 +768,7 @@ func _build_visual() -> void:
             var cap:PrismMesh = PrismMesh.new();
             cap.size = Vector3(size.x * 0.55, h * 0.4, size.y * 0.45);
             _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-size.x * 0.2, h + h * 0.2, -size.y * 0.25));
-            var heap:BoxMesh = BoxMesh.new();
-            heap.size = Vector3(1.2, 0.6, 1.2);
-            _add_mesh(heap, _flat_mat(Color(0.6, 0.6, 0.6)), Vector3(size.x * 0.25, 0.4, size.y * 0.2));
+            BuildingShapes.mine_extras(self);
         "graveyard":
             var ground:BoxMesh = BoxMesh.new();
             ground.size = Vector3(size.x - 0.1, h, size.y - 0.1);
@@ -787,6 +797,23 @@ func _build_visual() -> void:
             _roof = _add_mesh(crate, _flat_mat(Color(0.6, 0.45, 0.28)), Vector3(-size.x * 0.2, h + 0.3 * cs, -size.y * 0.2));
         _:
             pass;
+    if def.has("decor"):
+        BuildingShapes.decorate(self, def["decor"]);
+
+# BuildingShapes: the body (which rises while a site) and roof of a custom shape, and loose extras.
+func set_body(mesh:MeshInstance3D, y0:float, height:float) -> void:
+    _body = mesh;
+    _body_y0 = y0;
+    _body_h = height;
+
+func set_roof(mesh:MeshInstance3D) -> void:
+    _roof = mesh;
+
+func add_decor(mesh:Mesh, mat:Material, at:Vector3, rot:Vector3 = Vector3.ZERO) -> MeshInstance3D:
+    var mi:MeshInstance3D = _add_mesh(mesh, mat, at);
+    mi.rotation = rot;
+    _decor.append(mi);
+    return mi;
 
 func _update_visual() -> void:
     if _body == null:
@@ -798,8 +825,9 @@ func _update_visual() -> void:
     _body_mat.albedo_color = col;
     var sy:float = lerpf(0.15, 1.0, progress()) if building else 1.0;
     _body.scale = Vector3(1.0, sy, 1.0);
-    var h:float = def.get("height", 2.0);
-    _body.position.y = h * 0.5 * sy;
+    _body.position.y = _body_y0 + _body_h * 0.5 * sy;
+    for d in _decor:
+        d.visible = not building;
     if _roof != null:
         _roof.visible = not building;
     if _chimney != null:

@@ -1,0 +1,192 @@
+# ----------------------------------------------------------------
+# BuildingShapes
+#     Silhouettes for the buildings that should not read as "a
+#     house": the Granary's silos, the Town Hall's clock tower, the
+#     Mine's headframe and tunnel, and the extras on the Blacksmith,
+#     School and Forager's Hut. Everything is built from boxes,
+#     cylinders and spheres in the building's local frame (origin at
+#     the centre of its footprint, y up) and added through
+#     Building.add_decor, so it hides while the building is a site.
+# ----------------------------------------------------------------
+class_name BuildingShapes extends RefCounted;
+
+const IRON      :Color = Color(0.2, 0.19, 0.19);
+const TIMBER    :Color = Color(0.4, 0.28, 0.17);
+const DARK      :Color = Color(0.08, 0.07, 0.07);
+
+# --------------------------------
+# Helpers
+
+static func _box(b:Building, dims:Vector3, mat:Material, at:Vector3, rot:Vector3 = Vector3.ZERO) -> MeshInstance3D:
+    var m:BoxMesh = BoxMesh.new();
+    m.size = dims;
+    return b.add_decor(m, mat, at, rot);
+
+static func _cyl(b:Building, top_r:float, bottom_r:float, height:float, mat:Material, at:Vector3, segments:int = 16, rot:Vector3 = Vector3.ZERO) -> MeshInstance3D:
+    var m:CylinderMesh = CylinderMesh.new();
+    m.top_radius = top_r;
+    m.bottom_radius = bottom_r;
+    m.height = height;
+    m.radial_segments = segments;
+    m.rings = 1;
+    return b.add_decor(m, mat, at, rot);
+
+static func _ball(b:Building, radius:float, mat:Material, at:Vector3, squash:float = 1.0) -> MeshInstance3D:
+    var m:SphereMesh = SphereMesh.new();
+    m.radius = radius;
+    m.height = radius * 2.0 * squash;
+    m.radial_segments = 8;
+    m.rings = 4;
+    return b.add_decor(m, mat, at);
+
+# A four-sided pyramid roof sitting on a square of half-width w.
+static func _pyramid(b:Building, w:float, height:float, mat:Material, base:Vector3) -> MeshInstance3D:
+    return _cyl(b, 0.0, w * 1.4142, height, mat, base + Vector3(0, height * 0.5, 0), 4, Vector3(0, PI * 0.25, 0));
+
+static func _colour(c:Color) -> StandardMaterial3D:
+    var m:StandardMaterial3D = StandardMaterial3D.new();
+    m.albedo_color = c;
+    m.roughness = 0.9;
+    return m;
+
+static func _roof_mat(b:Building) -> StandardMaterial3D:
+    return SurfaceTextures.material(&"shingle", b.def.get("roof", Color.BROWN));
+
+# --------------------------------
+# Granary: a tall silo with a cone roof, a smaller one beside it, iron bands and a door.
+
+static func silo(b:Building) -> void:
+    var s:Vector2 = Vector2(b.size);
+    var r:float = minf(s.x, s.y) * 0.27;
+    var tall:float = 3.1;
+    var at:Vector3 = Vector3(-s.x * 0.2, 0.0, -s.y * 0.12);
+    var cyl:CylinderMesh = CylinderMesh.new();
+    cyl.top_radius = r;
+    cyl.bottom_radius = r;
+    cyl.height = tall;
+    cyl.radial_segments = 20;
+    b.set_body(b._add_mesh(cyl, b._body_mat, at + Vector3(0, tall * 0.5, 0)), 0.0, tall);
+    var cone:CylinderMesh = CylinderMesh.new();
+    cone.top_radius = 0.05;
+    cone.bottom_radius = r * 1.2;
+    cone.height = 0.9;
+    cone.radial_segments = 20;
+    b.set_roof(b._add_mesh(cone, _roof_mat(b), at + Vector3(0, tall + 0.45, 0)));
+    var iron:StandardMaterial3D = _colour(IRON);
+    for y in [0.7, 1.5, 2.3]:
+        _cyl(b, r * 1.03, r * 1.03, 0.07, iron, at + Vector3(0, y, 0), 20);
+    var r2:float = r * 0.72;
+    var tall2:float = 2.1;
+    var at2:Vector3 = Vector3(s.x * 0.3, 0.0, -s.y * 0.22);
+    _cyl(b, r2, r2, tall2, b._body_mat, at2 + Vector3(0, tall2 * 0.5, 0), 16);
+    _cyl(b, 0.04, r2 * 1.2, 0.7, _roof_mat(b), at2 + Vector3(0, tall2 + 0.35, 0), 16);
+    _cyl(b, r2 * 1.03, r2 * 1.03, 0.06, iron, at2 + Vector3(0, 1.0, 0), 16);
+    _box(b, Vector3(0.5, 0.95, 0.1), _colour(DARK), at + Vector3(0, 0.48, r));
+    _box(b, Vector3(0.55, 0.06, 0.12), _colour(TIMBER), at + Vector3(0, 0.98, r));
+
+# --------------------------------
+# Town Hall: a long stone hall with a gabled roof, columns at the door and a clock tower.
+
+static func hall(b:Building) -> void:
+    var s:Vector2 = Vector2(b.size);
+    var body:Vector2 = s - Vector2(0.5, 0.5);
+    var bh:float = b.def.get("height", 3.0) * 0.62;
+    var box:BoxMesh = BoxMesh.new();
+    box.size = Vector3(body.x, bh, body.y);
+    b.set_body(b._add_mesh(box, b._body_mat, Vector3(0, bh * 0.5, 0)), 0.0, bh);
+    var roof_h:float = bh * 0.5;
+    var prism:PrismMesh = PrismMesh.new();
+    prism.size = Vector3(s.x - 0.1, roof_h, s.y - 0.2);
+    b.set_roof(b._add_mesh(prism, _roof_mat(b), Vector3(0, bh + roof_h * 0.5, 0)));
+    b._build_door(body, bh);
+    var stone:StandardMaterial3D = b._body_mat;
+    for sx in [-0.75, 0.75]:
+        _cyl(b, 0.11, 0.13, bh * 0.9, stone, Vector3(sx, bh * 0.45, body.y * 0.5 + 0.2), 8);
+    _box(b, Vector3(2.0, 0.12, 0.7), stone, Vector3(0, 0.06, body.y * 0.5 + 0.3));
+    var tz:float = -s.y * 0.1;
+    var base:float = bh + roof_h * 0.55;
+    _box(b, Vector3(1.1, 1.5, 1.1), stone, Vector3(0, base + 0.75, tz));
+    _pyramid(b, 0.68, 0.9, _roof_mat(b), Vector3(0, base + 1.5, tz));
+    _box(b, Vector3(0.5, 0.5, 0.06), _colour(Color(0.93, 0.9, 0.78)), Vector3(0, base + 1.0, tz + 0.58));
+    _ball(b, 0.06, _colour(DARK), Vector3(0, base + 1.0, tz + 0.62));
+
+# --------------------------------
+# Mine: a headframe with a winding wheel, a tunnel mouth in a rocky mound, rails with a cart and ore heaps.
+
+static func mine_extras(b:Building) -> void:
+    var s:Vector2 = Vector2(b.size);
+    var timber:StandardMaterial3D = _colour(TIMBER);
+    var hx:float = s.x * 0.27;
+    var hz:float = -s.y * 0.12;
+    for dz in [-0.5, 0.5]:
+        for lean in [-1.0, 1.0]:
+            _box(b, Vector3(0.14, 2.9, 0.14), timber, Vector3(hx + lean * 0.42, 1.4, hz + dz), Vector3(0, 0, -lean * 0.3));
+    _box(b, Vector3(0.2, 0.2, 1.3), timber, Vector3(hx, 2.65, hz));
+    _cyl(b, 0.42, 0.42, 0.1, _colour(IRON), Vector3(hx, 2.65, hz), 14, Vector3(PI * 0.5, 0, 0));
+    _box(b, Vector3(0.06, 1.9, 0.06), _colour(IRON), Vector3(hx, 1.65, hz + 0.05));       # the rope
+    var rock:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.5, 0.47, 0.44));
+    var ore:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.62, 0.32, 0.22));
+    var mound_at:Vector3 = Vector3(s.x * 0.02, 0.0, s.y * 0.26);
+    _ball(b, 1.3, rock, mound_at, 0.75);
+    _ball(b, 0.7, rock, mound_at + Vector3(-1.1, 0.0, 0.1), 0.7);
+    _box(b, Vector3(0.6, 0.45, 0.5), rock, mound_at + Vector3(0.9, 0.2, -0.5), Vector3(0, 0.5, 0));
+    var mouth:Vector3 = mound_at + Vector3(0, 0.5, 1.12);
+    _box(b, Vector3(1.05, 0.95, 0.15), _colour(DARK), mouth);
+    for sx in [-0.6, 0.6]:
+        _box(b, Vector3(0.14, 1.1, 0.18), timber, mouth + Vector3(sx, 0.05, 0.02));
+    _box(b, Vector3(1.4, 0.14, 0.2), timber, mouth + Vector3(0, 0.58, 0.02));
+    for sx in [-0.28, 0.28]:
+        _box(b, Vector3(0.06, 0.05, 1.5), _colour(IRON), Vector3(mouth.x + sx, 0.04, mouth.z + 0.9));
+    _box(b, Vector3(0.55, 0.3, 0.4), timber, Vector3(mouth.x, 0.28, mouth.z + 1.1));
+    _ball(b, 0.2, ore, Vector3(mouth.x, 0.46, mouth.z + 1.1), 0.7);
+    _ball(b, 0.5, ore, Vector3(-s.x * 0.36, 0.0, s.y * 0.2), 0.8);       # iron ore heap
+    _ball(b, 0.62, rock, Vector3(-s.x * 0.28, 0.0, s.y * 0.38), 0.7);                                 # stone heap
+
+# --------------------------------
+# Extras on house-shaped buildings, chosen by the def's "decor" key.
+
+static func decorate(b:Building, kind:String) -> void:
+    var s:Vector2 = Vector2(b.size);
+    var body:Vector2 = s - Vector2(0.5, 0.5);
+    var h:float = b.def.get("height", 2.0);
+    var front:float = body.y * 0.5;
+    match kind:
+        "forge":
+            var stone:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.34, 0.32, 0.32));
+            var top:float = h + 2.0;
+            _box(b, Vector3(0.75, top, 0.75), stone, Vector3(s.x * 0.2, top * 0.5, -s.y * 0.18));
+            _box(b, Vector3(0.95, 0.18, 0.95), _colour(IRON), Vector3(s.x * 0.2, top + 0.05, -s.y * 0.18));
+            var glow:StandardMaterial3D = _colour(Color(1.0, 0.5, 0.15));
+            glow.emission_enabled = true;
+            glow.emission = Color(1.0, 0.45, 0.1);
+            glow.emission_energy_multiplier = 1.4;
+            _box(b, Vector3(0.7, 0.45, 0.08), glow, Vector3(-body.x * 0.25, 0.55, front + 0.03));
+            _box(b, Vector3(0.9, 0.7, 0.14), _colour(DARK), Vector3(-body.x * 0.25, 0.4, front));
+            _box(b, Vector3(0.45, 0.26, 0.24), _colour(IRON), Vector3(body.x * 0.3, 0.38, front + 0.5));
+            _box(b, Vector3(0.22, 0.25, 0.2), _colour(IRON), Vector3(body.x * 0.3, 0.13, front + 0.5));
+            _box(b, Vector3(0.75, 0.1, 0.4), _colour(Color(0.3, 0.3, 0.32)), Vector3(-body.x * 0.25, 0.05, front + 0.45));
+        "school":
+            var plaster:StandardMaterial3D = b._body_mat;
+            var peak:float = h + h * b.def.get("roof_pitch", 0.55);
+            _box(b, Vector3(0.9, 0.9, 0.9), plaster, Vector3(0, peak + 0.05, 0));
+            var slit:StandardMaterial3D = _colour(DARK);
+            for sx in [-1.0, 1.0]:
+                _box(b, Vector3(0.05, 0.4, 0.28), slit, Vector3(sx * 0.46, peak + 0.2, 0));
+                _box(b, Vector3(0.28, 0.4, 0.05), slit, Vector3(0, peak + 0.2, sx * 0.46));
+            _ball(b, 0.1, _colour(Color(0.85, 0.65, 0.2)), Vector3(0, peak + 0.15, 0));
+            _pyramid(b, 0.62, 0.7, _roof_mat(b), Vector3(0, peak + 0.5, 0));
+            _box(b, Vector3(1.8, 0.12, 0.6), plaster, Vector3(0, 0.06, front + 0.3));
+            _box(b, Vector3(1.0, 0.55, 0.05), _colour(Color(0.16, 0.3, 0.2)), Vector3(-body.x * 0.28, h * 0.58, front + 0.03));
+        "hut":
+            var rack:StandardMaterial3D = _colour(TIMBER);
+            var rz:float = front + 0.75;
+            for sx in [-0.55, 0.55]:
+                _box(b, Vector3(0.07, 1.1, 0.07), rack, Vector3(body.x * 0.12 + sx, 0.55, rz));
+            _box(b, Vector3(1.25, 0.06, 0.06), rack, Vector3(body.x * 0.12, 1.05, rz));
+            var cols:Array[Color] = [Color(0.75, 0.2, 0.2), Color(0.5, 0.45, 0.3), Color(0.35, 0.3, 0.2), Color(0.75, 0.2, 0.2)];
+            for i in cols.size():
+                _ball(b, 0.1, _colour(cols[i]), Vector3(body.x * 0.12 - 0.45 + i * 0.3, 0.9, rz), 1.3);
+            var wicker:StandardMaterial3D = _colour(Color(0.55, 0.42, 0.22));
+            _cyl(b, 0.24, 0.19, 0.26, wicker, Vector3(-body.x * 0.32, 0.13, front + 0.45), 10);
+            _ball(b, 0.2, _colour(Color(0.72, 0.18, 0.2)), Vector3(-body.x * 0.32, 0.3, front + 0.45), 0.7);
+            _cyl(b, 0.2, 0.16, 0.22, wicker, Vector3(-body.x * 0.32 - 0.5, 0.11, front + 0.7), 10);
