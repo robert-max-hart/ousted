@@ -127,6 +127,21 @@ func _cremate() -> void:
         _visual_dirty = true;
         world.notify("%d old %s cremated to free graves." % [burned, "grave was" if burned == 1 else "graves were"]);
 
+# After an expansion: every grave keeps its square, new squares are free.
+func on_resized(old:Rect2i) -> void:
+    var n:int = plot_count();
+    var kept:Array = [];
+    kept.resize(n);
+    for i in n:
+        var c:Vector2i = plot_cell(i);
+        if old.has_point(c):
+            kept[i] = graves[(c.x - old.position.x) + (c.y - old.position.y) * old.size.x];
+    graves = kept;
+    reserved.clear();
+    reserved.resize(n);
+    super.on_resized(old);
+    _visual_dirty = true;
+
 func on_terrain_changed() -> void:
     super.on_terrain_changed();
     _visual_dirty = true;

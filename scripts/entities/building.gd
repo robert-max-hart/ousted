@@ -38,6 +38,7 @@ var fuel_incoming:int = 0;          # firewood being carried here
 var inputs      :Dictionary = {};   # item -> int in the input inventory (production buildings)
 var input_incoming:Dictionary = {}; # item -> int being carried here
 var upgrades_done:Dictionary = {};   # upgrade id -> true
+var expansion   :Dictionary = {};   # while upgrading is Expansion.ID: {rect, cost, work} for the bigger footprint
 var upgrading   :StringName = &"";  # upgrade being built right now, or &"" (while set, delivered/incoming/work_done belong to it)
 var _base_spent :Dictionary = {};   # materials the building itself cost, set aside while an upgrade is built
 var dig_progress:Dictionary = {};   # item -> labor-hours into the next unit (mines)
@@ -84,6 +85,20 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
 
 func rect() -> Rect2i:
     return Rect2i(origin, size);
+
+# The ground this building holds: its rectangle, or the bigger one it is being expanded into.
+func footprint() -> Rect2i:
+    return expansion["rect"] if upgrading == Expansion.ID and not expansion.is_empty() else rect();
+
+# Called once an expansion has changed origin and size: refit what is drawn (and, in subclasses, per-plot data).
+func on_resized(_old:Rect2i) -> void:
+    name = "%s_%d_%d" % [def_id, origin.x, origin.y];
+    var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
+    position = Vector3(center.x, world.terrain.height_at(center.x, center.y), center.y);
+    if def.get("shape", "") == "pile" and _body != null:
+        (_body.mesh as BoxMesh).size = Vector3(size.x - 0.3, def.get("height", 0.1), size.y - 0.3);
+    if _fence != null:
+        _fence.rebuild();
 
 func display_name() -> String:
     return def["name"];
@@ -280,6 +295,8 @@ func set_forbidden(item:StringName, forbid:bool) -> void:
 # Construction
 
 func cost() -> Dictionary:
+    if upgrading == Expansion.ID:
+        return expansion["cost"];
     if upgrading != &"":
         return def["upgrades"][upgrading]["cost"];
     var mult:float = cost_mult * area_mult();
@@ -313,6 +330,8 @@ func has_all_materials() -> bool:
     return true;
 
 func work_required() -> float:
+    if upgrading == Expansion.ID:
+        return expansion["work"];
     return def["upgrades"][upgrading]["work"] if upgrading != &"" else def["work"] * cost_mult * area_mult();
 
 func progress() -> float:
@@ -443,6 +462,7 @@ func cancel_upgrade() -> void:
     _base_spent = {};
     incoming = {};
     work_done = work_required();
+    Expansion.cancel(world, self);
     upgrading = &"";
 
 func _finish_upgrade() -> void:
@@ -450,6 +470,11 @@ func _finish_upgrade() -> void:
         delivered[item] = delivered.get(item, 0) + _base_spent[item];
     _base_spent = {};
     incoming = {};
+    if upgrading == Expansion.ID:
+        upgrading = &"";
+        Expansion.finish(world, self);
+        work_done = work_required();
+        return;
     upgrades_done[upgrading] = true;
     world.notify("%s: %s built." % [display_name(), def["upgrades"][upgrading]["name"]]);
     upgrading = &"";
@@ -635,7 +660,7 @@ func to_dict() -> Dictionary:
         "settings": settings.duplicate(), "fuel": fuel, "fuel_coal": fuel_coal, "inputs": inputs.duplicate(),
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
-        "cost_mult": cost_mult, "priority": priority, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
+        "expansion": expansion.duplicate(true), "cost_mult": cost_mult, "priority": priority, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
         "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1,
     };
 
@@ -658,6 +683,7 @@ func restore_dict(d:Dictionary) -> void:
     _spoil_acc = d["spoil_acc"];
     _burn_acc = d["burn_acc"];
     cost_mult = d.get("cost_mult", 1.0);
+    expansion = d.get("expansion", {});
     priority = d.get("priority", PRIORITY_MEDIUM);
     _update_visual();
     update_site_label();
@@ -697,7 +723,10 @@ func info_text() -> String:
         for entry in world.death_log.slice(-5):
             s += "  %s, age %d, %s (%s)\n" % [entry["name"], entry["age"], entry["cause"], entry["when"]];
     if upgrading != &"":
-        s += "Upgrading: %s (%d%%)\n" % [def["upgrades"][upgrading]["name"], roundi(progress() * 100.0)];
+        if upgrading == Expansion.ID:
+            s += "Expanding to %dx%d (%d%%)\n" % [expansion["rect"].size.x, expansion["rect"].size.y, roundi(progress() * 100.0)];
+        else:
+            s += "Upgrading: %s (%d%%)\n" % [def["upgrades"][upgrading]["name"], roundi(progress() * 100.0)];
         s += "Priority: %s\n" % PRIORITY_NAMES[priority];
         if shortage_text() != "":
             s += "Not enough in storage: needs %s\n" % shortage_text();

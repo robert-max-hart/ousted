@@ -467,7 +467,7 @@ func _run_task(move_dt:float, dh:float) -> void:
                 if task.job >= 0:
                     speed *= 1.0 + experience(task.job);
                     practise(task.job, dh);
-            if (step["tick"] as Callable).call(self, dh * speed):
+            if (step["tick"] as Callable).call(self, dh * speed) and task != null:       # (the work itself may have ended the task, as finishing an expansion does)
                 task.index += 1;
         Task.Step.ACT:
             if (step["fn"] as Callable).call(self):

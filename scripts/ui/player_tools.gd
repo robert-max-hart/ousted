@@ -9,7 +9,7 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
@@ -18,6 +18,7 @@ const MODE_HINTS:Dictionary = {
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
     Mode.ROAD:     "Drag to lay a road. Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
     Mode.DEMOLISH: "Drag to demolish buildings and roads.",
+    Mode.EXPAND:   "Click on the ground beside it to grow it there. Right-click to stop.",
     Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
     Mode.LOWER:    "Hold the left mouse button to lower the ground.",
@@ -32,6 +33,7 @@ var mode        :int = Mode.SELECT;
 var build_id    :StringName = &"";
 var build_size  :Vector2i = Vector2i.ONE;
 var selected    :Variant = null;
+var expanding   :Building = null;      # the field, stockpile or graveyard being grown (Mode.EXPAND)
 var relocating  :Building = null;     # while placing a moved building: the one being moved
 var hint        :String = MODE_HINTS[Mode.SELECT];
 var error       :String = "";
@@ -109,6 +111,7 @@ func set_mode(m:int, id:StringName = &"") -> void:
     mode = m;
     build_id = id;
     relocating = null;
+    expanding = null;
     if m == Mode.BUILD:
         build_size = Defs.BUILDINGS[id]["size"];
         if _is_field_mode():
@@ -123,6 +126,14 @@ func set_mode(m:int, id:StringName = &"") -> void:
     _dragging = false;
     _brushing = false;
     mode_changed.emit(mode);
+
+# Grows a finished field, stockpile or graveyard: click the ground beside it and it stretches to take in that cell.
+func start_expand(b:Building) -> void:
+    if not b.is_complete() or not b.def.get("drag_size", false):
+        return;
+    set_mode(Mode.EXPAND);
+    expanding = b;
+    hint = "Expanding the %s. Click the ground beside it to grow it there (up to %d cells a side). Right-click to stop." % [b.display_name().to_lower(), FIELD_MAX_SIDE];
 
 # Picks a new spot for an existing building (see World.relocate): same footprint, a share of the cost.
 func start_relocate(b:Building) -> void:
@@ -216,6 +227,14 @@ func _on_press() -> void:
                 select(moved);
             elif error == "":
                 World.instance.place_building(build_id, origin, build_size);
+        Mode.EXPAND:
+            if World.alive(expanding):
+                var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);
+                error = Expansion.block_reason(World.instance, expanding, grown);
+                if error == "" and Expansion.start(World.instance, expanding, grown):
+                    var done:Building = expanding;
+                    set_mode(Mode.SELECT);
+                    select(done);
         Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.DEMOLISH, Mode.CANCEL:
             _dragging = true;
             _drag_start = _hover_cell;
@@ -401,6 +420,12 @@ func _update_ghosts() -> void:
             var short:bool = ok and not _can_afford();
             _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad if not ok else _mat_area if short else _mat_ok);
             _model_ghost.show_at(w, build_id, origin, build_size, _mat_m_bad if not ok else _mat_m_short if short else _mat_m_ok);
+        Mode.EXPAND:
+            if World.alive(expanding):
+                var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);
+                var why:String = Expansion.block_reason(w, expanding, grown);
+                _show_box(0, grown, 0.15, _mat_ok if why == "" else _mat_bad);
+                error = "" if why == "" or grown == expanding.rect() else why;
         Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH, Mode.CANCEL:
             var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
             _show_box(0, r, 0.4, _mat_bad if mode == Mode.DEMOLISH else _mat_area);
@@ -436,6 +461,12 @@ func _forage_filter(rn:ResourceNode) -> bool:
 
 # The footprint being placed by a variable-sized building tool, as text ("6x8 tiles, 48 total"), or "".
 func size_text() -> String:
+    if mode == Mode.EXPAND and _hover_ok and World.alive(expanding):
+        var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);
+        if grown == expanding.rect():
+            return "";
+        var extra:Dictionary = Expansion.plan(expanding, grown)["cost"];
+        return "%dx%d tiles, %d total, +%d%s" % [grown.size.x, grown.size.y, grown.size.x * grown.size.y, grown.size.x * grown.size.y - expanding.size.x * expanding.size.y, ": " + Defs.cost_string(extra) if not extra.is_empty() else ""];
     if mode != Mode.BUILD or not _is_field_mode() or not _hover_ok:
         return "";
     var r:Rect2i = _field_rect() if _dragging else Rect2i(_build_origin(), build_size);

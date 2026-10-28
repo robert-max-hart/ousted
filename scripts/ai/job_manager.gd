@@ -459,7 +459,7 @@ func _build_task(p:Pawn) -> Task:
         return null;
     var b:Building = best;
     b.builders += 1;
-    var verb:String = "Tilling" if b is Field else "Upgrading" if b.upgrading != &"" else "Building";
+    var verb:String = "Tilling" if b is Field else "Expanding" if b.upgrading == Expansion.ID else "Upgrading" if b.upgrading != &"" else "Building";
     var t:Task = Task.new(&"build", "%s %s" % [verb, b.display_name()]);
     t.job = Profession.BUILDER;
     t.target = b;

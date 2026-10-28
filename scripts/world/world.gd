@@ -22,6 +22,9 @@ const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
     JobManager.Profession.FARMER,
 ];
+const START_ROCKS_MIN   :int = 5;                   # loose rocks guaranteed near the start (8 stone each), whatever the seed
+const START_ROCKS_NEAR  :float = 10.0;              # ... in the ring this far from the start, no further than START_ROCKS_FAR
+const START_ROCKS_FAR   :float = 22.0;
 const MAX_BUILD_SLOPE   :float = 2.5;
 const MAX_WALK_SLOPE    :float = 2.2;
 
@@ -127,6 +130,7 @@ func _ready() -> void:
         if backdrop:
             TitleBackdrop.build(self, start);
             return;
+        _ensure_start_rocks(start);
         town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
         _start_colony_goods(start);
         Defs.ageing_days_per_year = 4.0;
@@ -225,6 +229,32 @@ func _find_start_cell() -> Vector2i:
                 best_score = score;
                 best = c;
     return best;
+
+# Tops the ring around the start up to START_ROCKS_MIN loose rocks, so the first buildings always have stone close
+# by (the random scatter leaves some seeds with one or two). Picks level, dry, empty cells with the world's own rng.
+func _ensure_start_rocks(start:Vector2i) -> void:
+    var have:int = 0;
+    for rn in nodes:
+        var d:float = Vector2(rn.cell - start).length();
+        if rn.kind == &"rock" and d >= START_ROCKS_NEAR and d <= START_ROCKS_FAR:
+            have += 1;
+    var free:Array[Vector2i] = [];
+    var reach:int = ceili(START_ROCKS_FAR);
+    for z in range(start.y - reach, start.y + reach + 1):
+        for x in range(start.x - reach, start.x + reach + 1):
+            var c:Vector2i = Vector2i(x, z);
+            var d:float = Vector2(c - start).length();
+            if d < START_ROCKS_NEAR or d > START_ROCKS_FAR or not terrain.in_bounds(c):
+                continue;
+            if terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4 or terrain.cell_slope(c) > 1.4:
+                continue;
+            if node_at[idx(c)] == null and occupant[idx(c)] == null:
+                free.append(c);
+    while have < START_ROCKS_MIN and not free.is_empty():
+        var pick:int = rng.randi_range(0, free.size() - 1);
+        add_node(&"rock", free[pick]);
+        free.remove_at(pick);
+        have += 1;
 
 func _clear_nodes(c:Vector2i, radius:int) -> void:
     for rn in nodes.duplicate():
@@ -358,6 +388,8 @@ func _restore_entities(save:Dictionary) -> void:
     for bd in save["buildings"]:
         var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true);
         b.restore_dict(bd);
+        if not b.expansion.is_empty():
+            Expansion.hold_cells(self, b);
         if bd["id"] == &"town_hall" and b.is_complete():
             town_hall = b;
     for i in buildings.size():
@@ -591,7 +623,7 @@ func remove_building(b:Building, refund:bool) -> void:
         p.home = null;
     # cancel work aimed at it now, while task callbacks can still see it
     release_site_workers(b);
-    var r:Rect2i = b.rect();
+    var r:Rect2i = b.footprint();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             occupant[idx(Vector2i(x, z))] = null;
@@ -642,7 +674,7 @@ func relocation_block_reason(b:Building) -> String:
     if not b.is_complete():
         return "Not finished";
     if b.upgrading != &"":
-        return "Upgrade in progress";
+        return "Upgrade in progress" if b.upgrading != Expansion.ID else "Expansion in progress";
     if b.relocating_to != null and alive(b.relocating_to):
         return "Already being moved";
     if b.relocating_from != null:

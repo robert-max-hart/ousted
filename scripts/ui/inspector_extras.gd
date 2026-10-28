@@ -13,6 +13,8 @@ class_name InspectorExtras extends VBoxContainer;
 var _mark_btn   :Button;
 var _early_btn  :Button;
 var _field      :Field;
+var _grow_btn   :Button;       # expand a field, stockpile or graveyard, or cancel the expansion
+var _grow_for   :Building;
 var _workers_box:VBoxContainer;
 var _workers_sig:String = "";
 var _node       :ResourceNode;
@@ -23,6 +25,11 @@ func _init() -> void:
     _mark_btn.visible = false;
     _mark_btn.pressed.connect(_on_mark);
     add_child(_mark_btn);
+    _grow_btn = Button.new();
+    _grow_btn.focus_mode = Control.FOCUS_NONE;
+    _grow_btn.visible = false;
+    _grow_btn.pressed.connect(_on_grow);
+    add_child(_grow_btn);
     _early_btn = Button.new();
     _early_btn.focus_mode = Control.FOCUS_NONE;
     _early_btn.visible = false;
@@ -34,6 +41,7 @@ func _init() -> void:
 
 func refresh(obj:Variant) -> void:
     _refresh_mark(obj);
+    _refresh_grow(obj);
     _refresh_early(obj);
     _refresh_workers(obj);
 
@@ -49,6 +57,30 @@ func _on_mark() -> void:
     if _node != null and World.alive(_node):
         World.instance.set_designated(_node, not _node.designated);
         _refresh_mark(_node);
+
+# Expand: for a finished building the player drags out (fields, stockpiles, graveyards).
+func _refresh_grow(obj:Variant) -> void:
+    _grow_for = obj as Building if obj is Building and obj.def.get("drag_size", false) else null;
+    _grow_btn.visible = _grow_for != null and _grow_for.is_complete() and _grow_for.relocating_from == null;
+    if not _grow_btn.visible:
+        return;
+    if _grow_for.upgrading == Expansion.ID:
+        _grow_btn.text = "Cancel the expansion";
+        _grow_btn.disabled = false;
+        _grow_btn.tooltip_text = "Stop and take back the materials delivered so far";
+        return;
+    _grow_btn.text = "Expand";
+    _grow_btn.disabled = _grow_for.upgrading != &"";
+    _grow_btn.tooltip_text = "Grow it on the side you click. The extra area costs the difference, and builders do the work." if not _grow_btn.disabled else "Another project is in progress";
+
+func _on_grow() -> void:
+    if _grow_for == null or not World.alive(_grow_for):
+        return;
+    if _grow_for.upgrading == Expansion.ID:
+        _grow_for.cancel_upgrade();
+        _refresh_grow(_grow_for);
+    else:
+        World.instance.tools.start_expand(_grow_for);
 
 # A field's "harvest now": a cold snap is coming, or the season is ending, so take what has grown.
 func _refresh_early(obj:Variant) -> void:

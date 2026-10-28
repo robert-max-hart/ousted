@@ -264,6 +264,52 @@ func on_day() -> void:
         if plot_state[i] == Plot.FALLOW:
             _set_fertility(i, fertility(i) + FALLOW_RECOVERY);
 
+# After an expansion: every plot keeps its crop and growth, new ones start fallow. The plot numbers change with the width.
+func on_resized(old:Rect2i) -> void:
+    var n:int = plot_count();
+    var st:PackedByteArray = PackedByteArray();
+    var gr:PackedFloat32Array = PackedFloat32Array();
+    var ct:PackedByteArray = PackedByteArray();
+    var fh:PackedFloat32Array = PackedFloat32Array();
+    var mo:PackedFloat32Array = PackedFloat32Array();
+    var nw:PackedByteArray = PackedByteArray();
+    var pc:Array[StringName] = [];
+    st.resize(n);
+    ct.resize(n);
+    nw.resize(n);
+    gr.resize(n);
+    fh.resize(n);
+    mo.resize(n);
+    pc.resize(n);
+    for i in n:
+        var c:Vector2i = plot_cell(i);
+        if old.has_point(c):
+            var oi:int = (c.x - old.position.x) + (c.y - old.position.y) * old.size.x;
+            st[i] = plot_state[oi];
+            pc[i] = plot_crop[oi];
+            gr[i] = growth[oi];
+            ct[i] = cuts[oi];
+            fh[i] = frozen_hours[oi];
+            mo[i] = moisture[oi];
+            nw[i] = near_water[oi];
+        else:
+            st[i] = Plot.FALLOW;
+            pc[i] = crop_id;
+            mo[i] = 0.5;
+            nw[i] = 1 if _is_near_water(c) else 0;
+    plot_state = st;
+    plot_crop = pc;
+    growth = gr;
+    cuts = ct;
+    frozen_hours = fh;
+    moisture = mo;
+    near_water = nw;
+    reserved.clear();
+    reserved.resize(n);
+    super.on_resized(old);
+    position = Vector3.ZERO;       # crops are drawn in world space
+    _visual_dirty = true;
+
 func on_terrain_changed() -> void:
     super.on_terrain_changed();
     _visual_dirty = true;
