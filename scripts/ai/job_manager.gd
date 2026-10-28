@@ -86,10 +86,19 @@ func choose_task(p:Pawn) -> Task:
         if _child_barred(p):
             return needs.stay_home_task(p);
 
-    for job in _job_order(p.profession):
+    var own:Array[Callable] = _job_order(p.profession);
+    for job in own:
         t = (job as Callable).call(p);
         if t != null:
             return t;
+    if p.profession != Profession.LABORER:
+        # nothing of their own to do: work as a laborer would (skipping what the list above already tried)
+        for job in _job_order(Profession.LABORER):
+            if own.has(job):
+                continue;
+            t = (job as Callable).call(p);
+            if t != null:
+                return t;
     return _idle_task(p);
 
 func _job_order(prof:int) -> Array[Callable]:
