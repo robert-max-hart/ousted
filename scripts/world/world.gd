@@ -63,6 +63,8 @@ var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, war
 var saplings    :Array[ResourceNode] = [];
 var road_work:Dictionary = {};              # cell -> work hours done: road cells staked out, waiting for builders and laborers
 var road_claimed:Dictionary = {};           # cell -> true while a citizen is working on it (not saved)
+var road_kind:Dictionary = {};              # cell -> Terrain.Overlay.ROAD or CHANNEL: what a staked or waiting cell becomes (missing: road)
+var irrigation_version:int = 0;             # bumped when channels are dug, filled in or flow changes (fields re-check their plots)
 var pending_roads:Dictionary = {};          # cell -> true: road cells waiting for a tree or rock to be cleared
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
@@ -158,6 +160,7 @@ func _ready() -> void:
     GameClock.hour_changed.connect(_on_hour);
     GameClock.day_changed.connect(_on_day);
     GameClock.season_changed.connect(_on_season);
+    Weather.drought_changed.connect(_on_drought);
     _apply_season(GameClock.season());
     notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
 
@@ -373,7 +376,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -441,6 +444,9 @@ func _restore_entities(save:Dictionary) -> void:
         pending_roads[c] = true;
     for e in save.get("road_work", []):
         road_work[e[0]] = e[1];
+    for e in save.get("road_kind", []):
+        road_kind[e[0]] = e[1];
+    update_irrigation();
     policies.restore(save.get("policies", {}));
     seeds.restore(save.get("seeds", null));
     ledger.restore(save.get("ledger", {}));
@@ -519,9 +525,14 @@ func _grow_trees() -> void:
             saplings.erase(rn);
     renderer.mark_dirty();
 
+func _on_drought(on:bool) -> void:
+    if is_backdrop:
+        return;
+    notify("A drought begins: no rain, and the ground dries fast. Fields away from water need watering." if on else "The drought has broken.");
+
 func _update_wetness() -> void:
     wetness += 0.03 * Weather.intensity;
-    wetness -= (0.004 + maxf(0.0, Weather.temperature) * 0.0003) * (1.0 - Weather.intensity);
+    wetness -= (0.004 + maxf(0.0, Weather.temperature) * 0.0003) * (1.0 - Weather.intensity) * Weather.drying();
     wetness = clampf(wetness, 0.0, 1.0);
 
 func remove_node(rn:ResourceNode) -> void:
@@ -573,6 +584,8 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
                 return "Something is already built here";
             if terrain.get_overlay(c) == Terrain.Overlay.ROAD:
                 return "A road is in the way";
+            if terrain.get_overlay(c) == Terrain.Overlay.CHANNEL or terrain.get_overlay(c) == Terrain.Overlay.CHANNEL_WET:
+                return "A channel is in the way";
     var hr:Vector2 = terrain.rect_height_range(r);
     var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("drag_size", false) else 1.0);
     if hr.y - hr.x > limit:
@@ -859,9 +872,10 @@ func can_plan_road(c:Vector2i) -> bool:
 
 # Plans a road cell for the Road tool. Anything in the way is marked for clearing first; then the cell is staked out
 # and citizens do ROAD_WORK_HOURS of work on it (no materials). Returns true if it is waiting on something to be cleared.
-func plan_road(c:Vector2i) -> bool:
+func plan_road(c:Vector2i, kind:int = Terrain.Overlay.ROAD) -> bool:
     if not can_plan_road(c) or terrain.get_overlay(c) != Terrain.Overlay.NONE or road_work.has(c) or pending_roads.has(c):
         return false;
+    road_kind[c] = kind;
     var rn:ResourceNode = node_at[idx(c)];
     if rn == null:
         stake_road(c);
@@ -878,6 +892,7 @@ func stake_road(c:Vector2i) -> void:
 
 func cancel_road(c:Vector2i) -> void:
     pending_roads.erase(c);
+    road_kind.erase(c);
     if road_work.erase(c):
         road_claimed.erase(c);
         terrain.set_overlay(c, Terrain.Overlay.NONE);
@@ -887,12 +902,58 @@ func work_road(c:Vector2i, dh:float) -> bool:
     if not road_work.has(c):
         return true;
     road_work[c] += dh;
-    if road_work[c] < Defs.ROAD_WORK_HOURS:
+    var channel:bool = road_kind.get(c, Terrain.Overlay.ROAD) == Terrain.Overlay.CHANNEL;
+    if road_work[c] < (Defs.CHANNEL_WORK_HOURS if channel else Defs.ROAD_WORK_HOURS):
         return false;
     road_work.erase(c);
+    road_kind.erase(c);
     terrain.set_overlay(c, Terrain.Overlay.NONE);
-    set_road(c, true);
+    if channel:
+        terrain.set_overlay(c, Terrain.Overlay.CHANNEL);
+        update_irrigation();
+    else:
+        set_road(c, true);
     return true;
+
+# --------------------------------
+# Irrigation: a dug channel that connects (cell to cell, not diagonally) to water carries it; plots near such a
+# channel stay moist (Field).
+
+func is_channel(c:Vector2i) -> bool:
+    var o:int = terrain.get_overlay(c) if terrain.in_bounds(c) else Terrain.Overlay.NONE;
+    return o == Terrain.Overlay.CHANNEL or o == Terrain.Overlay.CHANNEL_WET;
+
+func remove_channel(c:Vector2i) -> void:
+    if is_channel(c):
+        terrain.set_overlay(c, Terrain.Overlay.NONE);
+        update_irrigation();
+
+# Marks every channel cell reachable from water as flowing.
+func update_irrigation() -> void:
+    var wet:Dictionary = {};
+    var open:Array[Vector2i] = [];
+    var dirs:Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)];
+    var cells:Array[Vector2i] = [];
+    for z in Terrain.SIZE:
+        for x in Terrain.SIZE:
+            if terrain.overlay[z * Terrain.SIZE + x] == Terrain.Overlay.CHANNEL or terrain.overlay[z * Terrain.SIZE + x] == Terrain.Overlay.CHANNEL_WET:
+                cells.append(Vector2i(x, z));
+    for c in cells:
+        for d in dirs:
+            if terrain.in_bounds(c + d) and terrain.is_water(c + d):
+                wet[c] = true;
+                open.append(c);
+                break;
+    while not open.is_empty():
+        var c:Vector2i = open.pop_back();
+        for d in dirs:
+            var n:Vector2i = c + d;
+            if not wet.has(n) and is_channel(n):
+                wet[n] = true;
+                open.append(n);
+    for c in cells:
+        terrain.set_overlay(c, Terrain.Overlay.CHANNEL_WET if wet.has(c) else Terrain.Overlay.CHANNEL);
+    irrigation_version += 1;
 
 func set_road(c:Vector2i, on:bool) -> void:
     if on and not can_road(c):

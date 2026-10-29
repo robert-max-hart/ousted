@@ -5,6 +5,7 @@
 extends Node;
 
 signal weather_changed;
+signal drought_changed(on:bool);       # a dry spell began or ended (the world tells the player)
 
 # Mid-season mean temperatures (C): spring, summer, autumn, winter
 const SEASON_TEMP       :Array[float] = [11.0, 21.0, 9.0, -5.0];
@@ -12,6 +13,11 @@ const DAILY_SWING       :float = 4.0;
 const RAIN_START_CHANCE :Array[float] = [0.06, 0.03, 0.06, 0.05];   # per hour
 const RAIN_STOP_CHANCE  :float = 0.12;                                # per hour
 const RAIN_COOLING      :float = 2.0;
+const DROUGHT_CHANCE    :Array[float] = [0.02, 0.05, 0.02, 0.0];     # per day, by season: none in winter
+const DROUGHT_DAYS      :Vector2i = Vector2i(5, 11);                 # how long one lasts
+const DROUGHT_REST       :int = 10;                                   # days after one ends before another can start
+const DROUGHT_WARMING   :float = 3.0;                                # C hotter than the season while it lasts
+const DROUGHT_DRYING    :float = 2.5;                                # how much faster soil and ground dry
 const RAMP_IN_HOURS     :float = 1.5;                         # game hours for rain/snow to build to full
 const RAMP_OUT_HOURS    :float = 2.5;                         # ... and to clear away again
 const SNOW_BELOW        :float = 0.0;                         # C: all precipitation is snow
@@ -22,6 +28,9 @@ var is_raining      :bool = false;      # a precipitation spell is active (the t
 var intensity       :float = 0.0;       # 0..1, eases toward the spell; use this for anything visible
 var _dry_temperature:float = 10.0;
 var _day_offset     :float = 0.0;
+var drought_days    :int = 0;           # days left of a dry spell: no rain, hotter, everything dries faster
+var drought_rest    :int = 0;           # days left before another drought may start
+var drought_enabled :bool = true;       # tests that need steady weather switch it off
 var _rng            :RandomNumberGenerator = RandomNumberGenerator.new();
 
 func _ready() -> void:
@@ -41,6 +50,17 @@ func _process(delta:float) -> void:
 
 func _on_day(_day:int) -> void:
     _roll_day();
+    if drought_days > 0:
+        drought_days -= 1;
+        if drought_days == 0:
+            drought_rest = DROUGHT_REST;
+            drought_changed.emit(false);
+    elif drought_rest > 0:
+        drought_rest -= 1;
+    elif drought_enabled and _rng.randf() < DROUGHT_CHANCE[GameClock.season()]:
+        drought_days = _rng.randi_range(DROUGHT_DAYS.x, DROUGHT_DAYS.y);
+        is_raining = false;
+        drought_changed.emit(true);
 
 func _roll_day() -> void:
     _day_offset = _rng.randf_range(-4.0, 4.0);
@@ -48,15 +68,17 @@ func _roll_day() -> void:
 func _on_hour(_hour:int) -> void:
     var s:int = GameClock.season();
     if is_raining:
-        if _rng.randf() < RAIN_STOP_CHANCE:
+        if drought_days > 0 or _rng.randf() < RAIN_STOP_CHANCE:
             is_raining = false;
-    elif _rng.randf() < RAIN_START_CHANCE[s]:
+    elif drought_days == 0 and _rng.randf() < RAIN_START_CHANCE[s]:
         is_raining = true;
     _update_temperature();
     weather_changed.emit();
 
 # A new game starts with clear weather (or, for the title screen, a given strength of rain or snow).
 func reset(precipitation:float = 0.0) -> void:
+    drought_days = 0;
+    drought_rest = 0;
     is_raining = precipitation > 0.0;
     intensity = precipitation;
     _roll_day();
@@ -64,12 +86,13 @@ func reset(precipitation:float = 0.0) -> void:
     weather_changed.emit();
 
 func save_state() -> Dictionary:
-    return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset};
+    return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset, "drought_days": drought_days};
 
 func restore_state(d:Dictionary) -> void:
     is_raining = d["is_raining"];
     intensity = d["intensity"];
     _day_offset = d["day_offset"];
+    drought_days = d.get("drought_days", 0);
     _update_temperature();
 
 # The climate's mean temperature this many hours from now (no daily swing, rain or today's random offset).
@@ -106,7 +129,7 @@ func _update_temperature() -> void:
     # coldest around 04:00, warmest around 16:00
     var daily:float = -cos((h - 4.0) / 24.0 * TAU) * DAILY_SWING;
     _dry_temperature = mean_temperature() + daily;
-    temperature = _dry_temperature - RAIN_COOLING * intensity;
+    temperature = _dry_temperature - RAIN_COOLING * intensity + (DROUGHT_WARMING if drought_days > 0 else 0.0);
 
 # Share of precipitation falling as snow: 1 at or below SNOW_BELOW, 0 at or above RAIN_ABOVE.
 # Judged at the temperature of a full spell, so it stays steady while the spell ramps in and out.
@@ -117,7 +140,13 @@ func snow_fraction() -> float:
 func is_snowing() -> bool:
     return intensity > 0.05 and snow_fraction() > 0.5;
 
+# How much faster than usual the ground dries now.
+func drying() -> float:
+    return DROUGHT_DRYING if drought_days > 0 else 1.0;
+
 func description() -> String:
+    if drought_days > 0 and intensity <= 0.05:
+        return "Drought";
     if intensity > 0.05:
         var f:float = snow_fraction();
         if f >= 1.0:

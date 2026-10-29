@@ -447,6 +447,8 @@ const TEACHER_VETERAN_XP:float = 0.4;     # teaching + general experience at whi
 static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
     return 1.0 + TEACHER_MAX_BONUS * minf(1.0, (teaching_xp + general_xp) / TEACHER_VETERAN_XP);
 
+const CHANNEL_WORK_HOURS:float = 0.8;   # labor-hours to dig one irrigation channel cell
+const CHANNEL_RANGE:int = 2;            # plots this close to a channel that is connected to water stay moist
 const ROAD_WORK_HOURS:float = 0.4;       # labor-hours to lay one road cell (roads need work, no materials)
 
 # --------------------------------

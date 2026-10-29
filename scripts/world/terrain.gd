@@ -9,7 +9,7 @@ class_name Terrain extends Node3D;
 signal changed(rect:Rect2i);
 signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting or a road, field or site laid or removed
 
-enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE };      # (new ids go last: saves keep the numbers)
+enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET };      # (new ids go last: saves keep the numbers)
 
 const SIZE              :int = 128;
 const CHUNK             :int = 32;
@@ -24,6 +24,8 @@ const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
 const COLOR_GRAVE       :Color = Color(0.3, 0.4, 0.27);        # a graveyard: mossy, mown grass
 const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being dug: pale, bare soil
+const COLOR_CHANNEL     :Color = Color(0.34, 0.27, 0.19);      # a dug channel with no water in it
+const COLOR_CHANNEL_WET :Color = Color(0.2, 0.38, 0.5);        # one connected to water
 const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
 const DETAIL_AMOUNT     :float = 0.055;
 const DETAIL_SATURATION :float = 1.15;
@@ -287,13 +289,17 @@ func _corner_normal(x:int, z:int) -> Vector3:
 
 func _cell_color(c:Vector2i) -> Color:
     var col:Color;
-    if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
+    if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and overlay[index(c)] != Overlay.CHANNEL and overlay[index(c)] != Overlay.CHANNEL_WET and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
         return soil_color(soil_source.call(index(c)));
     match overlay[index(c)]:
         Overlay.ROAD:
             col = COLOR_ROAD;
         Overlay.SITE:
             col = COLOR_SITE;
+        Overlay.CHANNEL:
+            col = COLOR_CHANNEL;
+        Overlay.CHANNEL_WET:
+            col = COLOR_CHANNEL_WET;
         Overlay.GRAVE:
             col = COLOR_SNOW.lerp(COLOR_GRAVE, 0.5) if _season == GameClock.Season.WINTER else COLOR_GRAVE;
         Overlay.TILLED:

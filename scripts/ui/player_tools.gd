@@ -9,7 +9,7 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND, CHANNEL };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
@@ -17,7 +17,8 @@ const MODE_HINTS:Dictionary = {
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
     Mode.ROAD:     "Drag to lay a road. Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
-    Mode.DEMOLISH: "Drag to demolish buildings and roads.",
+    Mode.CHANNEL:  "Drag to dig an irrigation channel. One that connects to a river or lake carries water: plots within 2 cells of it stay moist, drought or not. Digging takes work, no materials.",
+    Mode.DEMOLISH: "Drag to demolish buildings, roads and channels.",
     Mode.EXPAND:   "Click on the ground beside it to grow it there. Right-click to stop.",
     Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
@@ -241,7 +242,7 @@ func _on_press() -> void:
                     var done:Building = expanding;
                     set_mode(Mode.SELECT);
                     select(done);
-        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.DEMOLISH, Mode.CANCEL:
+        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.CHANNEL, Mode.DEMOLISH, Mode.CANCEL:
             _dragging = true;
             _drag_start = _hover_cell;
         Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
@@ -278,6 +279,9 @@ func _on_release() -> void:
         Mode.ROAD:
             for c in _road_cells():
                 w.plan_road(c);
+        Mode.CHANNEL:
+            for c in _road_cells():
+                w.plan_road(c, Terrain.Overlay.CHANNEL);
         Mode.DEMOLISH:
             var r:Rect2i = _drag_rect();
             for b in w.buildings.duplicate():
@@ -286,6 +290,7 @@ func _on_release() -> void:
             for z in range(r.position.y, r.end.y):
                 for x in range(r.position.x, r.end.x):
                     w.set_road(Vector2i(x, z), false);
+                    w.remove_channel(Vector2i(x, z));
         Mode.CANCEL:
             var cr:Rect2i = _drag_rect();
             for b in w.buildings.duplicate():
@@ -436,7 +441,7 @@ func _update_ghosts() -> void:
         Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH, Mode.CANCEL:
             var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
             _show_box(0, r, 0.4, _mat_bad if mode == Mode.DEMOLISH else _mat_area);
-        Mode.ROAD:
+        Mode.ROAD, Mode.CHANNEL:
             if _dragging:
                 var cells:Array[Vector2i] = _road_cells();
                 var a:Vector2i = _drag_start;

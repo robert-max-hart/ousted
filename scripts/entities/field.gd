@@ -10,8 +10,11 @@ class_name Field extends Building;
 # (SALVAGE_HOURS), then it is lost. Added last so saved plot states keep their numbers.
 enum Plot { FALLOW, PLANTED, RIPE, DEAD, FROZEN };
 
-const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25};
-const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"plant": 2};     # ripe crops are gathered before anything is sown
+const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25, &"water": 0.3};
+const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"water": 2, &"plant": 3};     # ripe crops are gathered before anything is watered or sown
+const IRRIGATED_MOISTURE:float = 0.65;  # a plot beside a flowing channel never dries below this
+const WATER_BELOW       :float = 0.3;      # a growing plot drier than this wants a bucket
+const BUCKET_MOISTURE   :float = 0.55;     # what a bucket sets a plot (and the plots around it) to, at least
 const SALVAGE_HOURS     :float = 24.0;     # a frozen crop can be harvested this long before it is lost
 const SALVAGE_MIN_GROWTH:float = 0.25;     # a crop grown less than this is not worth harvesting (frozen ones are cleared)
 const EARLY_SHARE       :float = 0.7;      # an early harvest gives the share grown, times this
@@ -28,6 +31,8 @@ var harvest_early:bool = false;             # the player ordered every growing p
 var cuts        :PackedByteArray;           # harvests taken from the current sowing (multi-harvest crops)
 var moisture    :PackedFloat32Array;
 var near_water  :PackedByteArray;
+var irrigated   :PackedByteArray;          # 1 where a flowing channel is within reach (derived, not saved)
+var _irrigation_seen:int = -1;
 var reserved    :Array = [];                # Pawn or null per plot
 var _layers     :Dictionary = {};           # plant shape -> MultiMeshInstance3D drawing those plots
 var _visual_dirty:bool = true;
@@ -45,6 +50,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     frozen_hours.resize(n);
     moisture.resize(n);
     near_water.resize(n);
+    irrigated.resize(n);
     reserved.resize(n);
     plot_crop.resize(n);
     for i in n:
@@ -167,7 +173,8 @@ func restore_dict(d:Dictionary) -> void:
 # Returns {"index": int, "action": StringName, "rank": float} for the most urgent open plot (harvest, then clearing,
 # then planting, the closest first within each), or {}. A lower rank is more urgent, across fields too.
 # has_room(item) -> bool, when given, stops harvesting crops that nothing could store.
-func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable()) -> Dictionary:
+# can_water: there is a well to fetch buckets from.
+func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable(), can_water:bool = true) -> Dictionary:
     if state != State.COMPLETE:
         return {};
     var plantable:bool = can_plant() and not harvest_early;
@@ -196,6 +203,8 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
             Plot.FALLOW:
                 if plantable:
                     action = &"plant";
+        if action == &"" and can_water and plot_state[i] == Plot.PLANTED and moisture[i] < WATER_BELOW:
+            action = &"water";
         if action == &"" or (only_action != &"" and action != only_action):
             continue;
         var d:float = ACTION_PRIORITY[action] * 1.0e6 + Vector2(plot_cell(i) - from).length_squared();
@@ -238,6 +247,14 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
         &"clear":
             plot_state[i] = Plot.FALLOW;
             growth[i] = 0.0;
+        &"water":
+            for dz in range(-1, 2):       # one bucket wets the plot and the eight around it
+                for dx in range(-1, 2):
+                    var cx:int = i % size.x + dx;
+                    var cz:int = i / size.x + dz;
+                    if cx >= 0 and cz >= 0 and cx < size.x and cz < size.y:
+                        var j:int = cz * size.x + cx;
+                        moisture[j] = maxf(moisture[j], BUCKET_MOISTURE);
     _visual_dirty = true;
 
 # --------------------------------
@@ -246,6 +263,8 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
 func on_hour() -> void:
     if state != State.COMPLETE:
         return;
+    if _irrigation_seen != world.irrigation_version:
+        _update_irrigated();
     var temp:float = Weather.temperature;
     var killed:int = 0;
     var frozen:int = 0;
@@ -253,9 +272,11 @@ func on_hour() -> void:
         # soil moisture: rain wets, warmth dries, nearby water keeps it up
         var m:float = moisture[i];
         var dry:float = 1.0 - Weather.intensity;
-        m += 0.04 * Weather.intensity - (0.003 + maxf(0.0, temp) * 0.0006) * dry;
+        m += 0.04 * Weather.intensity - (0.003 + maxf(0.0, temp) * 0.0006) * dry * Weather.drying();
         if near_water[i] == 1:
             m = maxf(m, 0.45);
+        if irrigated[i] == 1:
+            m = maxf(m, IRRIGATED_MOISTURE);
         moisture[i] = clampf(m, 0.0, 1.0);
 
         match plot_state[i]:
@@ -341,6 +362,8 @@ func on_resized(old:Rect2i) -> void:
     frozen_hours = fh;
     moisture = mo;
     near_water = nw;
+    irrigated.resize(n);
+    _irrigation_seen = -1;
     reserved.clear();
     reserved.resize(n);
     super.on_resized(old);
@@ -358,6 +381,18 @@ func _growth_rate(c:Dictionary, temp:float, m:float) -> float:
     var temp_f:float = clampf((temp - c["min_temp"]) / 8.0, 0.3, 1.0);
     var water_f:float = clampf(0.3 + m * 1.2, 0.3, 1.0);
     return temp_f * water_f / (c["grow_days"] * GameClock.HOURS_PER_DAY);
+
+# Plots within CHANNEL_RANGE of a channel with water in it.
+func _update_irrigated() -> void:
+    _irrigation_seen = world.irrigation_version;
+    irrigated.resize(plot_count());
+    for i in plot_count():
+        irrigated[i] = 0;
+        var c:Vector2i = plot_cell(i);
+        for dz in range(-Defs.CHANNEL_RANGE, Defs.CHANNEL_RANGE + 1):
+            for dx in range(-Defs.CHANNEL_RANGE, Defs.CHANNEL_RANGE + 1):
+                if world.terrain.in_bounds(c + Vector2i(dx, dz)) and world.terrain.get_overlay(c + Vector2i(dx, dz)) == Terrain.Overlay.CHANNEL_WET:
+                    irrigated[i] = 1;
 
 func _is_near_water(c:Vector2i) -> bool:
     for dz in range(-NEAR_WATER_RANGE, NEAR_WATER_RANGE + 1):

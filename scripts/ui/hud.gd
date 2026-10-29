@@ -566,7 +566,7 @@ func _build_toolbar(root:Control) -> void:
     group.allow_unpress = false;
     var modes:Array = [
         [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"],
-        [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
+        [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.CHANNEL, "Channel"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
         [PlayerTools.Mode.RAISE, "Raise"], [PlayerTools.Mode.LOWER, "Lower"], [PlayerTools.Mode.FLATTEN, "Flatten"],
     ];
     for m in modes:

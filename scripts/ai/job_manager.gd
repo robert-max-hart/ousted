@@ -498,9 +498,9 @@ func _road_task(p:Pawn) -> Task:
         return null;
     var cell:Vector2i = best;
     world.road_claimed[cell] = true;
-    var t:Task = Task.new(&"road", "Laying road");
+    var t:Task = Task.new(&"road", "Digging a channel" if world.road_kind.get(cell, Terrain.Overlay.ROAD) == Terrain.Overlay.CHANNEL else "Laying road");
     t.job = Profession.BUILDER;
-    t.move_cell(cell, "Walking to the road");
+    t.move_cell(cell, "Walking to the work");
     t.work(func(_pw:Pawn, dh:float) -> bool:
         return world.work_road(cell, dh));
     t.on_end = func(_pw:Pawn) -> void:
@@ -536,6 +536,8 @@ func _gather_more_task(p:Pawn, item:StringName) -> Task:
 # Farming
 
 func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
+    var well:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_complete() and x.def.get("water", false));
     var best:Field = null;
     var best_work:Dictionary = {};
     var best_d:float = INF;
@@ -543,7 +545,7 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     for b in world.buildings:
         if not (b is Field) or p.has_failed(b):
             continue;
-        var w:Dictionary = (b as Field).find_work(pc, only_action, Stock.has_room_for);
+        var w:Dictionary = (b as Field).find_work(pc, only_action, Stock.has_room_for, well != null);
         if w.is_empty():
             continue;
         if w["rank"] < best_d:
@@ -556,11 +558,15 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     var i:int = best_work["index"];
     var action:StringName = best_work["action"];
     f.reserved[i] = p;
-    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops"};
+    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops", &"water": "Watering"};
     var label:String = "%s %s" % [verbs[action], f.crop()["name"].to_lower()] if action == &"plant" else verbs[action];
     var t:Task = Task.new(&"farm", label);
     t.job = Profession.FARMER;
     t.target = f;
+    if action == &"water":         # fill a bucket at the well first
+        t.related = well;
+        t.move_rect(well.rect(), well.is_walkable(), "Fetching water");
+        t.work_for(0.1, "Filling a bucket");
     t.move_cell(f.plot_cell(i), "Walking to field");
     t.work_for(Field.ACTION_HOURS[action], label, func(pw:Pawn) -> void:
         if World.alive(f):
