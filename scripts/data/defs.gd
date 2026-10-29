@@ -31,6 +31,9 @@ const ITEMS:Dictionary = {
     &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 50.0},
     &"apples":  {"name": "Apples", "color": Color(0.8, 0.25, 0.2), "food": true, "nutrition": 0.3, "spoil_days": 45.0},
     &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
+    &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
+    &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
+    &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
     &"tool_wood":  {"name": "Wooden Tool", "color": Color(0.7, 0.55, 0.35), "tool": {"bonus": 0.10, "uses": 100.0}},
     &"tool_iron":  {"name": "Iron Tool",   "color": Color(0.6, 0.6, 0.65),  "tool": {"bonus": 0.25, "uses": 200.0}},
@@ -239,6 +242,20 @@ const BUILDINGS:Dictionary = {
         },
         "desc": "Farmers plant fruit trees here once and pick the fruit every year. It takes a couple of years to bear the first time. Choose the tree in the inspector; it needs saplings found by foragers.",
     },
+    &"coop": {
+        "name": "Chicken Run", "size": Vector2i(4, 4), "cost": {&"wood": 6}, "work": 4.0,
+        "shape": "field", "height": 0.0, "color": Color(0.5, 0.42, 0.28),
+        "pasture": true, "animal": &"chicken", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
+        "inputs": {&"barley": 8, &"wheat": 8},
+        "desc": "A fenced run for chickens. A founding flock arrives when it is finished. They lay eggs, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain.",
+    },
+    &"pasture": {
+        "name": "Cow Pasture", "size": Vector2i(6, 6), "cost": {&"wood": 10}, "work": 8.0,
+        "shape": "field", "height": 0.0, "color": Color(0.36, 0.5, 0.28),
+        "pasture": true, "animal": &"cow", "drag_size": true, "min_side": 4, "walkable": true, "relocatable": false,
+        "inputs": {&"barley": 20, &"wheat": 20},
+        "desc": "Fenced grazing for cows. A founding pair arrives when it is finished. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
+    },
     &"graveyard": {
         "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
@@ -265,12 +282,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"orchard", &"forager"]],
+    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"forager"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
     ["Civic", [&"town_hall", &"well", &"school", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"orchard", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"orchard", &"coop", &"pasture", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -336,6 +353,16 @@ const CROPS:Dictionary = {
         "desc": "Bigger crops than apples but they spoil sooner.",
     },
 };
+
+# Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: the founding
+# stock that arrives when it is finished; breed: chance a day of one more while there is room (two or more are needed);
+# product/rate: item and units per animal per day; manure: units per animal per day; feed: grain per animal per day
+# when nothing grows to graze (the cold months).
+const ANIMALS:Dictionary = {
+    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "breed": 0.10, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
+    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "breed": 0.04, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
+};
+const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the animals graze and need no feed
 
 # solid:    blocks walking (pawns work from an adjacent cell)
 # auto:     gathered without player designation (foraging)

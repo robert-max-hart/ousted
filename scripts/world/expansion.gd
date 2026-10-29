@@ -92,7 +92,7 @@ static func hold_cells(w:World, b:Building) -> void:
             if b.rect().has_point(c):
                 continue;
             w.occupant[w.idx(c)] = b;
-            if b is Field or b is Graveyard:
+            if b is Field or b is Graveyard or b is Pasture:
                 w.terrain.set_overlay(c, Terrain.Overlay.SITE);
             var rn:ResourceNode = w.node_at[w.idx(c)];
             if rn != null:
@@ -124,6 +124,8 @@ static func finish(w:World, b:Building) -> void:
                 w.terrain.set_overlay(c, Terrain.Overlay.ORCHARD if (b as Field).is_orchard() else Terrain.Overlay.TILLED);
             elif b is Graveyard:
                 w.terrain.set_overlay(c, Terrain.Overlay.GRAVE);
+            elif b is Pasture:
+                w.terrain.set_overlay(c, Terrain.Overlay.ORCHARD);
     w._refresh_nav_rect(r);
     w.notify("%s expanded to %dx%d." % [b.display_name(), r.size.x, r.size.y]);
 
@@ -139,6 +141,6 @@ static func cancel(w:World, b:Building) -> void:
                 continue;
             if w.occupant[w.idx(c)] == b:
                 w.occupant[w.idx(c)] = null;
-            if b is Field or b is Graveyard:
+            if b is Field or b is Graveyard or b is Pasture:
                 w.terrain.set_overlay(c, Terrain.Overlay.NONE);
     b.expansion = {};

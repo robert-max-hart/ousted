@@ -599,10 +599,10 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var def:Dictionary = Defs.BUILDINGS[def_id];
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
-    var is_ground:bool = is_field or def.get("graveyard", false);       # drawn as a terrain overlay: bare while it goes up
+    var is_ground:bool = is_field or def.get("graveyard", false) or def.get("pasture", false);       # drawn as a terrain overlay: bare while it goes up
     if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
         terrain.flatten_rect(r);
-    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Building.new();
+    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
@@ -647,7 +647,7 @@ func remove_building(b:Building, refund:bool) -> void:
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             occupant[idx(Vector2i(x, z))] = null;
-            if b is Field or b is Graveyard:
+            if b is Field or b is Graveyard or b is Pasture:
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.NONE);
     b.removed = true;
     if tools != null and tools.selected == b:
@@ -744,6 +744,10 @@ func on_building_completed(b:Building) -> void:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):
                 terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.GRAVE);
+    if b is Pasture:
+        for z in range(b.origin.y, b.origin.y + b.size.y):
+            for x in range(b.origin.x, b.origin.x + b.size.x):
+                terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.ORCHARD);
     if b is Field:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):

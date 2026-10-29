@@ -18,6 +18,7 @@ const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls be
 var needs:NeedsTasks;
 var school:SchoolTasks;
 var burial:BurialTasks;
+var herd:HerdTasks;
 var production:ProductionTasks;
 var targets:Dictionary = {};       # profession -> how many citizens the player wants in it
 
@@ -26,6 +27,7 @@ func _init(w:World) -> void:
     needs = NeedsTasks.new(w);
     school = SchoolTasks.new(w);
     burial = BurialTasks.new(w);
+    herd = HerdTasks.new(w);
     production = ProductionTasks.new(w);
 
 func choose_task(p:Pawn) -> Task:
@@ -106,7 +108,7 @@ func _job_order(prof:int) -> Array[Callable]:
         Profession.BUILDER:
             return [_build_task, _road_task, _haul_task, _fuel_task, _collect_task, _clear_task];
         Profession.FARMER:
-            return [_farm_task, _haul_task, _fuel_task, _collect_task, _clear_task];
+            return [_farm_task, _herd_task, _haul_task, _fuel_task, _collect_task, _clear_task];
         Profession.WOODCUTTER:
             return [production.woodcutter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.FORAGER:
@@ -117,7 +119,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -510,6 +512,18 @@ func _road_task(p:Pawn) -> Task:
 # --------------------------------
 # Gathering
 
+# Farm animals: collect what is ready, else bring grain to a herd that is short of it.
+func _herd_task(p:Pawn) -> Task:
+    var t:Task = herd.collect_task(p);
+    if t != null:
+        return t;
+    for b in world.buildings:
+        if b is Pasture and b.is_complete() and not p.has_failed(b) and not b.inputs_wanted().is_empty():
+            t = production._stock_inputs_task(p, b);
+            if t != null:
+                return t;
+    return null;
+
 func _clear_task(p:Pawn) -> Task:
     return harvest_node_task(p, func(rn:ResourceNode) -> bool:
         return rn.designated);
@@ -538,6 +552,7 @@ func _gather_more_task(p:Pawn, item:StringName) -> Task:
 func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     var well:Building = world.nearest_building(p.position, func(x:Building) -> bool:
         return x.is_complete() and x.def.get("water", false));
+    var manure_src:Building = world.nearest_storage_with(&"manure", p.position);
     var best:Field = null;
     var best_work:Dictionary = {};
     var best_d:float = INF;
@@ -545,7 +560,7 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     for b in world.buildings:
         if not (b is Field) or p.has_failed(b):
             continue;
-        var w:Dictionary = (b as Field).find_work(pc, only_action, Stock.has_room_for, well != null);
+        var w:Dictionary = (b as Field).find_work(pc, only_action, Stock.has_room_for, well != null, manure_src != null);
         if w.is_empty():
             continue;
         if w["rank"] < best_d:
@@ -558,11 +573,27 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     var i:int = best_work["index"];
     var action:StringName = best_work["action"];
     f.reserved[i] = p;
-    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops", &"water": "Watering", &"treat": "Picking off pests"};
+    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops", &"water": "Watering", &"treat": "Picking off pests", &"manure": "Spreading manure"};
+    var load:Dictionary = {"n": 0, "picked": false};
+    if action == &"manure":         # one load of manure from storage
+        load["n"] = manure_src.reserve_out(&"manure", 1);
+        if load["n"] == 0:
+            f.reserved[i] = null;
+            return null;
     var label:String = "%s %s" % [verbs[action], f.crop()["name"].to_lower()] if action == &"plant" else verbs[action];
     var t:Task = Task.new(&"farm", label);
     t.job = Profession.FARMER;
     t.target = f;
+    if action == &"manure":
+        t.related = manure_src;
+        t.move_rect(manure_src.rect(), manure_src.is_walkable(), "Fetching manure");
+        t.act(func(pw:Pawn) -> bool:
+            load["picked"] = true;
+            var got:int = manure_src.take_reserved(&"manure", load["n"]);
+            if got < 1:
+                return false;
+            pw.set_carry(&"manure", got);
+            return true);
     if action == &"water":         # fill a bucket at the well first
         t.related = well;
         t.move_rect(well.rect(), well.is_walkable(), "Fetching water");
@@ -570,7 +601,12 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     t.move_cell(f.plot_cell(i), "Walking to field");
     t.work_for(Field.ACTION_HOURS[action], label, func(pw:Pawn) -> void:
         if World.alive(f):
-            f.apply(i, action, pw));
+            f.apply(i, action, pw);
+        if action == &"manure":
+            pw.clear_carry());
+    t.on_cancel = func(_pw:Pawn) -> void:
+        if action == &"manure" and not load["picked"] and World.alive(manure_src):
+            manure_src.release_out(&"manure", load["n"]);
     t.on_end = func(_pw:Pawn) -> void:
         if World.alive(f):
             f.reserved[i] = null;

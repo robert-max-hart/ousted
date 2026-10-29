@@ -10,8 +10,10 @@ class_name Field extends Building;
 # (SALVAGE_HOURS), then it is lost. Added last so saved plot states keep their numbers.
 enum Plot { FALLOW, PLANTED, RIPE, DEAD, FROZEN };
 
-const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25, &"water": 0.3, &"treat": 0.3};
-const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"treat": 2, &"water": 3, &"plant": 4};     # ripe crops are gathered before anything is watered or sown
+const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25, &"water": 0.3, &"treat": 0.3, &"manure": 0.35};
+const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"treat": 2, &"water": 3, &"manure": 4, &"plant": 5};
+const MANURE_BELOW      :float = 0.7;      # a fallow plot poorer than this gets manure before it is sown, when there is any
+const MANURE_BOOST      :float = 0.3;      # what one load adds to the plot and the eight around it     # ripe crops are gathered before anything is watered or sown
 const IRRIGATED_MOISTURE:float = 0.65;  # a plot beside a flowing channel never dries below this
 const PEST_MIN_TEMP     :float = 6.0;      # pests are about only above this (a hard frost clears them)
 const PEST_OUTBREAK     :float = 0.05;     # chance a day for a field with something growing, in the warm months
@@ -245,7 +247,7 @@ func restore_dict(d:Dictionary) -> void:
 # then planting, the closest first within each), or {}. A lower rank is more urgent, across fields too.
 # has_room(item) -> bool, when given, stops harvesting crops that nothing could store.
 # can_water: there is a well to fetch buckets from.
-func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable(), can_water:bool = true) -> Dictionary:
+func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = Callable(), can_water:bool = true, has_manure:bool = false) -> Dictionary:
     if state != State.COMPLETE:
         return {};
     var plantable:bool = can_plant() and not harvest_early;
@@ -274,6 +276,8 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
             Plot.FALLOW:
                 if plantable:
                     action = &"plant";
+        if action == &"plant" and has_manure and fertility(i) < MANURE_BELOW:
+            action = &"manure";       # enrich the plot first
         if action == &"" and plot_state[i] == Plot.PLANTED and pests[i] >= PEST_TREAT_ABOVE:
             action = &"treat";
         if action == &"" and can_water and plot_state[i] == Plot.PLANTED and moisture[i] < WATER_BELOW:
@@ -323,6 +327,14 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
             plot_state[i] = Plot.FALLOW;
             growth[i] = 0.0;
             pests[i] = 0.0;
+        &"manure":
+            for dz in range(-1, 2):       # one load enriches the plot and the eight around it
+                for dx in range(-1, 2):
+                    var mx:int = i % size.x + dx;
+                    var mz:int = i / size.x + dz;
+                    if mx >= 0 and mz >= 0 and mx < size.x and mz < size.y:
+                        var k:int = mz * size.x + mx;
+                        _set_fertility(k, fertility(k) + MANURE_BOOST);
         &"treat":
             for dz in range(-1, 2):       # pests are picked off the plot and the ones around it
                 for dx in range(-1, 2):
