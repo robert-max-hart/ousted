@@ -3,6 +3,11 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.4.1 | 28 Oct 2026 | Visual pass
+- The top bar no longer cuts off the Homeless count.
+- Staked road cells are now a flat, worn patch that clearly differs from a finished road.
+- The changelist panel no longer covers the menu buttons.
+
 # 0.4.0 | 28 Oct 2026 | Agriculture depth: M4 complete (steps 4 to 8)
 - Soil view: a Soil button in the top bar colours the ground by fertility (brown poor, green rich), numbers each plot of the selected field, and the crop list warns when a crop would drain poor soil or points out ones that restore it.
 - Water: random droughts (no rain, hotter, everything dries fast), buckets (farmers fetch water from a well for dry plots), and irrigation channels dug from a river or lake that keep nearby plots moist.

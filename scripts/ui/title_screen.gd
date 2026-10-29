@@ -134,11 +134,11 @@ func _build_changelist(root:Control) -> void:
     _changes = PanelContainer.new();
     _changes.visible = false;
     _changes.set_anchors_preset(Control.PRESET_CENTER);
-    _changes.custom_minimum_size = Vector2(760, 520);
-    _changes.offset_left = -380.0;
-    _changes.offset_right = 380.0;
-    _changes.offset_top = -260.0;
-    _changes.offset_bottom = 260.0;
+    _changes.custom_minimum_size = Vector2(660, 520);
+    _changes.offset_left = -60.0;       # right of centre, so the menu buttons stay in view
+    _changes.offset_right = 600.0;
+    _changes.offset_top = -190.0;
+    _changes.offset_bottom = 330.0;
     root.add_child(_changes);
     var col:VBoxContainer = VBoxContainer.new();
     col.add_theme_constant_override("separation", 8);
@@ -171,7 +171,7 @@ func _build_changelist(root:Control) -> void:
             var item:Label = Label.new();
             item.text = "- " + line;
             item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
-            item.custom_minimum_size.x = 700;
+            item.custom_minimum_size.x = 600;
             list.add_child(item);
     var close:Button = Button.new();
     close.text = "Close";

@@ -165,7 +165,7 @@ func _refresh_all() -> void:
     var homeless:int = w.families.homeless_count();
     if homeless > 0:
         parts.append("Homeless %d" % homeless);
-    _stock.text = "   ".join(parts);
+    _stock.text = "  ".join(parts);
     var food_tip:PackedStringArray = ["Storage: %d / %d" % [Stock.used(), Stock.capacity()]];
     for item in Defs.ITEMS:
         if Defs.ITEMS[item].get("food", false):
@@ -502,10 +502,10 @@ func _build_top_bar(root:Control) -> void:
     var panel:PanelContainer = _panel(root);
     panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);
     var row:HBoxContainer = HBoxContainer.new();
-    row.add_theme_constant_override("separation", 12);
+    row.add_theme_constant_override("separation", 8);
     panel.add_child(row);
     _date = Label.new();
-    _date.custom_minimum_size.x = 175;
+    _date.custom_minimum_size.x = 155;
     row.add_child(_date);
     _weather = Label.new();
     _weather.custom_minimum_size.x = 90;
