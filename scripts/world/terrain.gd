@@ -9,7 +9,7 @@ class_name Terrain extends Node3D;
 signal changed(rect:Rect2i);
 signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting or a road, field or site laid or removed
 
-enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET };      # (new ids go last: saves keep the numbers)
+enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET, ORCHARD };      # (new ids go last: saves keep the numbers)
 
 const SIZE              :int = 128;
 const CHUNK             :int = 32;
@@ -24,6 +24,7 @@ const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
 const COLOR_GRAVE       :Color = Color(0.3, 0.4, 0.27);        # a graveyard: mossy, mown grass
 const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being dug: pale, bare soil
+const COLOR_ORCHARD     :Color = Color(0.33, 0.5, 0.26);       # an orchard: mown grass between the trees
 const COLOR_CHANNEL     :Color = Color(0.34, 0.27, 0.19);      # a dug channel with no water in it
 const COLOR_CHANNEL_WET :Color = Color(0.2, 0.38, 0.5);        # one connected to water
 const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
@@ -296,6 +297,8 @@ func _cell_color(c:Vector2i) -> Color:
             col = COLOR_ROAD;
         Overlay.SITE:
             col = COLOR_SITE;
+        Overlay.ORCHARD:
+            col = COLOR_SNOW.lerp(COLOR_ORCHARD, 0.5) if _season == GameClock.Season.WINTER else COLOR_ORCHARD;
         Overlay.CHANNEL:
             col = COLOR_CHANNEL;
         Overlay.CHANNEL_WET:

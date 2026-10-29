@@ -31,7 +31,7 @@ func _ready() -> void:
     var disabled:int = 0;
     for b in world.hud._crop_list.get_children():
         disabled += 1 if (b as Button).disabled else 0;
-    _expect("the crop list disables %d locked crops" % disabled, disabled == Defs.CROPS.size() - 1);
+    _expect("the crop list disables %d locked crops" % disabled, disabled == Defs.CROPS.keys().filter(func(id:StringName) -> bool: return not Defs.CROPS[id].get("tree", false)).size() - 1);       # fields list field crops only
 
     # foraging finds
     var found:Array[StringName] = [];

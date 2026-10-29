@@ -99,8 +99,10 @@ func _scarecrow_part(mesh:Mesh, mat:Material, at:Vector3) -> void:
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     super.setup(w, id, o, s);
+    if is_orchard() != crop().get("tree", false):
+        crop_id = &"apple" if is_orchard() else &"wheat";
     if not w.seeds.has(crop_id):
-        crop_id = w.seeds.first_known();       # a new field starts with a crop the colony has seeds for
+        crop_id = w.seeds.first_known(is_orchard());       # a new field starts with a crop the colony has seeds for
     # crops are placed in world space, so keep the node at the origin
     position = Vector3.ZERO;
     var n:int = plot_count();
@@ -152,10 +154,13 @@ func crop() -> Dictionary:
 
 # Returns false (and changes nothing) for a crop the colony has no seeds for.
 func set_crop(id:StringName) -> bool:
-    if not Defs.CROPS.has(id) or not world.seeds.has(id):
+    if not Defs.CROPS.has(id) or not world.seeds.has(id) or Defs.CROPS[id].get("tree", false) != is_orchard():
         return false;
     crop_id = id;
     return true;
+
+func is_orchard() -> bool:
+    return def.get("orchard", false);
 
 func fertility(i:int) -> float:
     return world.soil_fertility[world.terrain.index(plot_cell(i))];

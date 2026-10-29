@@ -84,7 +84,7 @@ static func _roomy(world:World, r:Rect2i) -> bool:
 static func _plant(f:Field, rng:RandomNumberGenerator) -> void:
     if GameClock.season() == GameClock.Season.WINTER:
         return;
-    var crops:Array = Defs.CROPS.keys();
+    var crops:Array = Defs.CROPS.keys().filter(func(id:StringName) -> bool: return not Defs.CROPS[id].get("tree", false) and not f.is_orchard());
     f.crop_id = crops[rng.randi() % crops.size()];
     for i in f.plot_count():
         if rng.randf() < 0.12:

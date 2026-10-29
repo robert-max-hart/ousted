@@ -11,8 +11,9 @@ class_name CropMeshes extends RefCounted;
 const SHAPE_OF:Dictionary = {
     &"wheat": &"grain", &"barley": &"grain", &"beans": &"bush", &"potato": &"bush",
     &"radish": &"leafy", &"lettuce": &"leafy", &"cabbage": &"leafy", &"pumpkin": &"vine",
+    &"apple": &"tree", &"pear": &"tree",
 };
-const SHAPES:Array[StringName] = [&"grain", &"bush", &"leafy", &"vine"];
+const SHAPES:Array[StringName] = [&"grain", &"bush", &"leafy", &"vine", &"tree"];
 
 static var _meshes:Dictionary = {};
 static var _material:StandardMaterial3D = null;
@@ -86,6 +87,24 @@ static func _build(shape:StringName) -> ArrayMesh:
             heart.radial_segments = 6;
             heart.rings = 3;
             ResourceRenderer.add_part(mesh, heart, Transform3D(Basis(), Vector3(0, 0.2, 0)), mat);
+        &"tree":
+            # a fruit tree: a trunk with a round crown of three lobes (the crown takes the instance colour)
+            var trunk:CylinderMesh = CylinderMesh.new();
+            trunk.top_radius = 0.05;
+            trunk.bottom_radius = 0.08;
+            trunk.height = 0.7;
+            trunk.radial_segments = 5;
+            trunk.rings = 1;
+            ResourceRenderer.add_part(mesh, trunk, Transform3D(Basis(), Vector3(0, 0.35, 0)), mat, Color(0.55, 0.42, 0.3));
+            for i in 3:
+                var a:float = i * 2.1;
+                var lobe:SphereMesh = SphereMesh.new();
+                lobe.radius = 0.3 if i == 0 else 0.24;
+                lobe.height = lobe.radius * 1.7;
+                lobe.radial_segments = 7;
+                lobe.rings = 3;
+                var at:Vector3 = Vector3(0, 0.95, 0) if i == 0 else Vector3(cos(a) * 0.2, 0.8 + 0.08 * i, sin(a) * 0.2);
+                ResourceRenderer.add_part(mesh, lobe, Transform3D(Basis(), at), mat);
         _:
             # vine: a couple of broad leaves and the fruit
             for i in 3:

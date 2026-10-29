@@ -466,6 +466,8 @@ func _on_info_button() -> void:
             child.queue_free();
         for id in Defs.CROPS:
             var c:Dictionary = Defs.CROPS[id];
+            if c.get("tree", false) != (obj as Field).is_orchard():
+                continue;       # fields grow crops, orchards grow trees
             var btn:Button = Button.new();
             var known:bool = World.instance.seeds.has(id);
             var soil:float = (obj as Field).mean_fertility();

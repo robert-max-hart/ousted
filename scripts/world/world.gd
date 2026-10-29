@@ -573,6 +573,8 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
         for b in buildings:
             if b.def_id == def_id:
                 return "There is only one %s" % Defs.BUILDINGS[def_id]["name"];
+    if Defs.BUILDINGS[def_id].get("orchard", false) and not seeds.knows_trees():
+        return "No saplings yet: foragers may find some";
     if not Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE).encloses(r):
         return "Out of bounds";
     for z in range(r.position.y, r.end.y):
@@ -745,7 +747,7 @@ func on_building_completed(b:Building) -> void:
     if b is Field:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):
-                terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.TILLED);
+                terrain.set_overlay(Vector2i(x, z), Terrain.Overlay.ORCHARD if (b as Field).is_orchard() else Terrain.Overlay.TILLED);
     if b.def_id == &"town_hall" and town_hall == null:
         town_hall = b;
     if b.relocating_from != null and alive(b.relocating_from):

@@ -29,6 +29,8 @@ const ITEMS:Dictionary = {
     &"potato":  {"name": "Potatoes", "color": Color(0.7, 0.55, 0.35), "food": true, "nutrition": 0.5,  "spoil_days": 60.0},
     &"cabbage": {"name": "Cabbages", "color": Color(0.55, 0.75, 0.45), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
     &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 50.0},
+    &"apples":  {"name": "Apples", "color": Color(0.8, 0.25, 0.2), "food": true, "nutrition": 0.3, "spoil_days": 45.0},
+    &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
     &"tool_wood":  {"name": "Wooden Tool", "color": Color(0.7, 0.55, 0.35), "tool": {"bonus": 0.10, "uses": 100.0}},
     &"tool_iron":  {"name": "Iron Tool",   "color": Color(0.6, 0.6, 0.65),  "tool": {"bonus": 0.25, "uses": 200.0}},
@@ -227,6 +229,16 @@ const BUILDINGS:Dictionary = {
         },
         "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector. Pests get into crops in the warm months, more easily where the same crop grows in several fields; farmers pick them off, and a scarecrow keeps most away.",
     },
+    &"orchard": {
+        "name": "Orchard", "size": Vector2i(6, 6), "cost": {&"wood": 6}, "work": 8.0,
+        "shape": "field", "height": 0.0, "color": Color(0.34, 0.46, 0.25),
+        "field": true, "orchard": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
+        "upgrades": {
+            &"scarecrow": {"name": "Scarecrow", "cost": {&"wood": 4}, "work": 3.0,
+                "desc": "Scarecrows keep birds and beasts off the crop: pests arrive and spread much less often."},
+        },
+        "desc": "Farmers plant fruit trees here once and pick the fruit every year. It takes a couple of years to bear the first time. Choose the tree in the inspector; it needs saplings found by foragers.",
+    },
     &"graveyard": {
         "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
@@ -253,12 +265,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"forager"]],
+    ["Food", [&"field", &"orchard", &"forager"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
     ["Civic", [&"town_hall", &"well", &"school", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"orchard", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -310,6 +322,18 @@ const CROPS:Dictionary = {
         "name": "Pumpkins", "item": &"pumpkin", "grow_days": 8.0, "min_temp": 9.0, "frost_temp": 2.0,
         "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15), "find_weight": 0.5,
         "desc": "One huge harvest a year. It needs the warm months, so sow it as soon as the spring warms.",
+    },
+    # Tree crops (tree: true) grow in an Orchard, not a field: planted once, they fruit every year without replanting
+    # (a harvest count too large to run out; the cold only pauses their growth). `seed_word` names what is found.
+    &"apple": {
+        "name": "Apple trees", "item": &"apples", "grow_days": 18.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "apple saplings",
+        "yield": 5, "fertility": -0.02, "color": Color(0.75, 0.6, 0.3), "find_weight": 0.5, "harvests": 999, "regrow_days": 9.0,
+        "desc": "Slow to bear the first time, then fruit every year. Apples keep fairly well.",
+    },
+    &"pear": {
+        "name": "Pear trees", "item": &"pears", "grow_days": 20.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "pear saplings",
+        "yield": 6, "fertility": -0.02, "color": Color(0.7, 0.7, 0.3), "find_weight": 0.4, "harvests": 999, "regrow_days": 10.0,
+        "desc": "Bigger crops than apples but they spoil sooner.",
     },
 };
 

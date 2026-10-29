@@ -121,7 +121,7 @@ static func finish(w:World, b:Building) -> void:
             if old.has_point(c):
                 continue;
             if b is Field:
-                w.terrain.set_overlay(c, Terrain.Overlay.TILLED);
+                w.terrain.set_overlay(c, Terrain.Overlay.ORCHARD if (b as Field).is_orchard() else Terrain.Overlay.TILLED);
             elif b is Graveyard:
                 w.terrain.set_overlay(c, Terrain.Overlay.GRAVE);
     w._refresh_nav_rect(r);

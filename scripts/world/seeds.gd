@@ -23,11 +23,18 @@ func has(crop:StringName) -> bool:
     return known.has(crop);
 
 # The first known crop in the order of Defs.CROPS (a new field's crop).
-func first_known() -> StringName:
+func first_known(trees:bool = false) -> StringName:
     for id in Defs.CROPS:
-        if known.has(id):
+        if known.has(id) and Defs.CROPS[id].get("tree", false) == trees:
             return id;
-    return &"wheat";
+    return &"apple" if trees else &"wheat";
+
+# Whether the colony has found any tree crop (an orchard needs one).
+func knows_trees() -> bool:
+    for id in known:
+        if Defs.CROPS.has(id) and Defs.CROPS[id].get("tree", false):
+            return true;
+    return false;
 
 func locked() -> Array[StringName]:
     var out:Array[StringName] = [];
@@ -71,7 +78,7 @@ func on_forage(world:World, chance:float = FIND_CHANCE) -> StringName:
             pick = left[i];
             break;
     unlock(pick);
-    world.notify("Foragers found %s seeds. Fields can now be sown with %s." % [Defs.CROPS[pick]["name"].to_lower(), Defs.CROPS[pick]["name"].to_lower()]);
+    world.notify("Foragers found %s. %s can now be sown with %s." % [Defs.CROPS[pick].get("seed_word", Defs.CROPS[pick]["name"].to_lower() + " seeds"), "Orchards" if Defs.CROPS[pick].get("tree", false) else "Fields", Defs.CROPS[pick]["name"].to_lower()]);
     return pick;
 
 func to_array() -> Array:
