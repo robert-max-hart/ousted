@@ -1,0 +1,41 @@
+# Changelist, newest first. One section per push to main: a heading line of three parts (version, date, title)
+# split by vertical bars, then "- " bullets. The newest version is the build id on the title screen.
+# Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
+# Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
+
+# 0.4.0 | 28 Oct 2026 | Agriculture depth: M4 complete (steps 4 to 8)
+- Soil view: a Soil button in the top bar colours the ground by fertility (brown poor, green rich), numbers each plot of the selected field, and the crop list warns when a crop would drain poor soil or points out ones that restore it.
+- Water: random droughts (no rain, hotter, everything dries fast), buckets (farmers fetch water from a well for dry plots), and irrigation channels dug from a river or lake that keep nearby plots moist.
+- Pests: outbreaks that spread between plots, likelier when the same crop grows in several fields nearby; farmers pick them off, a frost clears them, and a Scarecrow field upgrade makes them rare.
+- Orchards: apple and pear trees, planted once and picked every year. Saplings are found by foragers, and no orchard can be placed until one is found.
+- Livestock: a Chicken Run (eggs) and a Cow Pasture (milk). Animals graze in warm weather, need grain in the cold months, breed up to the room, and starve without feed.
+- Manure: animals leave it, farmers collect and spread it on poor fallow plots before sowing.
+- The title screen has a Changelist button (this list) and shows the build id in the lower right.
+
+# 0.3.2 | 28 Oct 2026 | Playtest fixes, round two
+- Buildings can be rotated with R: the door, chimney and shapes turn with them.
+- Fields, graveyards and stockpiles start as a single tile you drag out; anything under 2x2 is refused. The field fence is lower.
+- Staked roads look like faintly worn grass, not like built roads. Road stones are smaller.
+- The Citizens panel sorts by any column. The 4 key sets 10x speed.
+- The game starts with 12 citizens, 3 of them children. Surface stone is down to 2x.
+- Couples who ended up in different houses now move in together, so babies are born again (found from a real save).
+- Farmers deliver food to the Granary instead of the nearest store; plants marked for clearing no longer wait for storage room.
+- Crops can be sown whenever it is warm enough, ripening or not (early harvest and frost salvage cover the risk).
+- The Woodcutter has a Work first setting (firewood by default). Blacksmith and School workers go inside while they work.
+- The Accepts filter is a compact list, and long inspector text is behind a ? button.
+- The moon crosses the sky the same way as the sun, outdoor sleepers lie down, hazel looks different from berry bushes, and the blacksmith window no longer smears.
+
+# 0.3.1 | 27 Oct 2026 | The playtest notes pass
+- Mechanics: 10x speed, shacks always on, the Gatherer profession retired (laborers gather), roads cost work instead of materials, and at least five loose rocks near the start.
+- Expansion: fields, stockpiles and graveyards can be enlarged after they are built.
+- Crops: sowing by climate instead of season lists, early harvest, frost salvage, and a spoilage log that names what spoiled.
+- Idle professionals now work as laborers.
+- Look: building silhouettes (silo Granary, Town Hall tower, forge, school bell tower, mine headframe), fences, stockpile crates, graveyard ground, furrowed soil, work and walking animations, procedural wall and roof textures.
+- Interface: an Esc menu, a Policies panel, a building ghost showing the real building, a Citizens panel, idle tags, a worker list, a Cancel tool and quieter site labels.
+
+# 0.3.0 | 26 Oct 2026 | The first push: M1 to M3 done, M4 begun
+- M1: the core loop. Terrain, camera, weather, seasons, citizens with needs, construction, roads, fields and a day and night cycle.
+- M2: logistics and economy. Per-building storage, spoilage, woodcutter, house heating, mine, coal, tools and blacksmith, building upgrades, save and load.
+- M3: population. Ages and schools, job experience, families and births, happiness and grief, graveyards, homelessness and shacks, a Town Hall that grows by upgrades, difficulty presets, a governance ledger.
+- M4 so far: eight crops, foraging (mushrooms, hazel, the Forager's Hut), and seeds found through play.
+- A title screen with a mock-town backdrop, chimney smoke, grass tufts and richer trees.

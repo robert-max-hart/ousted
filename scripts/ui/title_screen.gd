@@ -19,6 +19,7 @@ var _diff_btns  :Dictionary = {};        # difficulty id -> Button
 var _diff_text  :Label;
 var _seed_edit  :LineEdit;
 var _message    :Label;
+var _changes    :PanelContainer;         # the changelist overlay (data/changelist.txt)
 var _continue_slot:String = "";
 
 func _ready() -> void:
@@ -96,9 +97,13 @@ func _build_ui() -> void:
     cont.pressed.connect(_on_continue);
     var new_game:Button = _menu_button("New Game");
     new_game.pressed.connect(_show_new_game);
+    var changes:Button = _menu_button("Changelist");
+    changes.tooltip_text = "What changed in each push to main";
+    changes.pressed.connect(func() -> void: _changes.visible = true);
     var quit:Button = _menu_button("Quit");
     quit.pressed.connect(get_tree().quit);
     _build_new_game_panel(stack);
+    _build_changelist(root);
     _message = Label.new();
     _message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
     _message.add_theme_color_override("font_color", Color(1.0, 0.6, 0.5));
@@ -113,6 +118,66 @@ func _build_ui() -> void:
     footer.offset_left = 14.0;
     footer.offset_bottom = -10.0;
     root.add_child(footer);
+    var build:Label = Label.new();       # the build id, in step with the changelist
+    build.text = Changelist.build_id();
+    build.add_theme_color_override("font_color", Color(1, 1, 1, 0.6));
+    build.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT);
+    build.grow_horizontal = Control.GROW_DIRECTION_BEGIN;
+    build.grow_vertical = Control.GROW_DIRECTION_BEGIN;
+    build.offset_right = -14.0;
+    build.offset_bottom = -10.0;
+    build.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    root.add_child(build);
+
+# The changelist overlay: one heading per push, newest first, read from data/changelist.txt.
+func _build_changelist(root:Control) -> void:
+    _changes = PanelContainer.new();
+    _changes.visible = false;
+    _changes.set_anchors_preset(Control.PRESET_CENTER);
+    _changes.custom_minimum_size = Vector2(760, 520);
+    _changes.offset_left = -380.0;
+    _changes.offset_right = 380.0;
+    _changes.offset_top = -260.0;
+    _changes.offset_bottom = 260.0;
+    root.add_child(_changes);
+    var col:VBoxContainer = VBoxContainer.new();
+    col.add_theme_constant_override("separation", 8);
+    _changes.add_child(col);
+    var heading:Label = Label.new();
+    heading.text = "Changelist";
+    heading.add_theme_font_size_override("font_size", 28);
+    heading.add_theme_color_override("font_color", GOLD);
+    col.add_child(heading);
+    var scroll:ScrollContainer = ScrollContainer.new();
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL;
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    col.add_child(scroll);
+    var list:VBoxContainer = VBoxContainer.new();
+    list.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    list.add_theme_constant_override("separation", 4);
+    scroll.add_child(list);
+    for section in Changelist.parse():
+        var head:Label = Label.new();
+        head.text = "%s  (%s)  %s" % [section["version"], section["date"], section["title"]];
+        head.add_theme_font_size_override("font_size", 19);
+        head.add_theme_color_override("font_color", GOLD);
+        head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+        if list.get_child_count() > 0:
+            var gap:Control = Control.new();
+            gap.custom_minimum_size.y = 10;
+            list.add_child(gap);
+        list.add_child(head);
+        for line in section["items"]:
+            var item:Label = Label.new();
+            item.text = "- " + line;
+            item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+            item.custom_minimum_size.x = 700;
+            list.add_child(item);
+    var close:Button = Button.new();
+    close.text = "Close";
+    close.custom_minimum_size = Vector2(0, 40);
+    close.pressed.connect(func() -> void: _changes.visible = false);
+    col.add_child(close);
 
 func _menu_button(text:String) -> Button:
     var b:Button = Button.new();
