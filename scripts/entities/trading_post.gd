@@ -13,12 +13,13 @@ class_name TradingPost extends Building;
 var order     :Dictionary = {};        # {sell: item -> units, buy: item -> units, delivered: item -> units, sold_value: float}
 var en_route  :Dictionary = {};        # item -> units citizens are carrying to the yard now (not saved)
 var pickup    :Dictionary = {};        # item -> units waiting at the post for citizens to carry to storage
+var animals_waiting:Dictionary = {};    # animal kind -> bought animals waiting at the post for a citizen to lead them to a pasture
 
 func has_order() -> bool:
     return not order.is_empty();
 
 func idle() -> bool:
-    return order.is_empty() and pickup.is_empty();
+    return order.is_empty() and pickup.is_empty() and animals_waiting.is_empty();
 
 # --------------------------------
 # Placing an order
@@ -36,7 +37,7 @@ func place_order(sell:Dictionary, buy:Dictionary) -> String:
     var cost:float = 0.0;
     for item in buy:
         if buy[item] <= 0 or buy[item] > stock.get(item, 0):
-            return "The merchant does not have that much %s." % Defs.item_name(item).to_lower();
+            return "The merchant does not have that much %s." % Defs.offer_name(item).to_lower();
         cost += buy[item] * traders.buy_price(item);
     var income:float = 0.0;
     for item in sell:
@@ -87,8 +88,17 @@ func settle() -> void:
         stock[item] = stock.get(item, 0) - order["buy"][item];
         if stock[item] <= 0:
             stock.erase(item);
-        pickup[item] = pickup.get(item, 0) + order["buy"][item];
-    world.notify("Trade done: %s. The goods are ready to be carried from the Trading Post." % _summary(order["sell"], order["buy"]));
+        if Defs.is_seed_key(item):
+            world.seeds.unlock(Defs.offer_id(item));        # a seed needs no carrying: the crop is known at once
+            world.notify("%s: %s can now be grown." % [Defs.offer_name(item), "Orchards" if Defs.CROPS[Defs.offer_id(item)].get("tree", false) else "Fields"]);
+        elif Defs.is_animal_key(item):
+            animals_waiting[Defs.offer_id(item)] = animals_waiting.get(Defs.offer_id(item), 0) + order["buy"][item];
+        else:
+            pickup[item] = pickup.get(item, 0) + order["buy"][item];
+    var tail:String = "";
+    if not animals_waiting.is_empty():
+        tail = " The animals wait at the Trading Post for someone to lead them to a pasture.";
+    world.notify("Trade done: %s.%s" % [_summary(order["sell"], order["buy"]), tail]);
     order = {};
 
 # The merchant has gone with the order unfinished: what was delivered goes back to storage.
@@ -108,7 +118,7 @@ func _summary(sell:Dictionary, buy:Dictionary) -> String:
     var gave:String = ", ".join(out) if not out.is_empty() else "nothing";
     out.clear();
     for item in buy:
-        out.append("%d %s" % [buy[item], Defs.item_name(item).to_lower()]);
+        out.append("%d %s" % [buy[item], Defs.offer_name(item).to_lower()] if not Defs.is_seed_key(item) else Defs.offer_name(item).to_lower());
     return "sold %s for %s" % [gave, ", ".join(out)];
 
 # --------------------------------
@@ -129,6 +139,9 @@ func dump_goods() -> void:
     for item in pickup:
         world.deposit(item, pickup[item], position);
     pickup.clear();
+    if not animals_waiting.is_empty():
+        world.notify("The animals waiting at the Trading Post wander off.");
+        animals_waiting.clear();
 
 # --------------------------------
 # Saving, info
@@ -137,12 +150,14 @@ func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();
     d["order"] = order.duplicate(true);
     d["pickup"] = pickup.duplicate();
+    d["animals_waiting"] = animals_waiting.duplicate();
     return d;
 
 func restore_dict(d:Dictionary) -> void:
     super.restore_dict(d);
     order = d.get("order", {});
     pickup = d.get("pickup", {});
+    animals_waiting = d.get("animals_waiting", {});
 
 func info_text() -> String:
     var s:String = super.info_text();
@@ -152,6 +167,8 @@ func info_text() -> String:
         s += "Order in progress:\n";
         for item in order["sell"]:
             s += "  %s: %d of %d delivered\n" % [Defs.item_name(item), order["delivered"].get(item, 0), order["sell"][item]];
+    for kind in animals_waiting:
+        s += "Waiting to be led to a pasture: %d %s\n" % [animals_waiting[kind], Defs.ANIMALS[kind]["name"].to_lower()];
     if not pickup.is_empty():
         var parts:PackedStringArray = [];
         for item in pickup:

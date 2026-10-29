@@ -172,7 +172,7 @@ func _update_rows(list:VBoxContainer, buying:bool) -> void:
         var item:StringName = row.get_meta("item");
         var have:int = t.visit["stock"].get(item, 0) if buying else Stock.available(item);
         var price:float = t.buy_price(item) if buying else t.sell_price(item);
-        (row.get_node("Name") as Label).text = "%s  (%s each, %d)" % [Defs.item_name(item), _fmt(price), have];
+        (row.get_node("Name") as Label).text = "%s  (%s each, %d)" % [Defs.offer_name(item) if buying else Defs.item_name(item), _fmt(price), have];
         (row.get_node("Qty") as Label).text = str(qtys.get(item, 0));
         if not buying:
             var good:bool = t.visit["wants"].has(item);

@@ -14,6 +14,9 @@ const MIN_GAP_DAYS     :int = 5;
 const STAY_DAYS        :int = 4;
 const SELL_KINDS       :Vector2i = Vector2i(3, 5);       # how many kinds of goods a merchant brings
 const STOP_SHORT       :int = 4;                         # cells before the post the caravan halts
+const SEED_OFFERS      :Vector2i = Vector2i(1, 3);       # how many seeds or saplings a visit offers, at most (from what is not known yet)
+const IN_SEASON_WEIGHT :float = 3.0;                     # a crop that can be sown now is this much likelier to be offered
+const ANIMAL_CHANCE    :float = 0.7;                     # a kind of animal is offered with this chance, when a pasture for it has room
 const WANT_KINDS       :Vector2i = Vector2i(3, 5);       # and how many kinds they will buy
 const SELL_BUDGET      :int = 90;                        # about this much trade value of each kind
 const WANT_MULT        :Vector2 = Vector2(0.8, 1.5);     # what a merchant pays for goods they want, times the value
@@ -136,7 +139,43 @@ func _make_visit() -> Dictionary:
     _shuffle(asks);
     for i in world.rng.randi_range(WANT_KINDS.x, WANT_KINDS.y):
         wants[asks[i]] = snappedf(world.rng.randf_range(WANT_MULT.x, WANT_MULT.y), 0.05);
+    _offer_seeds(stock);
+    _offer_animals(stock);
     return {"stock": stock, "wants": wants, "days_left": STAY_DAYS, "arrived": false};
+
+# Seeds and saplings the colony does not have yet (any crop, those that can be sown now likelier). One of each.
+func _offer_seeds(stock:Dictionary) -> void:
+    var locked:Array[StringName] = world.seeds.locked();
+    var n:int = mini(world.rng.randi_range(SEED_OFFERS.x, SEED_OFFERS.y), locked.size());
+    for i in n:
+        var total:float = 0.0;
+        var weights:Array[float] = [];
+        for crop in locked:
+            var w:float = IN_SEASON_WEIGHT if Weather.can_sow(Defs.CROPS[crop]) else 1.0;
+            weights.append(w);
+            total += w;
+        var roll:float = world.rng.randf() * total;
+        var pick:int = locked.size() - 1;
+        for k in locked.size():
+            roll -= weights[k];
+            if roll <= 0.0:
+                pick = k;
+                break;
+        stock[Defs.seed_key(locked[pick])] = 1;
+        locked.remove_at(pick);
+
+# Animals, for the kinds the colony has a pasture with room for.
+func _offer_animals(stock:Dictionary) -> void:
+    for kind in Defs.ANIMALS:
+        var room:int = 0;
+        for b in world.buildings:
+            if b is Pasture and b.is_complete() and b.def["animal"] == kind:
+                room += (b as Pasture).free_room();
+        var post:Building = trading_post();
+        if post is TradingPost:
+            room -= (post as TradingPost).animals_waiting.get(kind, 0);
+        if room > 0 and world.rng.randf() < ANIMAL_CHANCE:
+            stock[Defs.animal_key(kind)] = mini(room, world.rng.randi_range(1, Defs.ANIMALS[kind]["start"]));
 
 func _shuffle(a:Array) -> void:
     for i in range(a.size() - 1, 0, -1):

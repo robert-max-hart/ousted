@@ -247,14 +247,14 @@ const BUILDINGS:Dictionary = {
         "shape": "field", "height": 0.0, "color": Color(0.5, 0.42, 0.28),
         "pasture": true, "animal": &"chicken", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
         "inputs": {&"barley": 8, &"wheat": 8},
-        "desc": "A fenced run for chickens. A founding flock arrives when it is finished. They lay eggs, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain.",
+        "desc": "A fenced run for chickens. It starts empty: buy chickens from a merchant and a citizen leads them here. They lay eggs, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain.",
     },
     &"pasture": {
         "name": "Cow Pasture", "size": Vector2i(6, 6), "cost": {&"wood": 10}, "work": 8.0,
         "shape": "field", "height": 0.0, "color": Color(0.36, 0.5, 0.28),
         "pasture": true, "animal": &"cow", "drag_size": true, "min_side": 4, "walkable": true, "relocatable": false,
         "inputs": {&"barley": 20, &"wheat": 20},
-        "desc": "Fenced grazing for cows. A founding pair arrives when it is finished. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
+        "desc": "Fenced grazing for cows. It starts empty: buy cows from a merchant and a citizen leads them here. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
     },
     &"trading_post": {
         "name": "Trading Post", "size": Vector2i(4, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
@@ -317,7 +317,7 @@ const CROPS:Dictionary = {
         "desc": "Puts nitrogen back into the soil. Wants warm weather.",
     },
     &"radish": {
-        "name": "Radishes", "item": &"radish", "grow_days": 4.0, "min_temp": 1.0, "frost_temp": -4.0,
+        "name": "Radishes", "item": &"radish", "seed_word": "radish seeds", "grow_days": 4.0, "min_temp": 1.0, "frost_temp": -4.0,
         "yield": 3, "fertility": -0.04, "color": Color(0.85, 0.25, 0.3),
         "desc": "Very quick and hardy, so the first food of spring, but small and not filling.",
     },
@@ -332,7 +332,7 @@ const CROPS:Dictionary = {
         "desc": "A hardy grain that starts in the cold and shrugs off frost. Spring only.",
     },
     &"potato": {
-        "name": "Potatoes", "item": &"potato", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0,
+        "name": "Potatoes", "item": &"potato", "seed_word": "seed potatoes", "grow_days": 12.0, "min_temp": 6.0, "frost_temp": 0.0,
         "yield": 6, "fertility": -0.2, "color": Color(0.7, 0.55, 0.35), "find_weight": 0.7,
         "desc": "A big harvest and very filling, but slow, frost-tender and very hard on the soil.",
     },
@@ -342,7 +342,7 @@ const CROPS:Dictionary = {
         "desc": "Cool-season, keeps well, adds variety to the diet.",
     },
     &"pumpkin": {
-        "name": "Pumpkins", "item": &"pumpkin", "grow_days": 8.0, "min_temp": 9.0, "frost_temp": 2.0,
+        "name": "Pumpkins", "item": &"pumpkin", "seed_word": "pumpkin seeds", "grow_days": 8.0, "min_temp": 9.0, "frost_temp": 2.0,
         "yield": 8, "fertility": -0.18, "color": Color(0.9, 0.55, 0.15), "find_weight": 0.5,
         "desc": "One huge harvest a year. It needs the warm months, so sow it as soon as the spring warms.",
     },
@@ -369,16 +369,55 @@ const TRADE_VALUE:Dictionary = {
     &"eggs": 2, &"milk": 2, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
+# What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
+# are item ids, a seed is "seed:<crop>" and an animal is "animal:<kind>".
+const SEED_VALUE:Dictionary = {
+    &"wheat": 20, &"beans": 18, &"radish": 10, &"lettuce": 12, &"barley": 20, &"potato": 30, &"cabbage": 22, &"pumpkin": 35,
+    &"apple": 60, &"pear": 65,
+};
+const SEED_PREFIX:String = "seed:";
+const ANIMAL_PREFIX:String = "animal:";
+
+static func seed_key(crop:StringName) -> StringName:
+    return StringName(SEED_PREFIX + String(crop));
+
+static func animal_key(kind:StringName) -> StringName:
+    return StringName(ANIMAL_PREFIX + String(kind));
+
+static func is_seed_key(key:StringName) -> bool:
+    return String(key).begins_with(SEED_PREFIX);
+
+static func is_animal_key(key:StringName) -> bool:
+    return String(key).begins_with(ANIMAL_PREFIX);
+
+static func offer_id(key:StringName) -> StringName:
+    return StringName(String(key).get_slice(":", 1));
+
 static func trade_value(item:StringName) -> int:
+    if is_seed_key(item):
+        return SEED_VALUE.get(offer_id(item), 20);
+    if is_animal_key(item):
+        return ANIMALS[offer_id(item)].get("value", 30);
     return TRADE_VALUE.get(item, 0);
 
-# Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: the founding
-# stock that arrives when it is finished; breed: chance a day of one more while there is room (two or more are needed);
+# What a trade offer is called in the window and the log.
+static func offer_name(key:StringName) -> String:
+    if is_seed_key(key):
+        var c:Dictionary = CROPS[offer_id(key)];
+        var w:String = c.get("seed_word", "%s seeds" % c["name"].to_lower());
+        return w.substr(0, 1).to_upper() + w.substr(1);
+    if is_animal_key(key):
+        return String(ANIMALS[offer_id(key)]["one"]).capitalize();
+    return item_name(key);
+
+# Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: how many a
+# merchant brings at most (a pasture starts empty: animals are bought); value: trade value of one; guide: how many a
+# citizen can lead to a pasture at once; breed: chance a day of one more while there is room (two or more are needed);
 # product/rate: item and units per animal per day; manure: units per animal per day; feed: grain per animal per day
 # when nothing grows to graze (the cold months).
 const ANIMALS:Dictionary = {
-    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "breed": 0.10, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
-    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "breed": 0.04, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
+    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
+    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
 };
 const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the animals graze and need no feed
 

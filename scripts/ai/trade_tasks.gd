@@ -13,7 +13,10 @@ func trade_task(p:Pawn) -> Task:
     var t:Task = _deliver_to_yard(p, post);
     if t != null:
         return t;
-    return _collect_from_yard(p, post);
+    t = _collect_from_yard(p, post);
+    if t != null:
+        return t;
+    return _guide_animals(p, post);
 
 func _post() -> TradingPost:
     for b in world.buildings:
@@ -78,3 +81,63 @@ func _collect_from_yard(p:Pawn, post:TradingPost) -> Task:
             return true);
         return t;
     return null;
+
+# Lead bought animals from the post to the nearest pasture of their kind that has room. They are taken off the
+# post's list when the citizen sets out and put back if the trip is cut short.
+func _guide_animals(p:Pawn, post:TradingPost) -> Task:
+    if p.has_failed(post):
+        return null;
+    for kind in post.animals_waiting:
+        var pasture:Pasture = _pasture_for(kind, post);
+        if pasture == null:
+            continue;
+        var n:int = mini(post.animals_waiting[kind], mini(pasture.free_room(), Defs.ANIMALS[kind]["guide"]));
+        if n <= 0:
+            continue;
+        post.animals_waiting[kind] -= n;
+        if post.animals_waiting[kind] <= 0:
+            post.animals_waiting.erase(kind);
+        pasture.incoming_animals += n;
+        var st:Dictionary = {"herd": null, "done": false};
+        var name:String = Defs.ANIMALS[kind]["name"].to_lower();
+        var t:Task = Task.new(&"guide", "Leading %s to the %s" % [name, pasture.display_name().to_lower()]);
+        t.target = pasture;
+        t.related = post;
+        t.move_rect(post.rect(), post.is_walkable(), "Fetching the %s" % name);
+        t.act(func(pw:Pawn) -> bool:
+            st["herd"] = GuidedHerd.lead(world, kind, n, pw);
+            return true);
+        t.move_rect(pasture.rect(), pasture.is_walkable(), "Leading the %s to the pasture" % name);
+        t.act(func(_pw:Pawn) -> bool:
+            st["done"] = true;
+            pasture.incoming_animals = maxi(0, pasture.incoming_animals - n);
+            var left:int = n - pasture.add_animals(n);
+            if left > 0 and World.alive(post):
+                post.animals_waiting[kind] = post.animals_waiting.get(kind, 0) + left;       # no room after all: back to the post
+            return true);
+        var finish:Callable = func(_pw:Pawn) -> void:
+            if st["herd"] != null and is_instance_valid(st["herd"]):
+                (st["herd"] as Node).queue_free();
+            st["herd"] = null;
+        t.on_end = finish;
+        t.on_cancel = func(pw:Pawn) -> void:
+            if not st["done"]:
+                if World.alive(pasture):
+                    pasture.incoming_animals = maxi(0, pasture.incoming_animals - n);
+                if World.alive(post):
+                    post.animals_waiting[kind] = post.animals_waiting.get(kind, 0) + n;
+            finish.call(pw);
+        return t;
+    return null;
+
+# The nearest finished pasture for this kind of animal with room for at least one more.
+func _pasture_for(kind:StringName, post:TradingPost) -> Pasture:
+    var best:Pasture = null;
+    var best_d:float = INF;
+    for b in world.buildings:
+        if b is Pasture and b.is_complete() and b.def["animal"] == kind and (b as Pasture).free_room() > 0:
+            var d:float = b.position.distance_squared_to(post.position);
+            if d < best_d:
+                best_d = d;
+                best = b as Pasture;
+    return best;

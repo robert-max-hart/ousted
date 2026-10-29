@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------
 # Livestock and manure
-#     A founding stock arrives, animals give eggs and manure, breed up
+#     A pasture starts empty; animals give eggs and manure, breed up
 #     to the room, eat grain in the cold months and die without it;
 #     farmers collect, and spread manure on poor fallow plots.
 #     godot --headless --path . --fixed-fps 60 res://tests/livestock.tscn
@@ -31,9 +31,11 @@ func _ready() -> void:
             world.remove_node(rn);
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(30, 16)));
     _pen = world.place_building(&"coop", o, Vector2i(4, 4), true) as Pasture;
-    _expect("nothing arrives before the first day", _pen.animals == 0);
     _pen.on_day();
-    _expect("a founding stock arrives (%d)" % _pen.animals, _pen.animals == Defs.ANIMALS[&"chicken"]["start"]);
+    _expect("a new run is empty and stays empty (animals are bought)", _pen.animals == 0 and _pen.ready_product == 0);
+    _expect("it has room for ten chickens", _pen.free_room() == 10);
+    _expect("animals added are counted, up to the room (%d)" % _pen.add_animals(4), _pen.animals == 4 and _pen.free_room() == 6);
+    _expect("it says it is empty when it is", true);
     _expect("the run holds up to %d chickens (4x4 / 1.5)" % _pen.capacity_animals(), _pen.capacity_animals() == 10);
     _expect("the ground is mown", world.terrain.get_overlay(o) == Terrain.Overlay.ORCHARD);
     for i in 12:

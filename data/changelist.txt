@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.4.2 | 28 Oct 2026 | Trade: merchants, barter, seeds and animals (M6 steps 1 to 3)
+- A Trading Post, built as an open market stall, and merchants who walk in from the map edge with a donkey cart a few times a season, stay a few days and leave.
+- A barter window: they sell goods at 1.25 times their value and pay full value (times their own price multiplier) for what they asked for, half for anything else. Citizens carry what you sell to the post and what you buy to storage, and nothing changes hands until it has all arrived.
+- Merchants sell seeds and saplings for crops you have not found yet (the ones you can sow now are offered more often), so trade is now the main way to new crops.
+- Pastures and chicken runs start empty: buy animals from a merchant and a citizen leads them to their pasture.
+- The Cow Pasture and Chicken Run no longer come with animals.
+
 # 0.4.1 | 28 Oct 2026 | Visual pass
 - The top bar no longer cuts off the Homeless count.
 - Staked road cells are now a flat, worn patch that clearly differs from a finished road.

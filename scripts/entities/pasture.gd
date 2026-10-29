@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------
 # Pasture
 #     A fenced run for one kind of farm animal (Chicken Run, Cow
-#     Pasture), sized by dragging. A founding stock arrives when it is
-#     finished. Each day the animals graze (warm weather) or eat grain
+#     Pasture), sized by dragging. It starts empty: animals are bought
+#     from a merchant and led here by a citizen (TradeTasks). Each day the animals graze (warm weather) or eat grain
 #     from the building's input buffer (the cold months), give their
 #     product and manure, and breed while there is room. Farmers
 #     collect the product and the manure (HerdTasks); manure is spread
@@ -17,7 +17,8 @@ const FEED_DAYS       :float = 12.0;   # the grain buffer a herd is topped up to
 const STOCK_UP_BELOW  :float = 12.0;   # C, daily mean: below this the buffer is kept stocked (autumn, winter, early spring)
 
 var animals     :int = 0;
-var arrived     :bool = false;
+var arrived     :bool = false;         # (old saves: had its founding stock; unused now, animals are bought)
+var incoming_animals:int = 0;           # being led here now (not saved)
 var product_acc :float = 0.0;
 var manure_acc  :float = 0.0;
 var feed_acc    :float = 0.0;
@@ -67,10 +68,6 @@ func on_day() -> void:
     super.on_day();
     if not is_complete():
         return;
-    if not arrived:
-        arrived = true;
-        animals = animal()["start"];
-        world.notify("A founding stock of %d %s arrives at the %s." % [animals, animal()["name"].to_lower(), display_name().to_lower()]);
     if animals <= 0:
         return;
     _eat();
@@ -85,6 +82,16 @@ func on_day() -> void:
     ready_manure = mini(READY_CAP, ready_manure + m);
     if animals >= 2 and animals < capacity_animals() and world.rng.randf() < a["breed"]:
         animals += 1;
+
+# Room for more, counting animals already on the way.
+func free_room() -> int:
+    return maxi(0, capacity_animals() - animals - incoming_animals);
+
+# Animals arrive (from a merchant, led by a citizen). Returns how many fitted.
+func add_animals(n:int) -> int:
+    var k:int = clampi(n, 0, maxi(0, capacity_animals() - animals));
+    animals += k;
+    return k;
 
 # Grazing is free in warm weather; otherwise the herd eats grain from the buffer, and animals with nothing to eat die.
 func _eat() -> void:
@@ -175,6 +182,8 @@ func info_text() -> String:
         return super.info_text();
     var a:Dictionary = animal();
     var s:String = "%s: %d of %d\n" % [a["name"], animals, capacity_animals()];
+    if animals == 0:
+        s += "Empty: buy %s from a merchant at the Trading Post.\n" % a["name"].to_lower();
     s += "%s ready: %d, manure ready: %d\n" % [Defs.item_name(a["product"]), ready_product, ready_manure];
     s += "Feed: %s\n" % ("grazing" if grazing() else "grain in store %d" % feed_units());
     if not grazing() and animals > 0 and feed_units() < ceili(animals * a["feed"] * 3.0):
