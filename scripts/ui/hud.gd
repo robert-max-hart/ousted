@@ -49,6 +49,8 @@ var _priority_btns:Array[Button] = [];
 var _size_label :Label;              # follows the cursor while sizing a field, graveyard or stockpile
 var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the inspector's button
 var _ledger_btn :Button;
+var _trade_btn  :Button;               # opens the barter window at a Trading Post with a merchant
+var _trade_panel:TradePanel;
 var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
 var _menu       :Control;            # the Esc menu: a dimmed full-screen layer with a centred panel
@@ -97,6 +99,9 @@ func _ready() -> void:
     _ledger_panel = LedgerPanel.new();
     root.add_child(_ledger_panel);
     _ledger_panel.setup(World.instance.ledger);
+    _trade_panel = TradePanel.new();
+    root.add_child(_trade_panel);
+    _trade_panel.setup();
     _citizens = CitizensPanel.new();
     root.add_child(_citizens);
     _citizens.setup();
@@ -221,6 +226,7 @@ func _refresh_info() -> void:
     _refresh_site(obj);
     _extras.refresh(obj);
     _refresh_ledger_button(obj);
+    _refresh_trade_button(obj);
     _refresh_filters(obj);
     _refresh_controls(obj);
     _refresh_upgrades(obj);
@@ -257,6 +263,15 @@ func _on_cancel_build() -> void:
         World.instance.remove_building(sel, true);
 
 # The Town Hall's Ledger button: enabled once it has the Governance upgrade (the record is kept regardless).
+func _refresh_trade_button(obj:Variant) -> void:
+    var post:TradingPost = obj as TradingPost if obj is TradingPost else null;
+    var here:bool = post != null and post.is_complete() and World.instance.traders.present();
+    _trade_btn.visible = post != null and post.is_complete();
+    _trade_btn.disabled = not here;
+    _trade_btn.text = "Trade with the merchant" if here else "No merchant here";
+    if not here and _trade_panel.visible:
+        _trade_panel.visible = false;
+
 func _refresh_ledger_button(obj:Variant) -> void:
     var b:Building = obj as Building if obj is Building else null;
     _ledger_btn.visible = b != null and b.def_id == &"town_hall" and b.is_complete();
@@ -828,6 +843,14 @@ func _build_info_panel(root:Control) -> void:
     _ledger_btn.visible = false;
     _ledger_btn.pressed.connect(func() -> void: _ledger_panel.open());
     col.add_child(_ledger_btn);
+    _trade_btn = Button.new();
+    _trade_btn.focus_mode = Control.FOCUS_NONE;
+    _trade_btn.visible = false;
+    _trade_btn.pressed.connect(func() -> void:
+        var sel:Variant = World.instance.tools.selected;
+        if sel is TradingPost:
+            _trade_panel.open(sel));
+    col.add_child(_trade_btn);
     _upgrade_box = VBoxContainer.new();
     _upgrade_box.visible = false;
     col.add_child(_upgrade_box);

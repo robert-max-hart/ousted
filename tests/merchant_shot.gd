@@ -30,14 +30,19 @@ func _ready() -> void:
     m.position = world.terrain.cell_center(route[maxi(0, route.size() - 6)]);
     m._path_i = maxi(0, route.size() - 6);
     world.camera_rig.focus_on(Vector3(o.x + 2, 0, o.y + 2));
-    world.camera_rig._distance = 14.0;
-    world.camera_rig._target_distance = 14.0;
+    world.camera_rig._distance = 11.0;
+    world.camera_rig._target_distance = 11.0;
     world.tools.select(_post);
     GameClock.set_speed(1);
 
 func _process(_delta:float) -> void:
     _frame += 1;
-    if _frame == 30:
+    if _frame >= 5 and _frame < 560 and world.traders.merchant != null:       # follow the cart close up
+        var mp:Vector3 = world.traders.merchant.position;
+        world.camera_rig.focus_on(Vector3(mp.x, 0, mp.z));
+        world.camera_rig._distance = 7.0;
+        world.camera_rig._target_distance = 7.0;
+    if _frame == 60:
         get_viewport().get_texture().get_image().save_png(_out.path_join("merchant_a.png"));
     if _frame == 600:
         get_viewport().get_texture().get_image().save_png(_out.path_join("merchant_b.png"));

@@ -111,6 +111,101 @@ static func hall(b:Building) -> void:
     _ball(b, 0.06, _colour(DARK), Vector3(0, base + 1.0, tz + 0.62));
 
 # --------------------------------
+# Trading Post: an open market pavilion, not a house. A plank deck under a striped canvas tent on four posts, a
+# counter with a balance, crates, barrels and sacks, a banner on the ridge and a hanging sign by the deck.
+
+static var _stripes_tex:ImageTexture = null;
+
+static func _awning(red:Color, cream:Color) -> StandardMaterial3D:
+    if _stripes_tex == null:
+        var img:Image = Image.create(8, 1, false, Image.FORMAT_RGBA8);
+        for x in 8:
+            img.set_pixel(x, 0, red if x < 4 else cream);
+        _stripes_tex = ImageTexture.create_from_image(img);
+    var m:StandardMaterial3D = StandardMaterial3D.new();
+    m.albedo_texture = _stripes_tex;
+    m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST;
+    m.uv1_triplanar = true;
+    m.uv1_scale = Vector3(0.45, 1.0, 1.0);
+    m.cull_mode = BaseMaterial3D.CULL_DISABLED;
+    m.roughness = 1.0;
+    return m;
+
+static func market(b:Building) -> void:
+    var s:Vector2 = Vector2(b.vsize);
+    var deck:Vector2 = s - Vector2(0.3, 0.3);
+    var wood:StandardMaterial3D = SurfaceTextures.material(&"planks", Color(0.7, 0.55, 0.38));
+    var timber:StandardMaterial3D = _colour(TIMBER);
+    var deck_h:float = 0.22;
+    var plat:BoxMesh = BoxMesh.new();
+    plat.size = Vector3(deck.x, deck_h, deck.y);
+    b.set_body(b._add_mesh(plat, wood, Vector3(0, deck_h * 0.5, 0)), 0.0, deck_h);
+    var post_h:float = 2.15;
+    var hx:float = deck.x * 0.5 - 0.15;
+    var hz:float = deck.y * 0.5 - 0.15;
+    for sx in [-hx, hx]:
+        for sz in [-hz, hz]:
+            _box(b, Vector3(0.14, post_h, 0.14), timber, Vector3(sx, deck_h + post_h * 0.5, sz));
+    # the tent: a striped gable, ridge along x, overhanging the deck a little
+    var tent_h:float = 0.7;
+    var tent_z:float = -0.3;       # shifted back, so the counter and its goods stay open to the sky from the front
+    var tent_d:float = deck.y - 0.3;
+    var tent:PrismMesh = PrismMesh.new();
+    tent.size = Vector3(deck.x + 0.5, tent_h, tent_d);
+    b.set_roof(b._add_mesh(tent, _awning(Color(0.72, 0.2, 0.16), Color(0.93, 0.87, 0.7)), Vector3(0, deck_h + post_h + tent_h * 0.5, tent_z)));
+    # the roof is a decor-less mesh so it shows while building; the rest hides until the post is finished
+    var red:StandardMaterial3D = _colour(Color(0.72, 0.2, 0.16));
+    _box(b, Vector3(deck.x + 0.5, 0.2, 0.05), red, Vector3(0, deck_h + post_h - 0.1, tent_z + tent_d * 0.5));       # valance
+    _box(b, Vector3(deck.x + 0.5, 0.2, 0.05), red, Vector3(0, deck_h + post_h - 0.1, tent_z - tent_d * 0.5));
+    # counter along the front, a cloth over it, a balance on top
+    _box(b, Vector3(deck.x * 0.62, 0.62, 0.5), timber, Vector3(-deck.x * 0.1, deck_h + 0.31, hz - 0.35));
+    _box(b, Vector3(deck.x * 0.62 + 0.1, 0.05, 0.6), _colour(Color(0.93, 0.87, 0.7)), Vector3(-deck.x * 0.1, deck_h + 0.64, hz - 0.35));
+    var iron:StandardMaterial3D = _colour(IRON);
+    var scale_at:Vector3 = Vector3(-deck.x * 0.2, deck_h + 0.66, hz - 0.35);
+    _box(b, Vector3(0.05, 0.5, 0.05), iron, scale_at + Vector3(0, 0.25, 0));
+    _box(b, Vector3(0.62, 0.04, 0.04), iron, scale_at + Vector3(0, 0.5, 0));
+    for dx in [-0.28, 0.28]:
+        _cyl(b, 0.12, 0.12, 0.025, _colour(Color(0.8, 0.65, 0.2)), scale_at + Vector3(dx, 0.3, 0), 12);
+        _box(b, Vector3(0.01, 0.2, 0.01), iron, scale_at + Vector3(dx, 0.4, 0));
+    # wares on the counter: fruit, loaves, a basket and a jug
+    var top_y:float = deck_h + 0.7;
+    var cx:float = -deck.x * 0.1;
+    for i in 4:
+        _ball(b, 0.1, _colour(Color(0.78, 0.2, 0.16) if i % 2 == 0 else Color(0.55, 0.7, 0.25)), Vector3(cx - 0.9 + i * 0.17, top_y + 0.08, hz - 0.3 + (i % 2) * 0.12), 1.0);
+    _cyl(b, 0.2, 0.15, 0.16, _colour(Color(0.6, 0.45, 0.25)), Vector3(cx + 0.1, top_y + 0.1, hz - 0.35), 10);
+    for i in 3:
+        _ball(b, 0.09, _colour(Color(0.85, 0.65, 0.3)), Vector3(cx + 0.1 + (i - 1) * 0.1, top_y + 0.22, hz - 0.35 + (i % 2) * 0.05), 0.9);
+    _box(b, Vector3(0.55, 0.12, 0.2), _colour(Color(0.8, 0.62, 0.3)), Vector3(cx + 0.75, top_y + 0.08, hz - 0.32));
+    _box(b, Vector3(0.45, 0.1, 0.18), _colour(Color(0.85, 0.7, 0.4)), Vector3(cx + 0.78, top_y + 0.18, hz - 0.32));
+    _cyl(b, 0.09, 0.11, 0.3, _colour(Color(0.5, 0.32, 0.2)), Vector3(cx + 1.2, top_y + 0.17, hz - 0.35), 10);
+    # goods at the back: crates, barrels and sacks
+    var crate:StandardMaterial3D = SurfaceTextures.material(&"planks", Color(0.82, 0.66, 0.42));
+    _box(b, Vector3(0.62, 0.5, 0.55), crate, Vector3(-deck.x * 0.3, deck_h + 0.25, -hz + 0.45), Vector3(0, 0.15, 0));
+    _box(b, Vector3(0.55, 0.5, 0.5), crate, Vector3(-deck.x * 0.3 + 0.7, deck_h + 0.25, -hz + 0.42), Vector3(0, -0.1, 0));
+    _box(b, Vector3(0.5, 0.45, 0.45), crate, Vector3(-deck.x * 0.3 + 0.3, deck_h + 0.72, -hz + 0.42), Vector3(0, 0.35, 0));
+    for i in 2:
+        var bx:float = deck.x * 0.28 + i * 0.62;
+        _cyl(b, 0.27, 0.3, 0.7, timber, Vector3(bx, deck_h + 0.35, -hz + 0.45), 12);
+        for band in [0.18, 0.52]:
+            _cyl(b, 0.305, 0.305, 0.05, iron, Vector3(bx, deck_h + band, -hz + 0.45), 12);
+    var sack:StandardMaterial3D = _colour(Color(0.78, 0.7, 0.5));
+    _ball(b, 0.26, sack, Vector3(deck.x * 0.3, deck_h + 0.2, hz - 0.45), 0.8);
+    _ball(b, 0.22, sack, Vector3(deck.x * 0.3 + 0.45, deck_h + 0.17, hz - 0.35), 0.8);
+    _ball(b, 0.2, _colour(Color(0.66, 0.5, 0.3)), Vector3(deck.x * 0.3 + 0.1, deck_h + 0.5, hz - 0.4), 0.8);
+    # a banner on the ridge and a hanging sign on a bracket at the corner, with a coin on it
+    var top:float = deck_h + post_h + tent_h;
+    _box(b, Vector3(0.05, 0.7, 0.05), timber, Vector3(deck.x * 0.4, top + 0.3, 0));
+    _box(b, Vector3(0.5, 0.3, 0.03), _colour(Color(0.72, 0.2, 0.16)), Vector3(deck.x * 0.4 + 0.27, top + 0.5, 0));
+    var sx:float = -s.x * 0.5 - 0.1;
+    _box(b, Vector3(0.1, 1.9, 0.1), timber, Vector3(sx, 0.95, s.y * 0.5 - 0.1));
+    _box(b, Vector3(0.8, 0.07, 0.07), timber, Vector3(sx + 0.4, 1.8, s.y * 0.5 - 0.1));
+    _box(b, Vector3(0.6, 0.5, 0.06), wood, Vector3(sx + 0.45, 1.45, s.y * 0.5 - 0.1));
+    _cyl(b, 0.17, 0.17, 0.05, _colour(Color(0.85, 0.7, 0.2)), Vector3(sx + 0.45, 1.45, s.y * 0.5 - 0.06), 14, Vector3(PI * 0.5, 0, 0));
+    # lanterns under the tent
+    for lx in [-hx + 0.3, hx - 0.3]:
+        _ball(b, 0.09, _colour(Color(1.0, 0.8, 0.4)), Vector3(lx, deck_h + post_h - 0.35, hz - 0.1), 1.2);
+
+# --------------------------------
 # Mine: a headframe with a winding wheel, a tunnel mouth in a rocky mound, rails with a cart and ore heaps.
 
 static func mine_extras(b:Building) -> void:

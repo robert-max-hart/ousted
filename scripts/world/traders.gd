@@ -13,9 +13,12 @@ const VISITS_PER_SEASON:float = 3.0;
 const MIN_GAP_DAYS     :int = 5;
 const STAY_DAYS        :int = 4;
 const SELL_KINDS       :Vector2i = Vector2i(3, 5);       # how many kinds of goods a merchant brings
+const STOP_SHORT       :int = 4;                         # cells before the post the caravan halts
 const WANT_KINDS       :Vector2i = Vector2i(3, 5);       # and how many kinds they will buy
 const SELL_BUDGET      :int = 90;                        # about this much trade value of each kind
 const WANT_MULT        :Vector2 = Vector2(0.8, 1.5);     # what a merchant pays for goods they want, times the value
+const OTHER_PAYS       :float = 0.5;                     # ... and for goods they did not ask for
+const OWN_MARGIN       :float = 1.25;                    # what they charge for their own goods, times the value
 
 # What merchants bring, and what they ask for (trade values are in Defs.TRADE_VALUE).
 const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"eggs", &"hazelnuts", &"tool_wood", &"tool_iron", &"tool_steel"];
@@ -35,6 +38,14 @@ func trading_post() -> Building:
         if b.def.get("trade_post", false) and b.is_complete():
             return b;
     return null;
+
+# What the colony pays for one unit of the merchant's goods, and what the merchant pays for one of ours (value units).
+func buy_price(item:StringName) -> float:
+    return snappedf(Defs.trade_value(item) * OWN_MARGIN, 0.01);
+
+func sell_price(item:StringName) -> float:
+    var wants:Dictionary = visit.get("wants", {});
+    return snappedf(Defs.trade_value(item) * wants.get(item, OTHER_PAYS), 0.01);
 
 func present() -> bool:
     return merchant != null and merchant.state == Merchant.State.TRADING;
@@ -78,6 +89,9 @@ func start_visit() -> bool:
 func depart() -> void:
     if merchant == null:
         return;
+    var post:Building = trading_post();
+    if post is TradingPost:
+        (post as TradingPost).lapse();
     var back:Array[Vector2i] = _route_from(merchant.cell(), _entry);
     if back.is_empty():
         _clear();         # no way out is as good as gone
@@ -152,6 +166,8 @@ func _route(edge:Vector2i, post:Building) -> Array[Vector2i]:
     for i in mini(goals.size(), 4):
         var path:Array[Vector2i] = world.nav.find_path(edge, goals[i]);
         if not path.is_empty():
+            for k in mini(STOP_SHORT, maxi(0, path.size() - 2)):
+                path.remove_at(path.size() - 1);       # the cart and donkey are long: stop a few cells short of the stall
             return path;
     return [];
 

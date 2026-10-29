@@ -19,6 +19,7 @@ var needs:NeedsTasks;
 var school:SchoolTasks;
 var burial:BurialTasks;
 var herd:HerdTasks;
+var trade:TradeTasks;
 var production:ProductionTasks;
 var targets:Dictionary = {};       # profession -> how many citizens the player wants in it
 
@@ -28,6 +29,7 @@ func _init(w:World) -> void:
     school = SchoolTasks.new(w);
     burial = BurialTasks.new(w);
     herd = HerdTasks.new(w);
+    trade = TradeTasks.new(w);
     production = ProductionTasks.new(w);
 
 func choose_task(p:Pawn) -> Task:
@@ -119,7 +121,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
 
 # --------------------------------
 # Professions

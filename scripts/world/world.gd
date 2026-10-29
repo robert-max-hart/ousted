@@ -605,7 +605,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var is_ground:bool = is_field or def.get("graveyard", false) or def.get("pasture", false);       # drawn as a terrain overlay: bare while it goes up
     if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
         terrain.flatten_rect(r);
-    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else Building.new();
+    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else TradingPost.new() if def.get("trade_post", false) else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
@@ -632,6 +632,8 @@ func remove_building(b:Building, refund:bool) -> void:
     if b is Graveyard and (b as Graveyard).used_slots() > 0:
         notify("%s can't be demolished while it has graves in it." % b.display_name());
         return;
+    if b is TradingPost:
+        (b as TradingPost).dump_goods();
     if b.fuel > 0:
         deposit(&"firewood", b.fuel, b.position);
     for item in b.inputs:
@@ -704,6 +706,8 @@ func relocation_block_reason(b:Building) -> String:
         return "This is the new site";
     if b.is_storage() and not b.is_empty():
         return "Empty it first";
+    if b is TradingPost and not (b as TradingPost).idle():
+        return "Finish the trade first";
     return "";
 
 # Starts building the same thing at a new spot for a share of the cost (Defs.RELOCATE_COST_MULT). The old building keeps

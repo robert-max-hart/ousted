@@ -781,6 +781,8 @@ func _build_visual() -> void:
     match shape:
         "silo":
             BuildingShapes.silo(self);
+        "market":
+            BuildingShapes.market(self);
         "hall":
             BuildingShapes.hall(self);
             if def.has("fuel_capacity"):

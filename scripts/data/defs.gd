@@ -258,7 +258,7 @@ const BUILDINGS:Dictionary = {
     },
     &"trading_post": {
         "name": "Trading Post", "size": Vector2i(4, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
-        "shape": "house", "height": 1.8, "color": Color(0.62, 0.5, 0.32), "roof": Color(0.7, 0.45, 0.2),
+        "shape": "market", "height": 2.6, "color": Color(0.62, 0.5, 0.32), "wall": &"planks",
         "trade_post": true, "unique": true,
         "desc": "Merchants walk in from the edge of the map a few times a season, stay a few days and leave again. They bring goods to sell and name what they want to buy.",
     },

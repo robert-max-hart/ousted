@@ -54,7 +54,7 @@ func _process(_delta:float) -> void:
     var t:Traders = world.traders;
     if _phase == 1 and t.present():
         _expect("the merchant reaches the post (%.0f hours)" % (GameClock.total_hours - _start), true);
-        _expect("next to it", Rect2i(_post.origin, _post.size).grow(2).has_point(t.merchant.cell()));
+        _expect("next to it", Rect2i(_post.origin, _post.size).grow(Traders.STOP_SHORT + 2).has_point(t.merchant.cell()));
         _expect("the inspector says how long they stay", _post.info_text().contains("4 more days"));
         var d:Dictionary = t.to_dict();
         _expect("a merchant at the post is saved too", d["merchant"]["state"] == Merchant.State.TRADING);
