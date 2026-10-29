@@ -200,6 +200,13 @@ Fields are player-placed rectangles (fixed 6×6 in the prototype, drag-sized lat
 - Barter uses item values. Luxury goods (TBD: wool, honey, pottery, spirits…) are mostly for trading.
 - Merchants can bring new seed types and livestock, which ties trade back into agriculture.
 
+**M6 plan (decided 2026-10-28, user's answers):** M5 is tabled (see CLAUDE.md), so trade comes next.
+- **Goods are hauled by citizens.** A deal reserves what you sell in storage, laborers carry it to the Trading Post's yard, and what you buy is carried from the yard to storage. Nothing teleports.
+- **Merchants walk in from the map edge** to the Trading Post a few times a season, stay a few days and walk out again. Offers and wants are random per visit.
+- **Luxury goods:** honey (beehives), wool and cloth (sheep, then a weaver), pottery (clay and a kiln), spirits (a still, from barley or fruit), and **gold and silver, to be mined later**.
+- Barter, not coins: every item has a trade `value`. **Margins (user, 2026-10-28):** a merchant pays the value times their want multiplier (0.8 to 1.5) for goods they asked for, half the value for anything else, and charges 1.25 times the value for their own goods.
+- **Steps:** 1 values, the Trading Post and merchant visits (walk-in, stay, leave); 2 the barter UI, trade orders and the hauling and settlement rules; 3 merchants selling seeds and saplings (`Seeds.unlock`) and livestock; 4 the luxury producers; 5 gold and silver from mines; then polish (merchant types, seasonal prices, a trade history in the ledger).
+
 ### 3.10 UI
 - Top bar: date, time, weather, key resources, population, speed controls.
 - Bottom bar: tools (select, harvest, road, terraform, demolish) and the build menu.

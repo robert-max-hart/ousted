@@ -256,6 +256,12 @@ const BUILDINGS:Dictionary = {
         "inputs": {&"barley": 20, &"wheat": 20},
         "desc": "Fenced grazing for cows. A founding pair arrives when it is finished. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
     },
+    &"trading_post": {
+        "name": "Trading Post", "size": Vector2i(4, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
+        "shape": "house", "height": 1.8, "color": Color(0.62, 0.5, 0.32), "roof": Color(0.7, 0.45, 0.2),
+        "trade_post": true, "unique": true,
+        "desc": "Merchants walk in from the edge of the map a few times a season, stay a few days and leave again. They bring goods to sell and name what they want to buy.",
+    },
     &"graveyard": {
         "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
@@ -284,10 +290,10 @@ const BUILD_CATEGORIES:Array = [
     ["Storage", [&"stockpile", &"granary"]],
     ["Food", [&"field", &"orchard", &"coop", &"pasture", &"forager"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
-    ["Civic", [&"town_hall", &"well", &"school", &"graveyard"]],
+    ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"field", &"orchard", &"coop", &"pasture", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -353,6 +359,18 @@ const CROPS:Dictionary = {
         "desc": "Bigger crops than apples but they spoil sooner.",
     },
 };
+
+# Trade value of the goods merchants deal in (barter, no coins): an item missing here cannot be traded.
+# A merchant pays a share of this for goods they want and charges a margin on their own.
+const TRADE_VALUE:Dictionary = {
+    &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
+    &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
+    &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
+    &"eggs": 2, &"milk": 2, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+};
+
+static func trade_value(item:StringName) -> int:
+    return TRADE_VALUE.get(item, 0);
 
 # Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: the founding
 # stock that arrives when it is finished; breed: chance a day of one more while there is room (two or more are needed);

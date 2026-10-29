@@ -37,6 +37,7 @@ var jobs        :JobManager;
 var policies    :Policies = Policies.new();
 var seeds       :Seeds = Seeds.new();       # the crops that can be sown (starting seeds come from the difficulty)
 var ledger      :Ledger = Ledger.new();
+var traders     :Traders;                  # merchant visits (needs a Trading Post)
 var families    :Families;
 var bodies      :Array[Body] = [];
 var child_labor_share:float = 0.0;   # share of the children working right now (0 when the policy forbids it)
@@ -113,6 +114,7 @@ func _ready() -> void:
     visuals.name = "Visuals";
     add_child(visuals);
     visuals.setup_environment();
+    traders = Traders.new(self);
     _entities = Node3D.new();
     _entities.name = "Entities";
     add_child(_entities);
@@ -376,7 +378,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "traders": traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -450,6 +452,7 @@ func _restore_entities(save:Dictionary) -> void:
     policies.restore(save.get("policies", {}));
     seeds.restore(save.get("seeds", null));
     ledger.restore(save.get("ledger", {}));
+    traders.restore(save.get("traders", {}));
     var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
     if saved_targets != null:
         jobs.targets = saved_targets;
@@ -783,6 +786,10 @@ func nearest_storage_with(item:StringName, pos:Vector3) -> Building:
 # Distance still counts, but a store that suits the item (a Granary for food) beats a nearer general one
 # (Building.storage_rank, each point worth STORAGE_RANK_CELLS cells of walking).
 const STORAGE_RANK_CELLS:float = 3.0;
+
+# Merchants are drawn with the other entities.
+func add_merchant(m:Merchant) -> void:
+    _entities.add_child(m);
 
 func nearest_storage_for(item:StringName, pos:Vector3) -> Building:
     var best:Building = null;
@@ -1130,6 +1137,7 @@ func _update_child_labor() -> void:
 
 func _on_day(_d:int) -> void:
     renderer.update_foliage();
+    traders.on_day();
     ledger.on_day(self);
     for b in buildings:
         b.on_day();
