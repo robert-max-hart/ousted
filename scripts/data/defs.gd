@@ -221,7 +221,11 @@ const BUILDINGS:Dictionary = {
         "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
         "shape": "field", "height": 0.0, "color": Color(0.4, 0.28, 0.18),
         "field": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
-        "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector.",
+        "upgrades": {
+            &"scarecrow": {"name": "Scarecrow", "cost": {&"wood": 4}, "work": 3.0,
+                "desc": "Scarecrows keep birds and beasts off the crop: pests arrive and spread much less often."},
+        },
+        "desc": "Farmers plant, tend and harvest crops here. Choose the crop in the inspector. Pests get into crops in the warm months, more easily where the same crop grows in several fields; farmers pick them off, and a scarecrow keeps most away.",
     },
     &"graveyard": {
         "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,

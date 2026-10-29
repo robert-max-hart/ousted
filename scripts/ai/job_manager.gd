@@ -558,7 +558,7 @@ func _farm_task(p:Pawn, only_action:StringName = &"") -> Task:
     var i:int = best_work["index"];
     var action:StringName = best_work["action"];
     f.reserved[i] = p;
-    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops", &"water": "Watering"};
+    var verbs:Dictionary = {&"plant": "Planting", &"harvest": "Harvesting", &"clear": "Clearing dead crops", &"water": "Watering", &"treat": "Picking off pests"};
     var label:String = "%s %s" % [verbs[action], f.crop()["name"].to_lower()] if action == &"plant" else verbs[action];
     var t:Task = Task.new(&"farm", label);
     t.job = Profession.FARMER;

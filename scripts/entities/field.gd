@@ -10,9 +10,21 @@ class_name Field extends Building;
 # (SALVAGE_HOURS), then it is lost. Added last so saved plot states keep their numbers.
 enum Plot { FALLOW, PLANTED, RIPE, DEAD, FROZEN };
 
-const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25, &"water": 0.3};
-const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"water": 2, &"plant": 3};     # ripe crops are gathered before anything is watered or sown
+const ACTION_HOURS      :Dictionary = {&"plant": 0.4, &"harvest": 0.5, &"clear": 0.25, &"water": 0.3, &"treat": 0.3};
+const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"treat": 2, &"water": 3, &"plant": 4};     # ripe crops are gathered before anything is watered or sown
 const IRRIGATED_MOISTURE:float = 0.65;  # a plot beside a flowing channel never dries below this
+const PEST_MIN_TEMP     :float = 6.0;      # pests are about only above this (a hard frost clears them)
+const PEST_OUTBREAK     :float = 0.05;     # chance a day for a field with something growing, in the warm months
+const PEST_SAME_CROP    :float = 0.5;      # outbreak chance grows this much for each other field growing the same crop nearby
+const PEST_NEARBY       :float = 20.0;     # ... within this many cells
+const PEST_GROWTH       :float = 0.12;     # an infested plot gets this much worse a day (at 1.0 the crop is eaten)
+const PEST_SPREAD       :float = 0.25;     # chance a day an infested plot infects each neighbour
+const PEST_GROWTH_COST  :float = 0.6;      # growth slows by this share at full infestation
+const PEST_YIELD_COST   :float = 0.7;      # and so does the harvest
+const PEST_TREAT_ABOVE  :float = 0.25;     # farmers pick pests off plots at least this infested
+const SCARECROW_OUTBREAK:float = 0.25;     # what a scarecrow leaves of the outbreak chance, the spread and the growth
+const SCARECROW_SPREAD  :float = 0.35;
+const SCARECROW_GROWTH  :float = 0.5;
 const WATER_BELOW       :float = 0.3;      # a growing plot drier than this wants a bucket
 const BUCKET_MOISTURE   :float = 0.55;     # what a bucket sets a plot (and the plots around it) to, at least
 const SALVAGE_HOURS     :float = 24.0;     # a frozen crop can be harvested this long before it is lost
@@ -31,11 +43,59 @@ var harvest_early:bool = false;             # the player ordered every growing p
 var cuts        :PackedByteArray;           # harvests taken from the current sowing (multi-harvest crops)
 var moisture    :PackedFloat32Array;
 var near_water  :PackedByteArray;
+var pests       :PackedFloat32Array;        # 0..1 infestation per plot
 var irrigated   :PackedByteArray;          # 1 where a flowing channel is within reach (derived, not saved)
 var _irrigation_seen:int = -1;
 var reserved    :Array = [];                # Pawn or null per plot
 var _layers     :Dictionary = {};           # plant shape -> MultiMeshInstance3D drawing those plots
 var _visual_dirty:bool = true;
+var _scarecrows :Node3D;
+var _scarecrows_for:Rect2i = Rect2i();      # the footprint they were built for
+
+# One scarecrow for every 6x6 stretch of the field: a pole, a crossbar, a sack head and a hat.
+func _build_scarecrows() -> void:
+    _scarecrows_for = rect();
+    if _scarecrows != null:
+        _scarecrows.queue_free();
+    _scarecrows = Node3D.new();
+    add_child(_scarecrows);
+    var wood:StandardMaterial3D = StandardMaterial3D.new();
+    wood.albedo_color = Color(0.4, 0.29, 0.18);
+    var sack:StandardMaterial3D = StandardMaterial3D.new();
+    sack.albedo_color = Color(0.75, 0.66, 0.45);
+    var hat:StandardMaterial3D = StandardMaterial3D.new();
+    hat.albedo_color = Color(0.3, 0.22, 0.14);
+    for bz in range(0, size.y, 6):
+        for bx in range(0, size.x, 6):
+            var c:Vector2i = origin + Vector2i(mini(bx + 3, size.x - 1), mini(bz + 3, size.y - 1));
+            var base:Vector3 = world.terrain.cell_center(c);
+            var pole:BoxMesh = BoxMesh.new();
+            pole.size = Vector3(0.07, 1.5, 0.07);
+            _scarecrow_part(pole, wood, base + Vector3(0, 0.75, 0));
+            var arms:BoxMesh = BoxMesh.new();
+            arms.size = Vector3(0.9, 0.06, 0.06);
+            _scarecrow_part(arms, wood, base + Vector3(0, 1.15, 0));
+            var head:SphereMesh = SphereMesh.new();
+            head.radius = 0.12;
+            head.height = 0.24;
+            _scarecrow_part(head, sack, base + Vector3(0, 1.58, 0));
+            var brim:CylinderMesh = CylinderMesh.new();
+            brim.top_radius = 0.2;
+            brim.bottom_radius = 0.2;
+            brim.height = 0.03;
+            _scarecrow_part(brim, hat, base + Vector3(0, 1.7, 0));
+            var crown:CylinderMesh = CylinderMesh.new();
+            crown.top_radius = 0.09;
+            crown.bottom_radius = 0.11;
+            crown.height = 0.14;
+            _scarecrow_part(crown, hat, base + Vector3(0, 1.78, 0));
+
+func _scarecrow_part(mesh:Mesh, mat:Material, at:Vector3) -> void:
+    var mi:MeshInstance3D = MeshInstance3D.new();
+    mi.mesh = mesh;
+    mi.material_override = mat;
+    mi.position = at;
+    _scarecrows.add_child(mi);
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     super.setup(w, id, o, s);
@@ -51,6 +111,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     moisture.resize(n);
     near_water.resize(n);
     irrigated.resize(n);
+    pests.resize(n);
     reserved.resize(n);
     plot_crop.resize(n);
     for i in n:
@@ -69,6 +130,8 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
         _layers[shape] = mmi;
 
 func _process(_delta:float) -> void:
+    if has_upgrade(&"scarecrow") and _scarecrows_for != rect():
+        _build_scarecrows();
     if _visual_dirty:
         _visual_dirty = false;
         _rebuild_crops();
@@ -150,6 +213,7 @@ func to_dict() -> Dictionary:
     d["frozen_hours"] = frozen_hours;
     d["harvest_early"] = harvest_early;
     d["moisture"] = moisture;
+    d["pests"] = pests;
     return d;
 
 func restore_dict(d:Dictionary) -> void:
@@ -165,6 +229,8 @@ func restore_dict(d:Dictionary) -> void:
     frozen_hours.resize(plot_count());
     harvest_early = d.get("harvest_early", false);
     moisture = d["moisture"];
+    pests = d.get("pests", PackedFloat32Array());
+    pests.resize(plot_count());
     _visual_dirty = true;
 
 # --------------------------------
@@ -203,6 +269,8 @@ func find_work(from:Vector2i, only_action:StringName = &"", has_room:Callable = 
             Plot.FALLOW:
                 if plantable:
                     action = &"plant";
+        if action == &"" and plot_state[i] == Plot.PLANTED and pests[i] >= PEST_TREAT_ABOVE:
+            action = &"treat";
         if action == &"" and can_water and plot_state[i] == Plot.PLANTED and moisture[i] < WATER_BELOW:
             action = &"water";
         if action == &"" or (only_action != &"" and action != only_action):
@@ -227,13 +295,14 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
                 plot_crop[i] = crop_id;
                 growth[i] = 0.0;
                 cuts[i] = 0;
+                pests[i] = 0.0;
         &"harvest":
             var st:int = plot_state[i];
             if st == Plot.RIPE or st == Plot.FROZEN or (st == Plot.PLANTED and harvest_early and growth[i] >= SALVAGE_MIN_GROWTH):
                 var c:Dictionary = Defs.CROPS[plot_crop[i]];
                 # ripe: all of it; early or frost-damaged: the share that has grown, less a little
                 var share:float = 1.0 if st == Plot.RIPE else minf(1.0, growth[i]) * (FROZEN_SHARE if st == Plot.FROZEN else EARLY_SHARE);
-                var amount:int = maxi(1, roundi(c["yield"] * lerpf(0.4, 1.3, fertility(i)) * share));
+                var amount:int = maxi(1, roundi(c["yield"] * lerpf(0.4, 1.3, fertility(i)) * share * (1.0 - PEST_YIELD_COST * pests[i])));
                 pawn.add_carry(c["item"], amount);
                 _set_fertility(i, fertility(i) + c["fertility"] * share);
                 cuts[i] += 1;
@@ -244,9 +313,18 @@ func apply(i:int, action:StringName, pawn:Pawn) -> void:
                     plot_state[i] = Plot.FALLOW;
                     growth[i] = 0.0;
                     cuts[i] = 0;
+                    pests[i] = 0.0;
         &"clear":
             plot_state[i] = Plot.FALLOW;
             growth[i] = 0.0;
+            pests[i] = 0.0;
+        &"treat":
+            for dz in range(-1, 2):       # pests are picked off the plot and the ones around it
+                for dx in range(-1, 2):
+                    var tx:int = i % size.x + dx;
+                    var tz:int = i / size.x + dz;
+                    if tx >= 0 and tz >= 0 and tx < size.x and tz < size.y:
+                        pests[tz * size.x + tx] = 0.0;
         &"water":
             for dz in range(-1, 2):       # one bucket wets the plot and the eight around it
                 for dx in range(-1, 2):
@@ -290,7 +368,7 @@ func on_hour() -> void:
                     else:
                         killed += 1;
                     continue;
-                growth[i] += _growth_rate(c, temp, moisture[i]);
+                growth[i] += _growth_rate(c, temp, moisture[i]) * (1.0 - PEST_GROWTH_COST * pests[i]);
                 if growth[i] >= 1.0:
                     plot_state[i] = Plot.RIPE;
             Plot.FROZEN:
@@ -321,6 +399,63 @@ func on_day() -> void:
     for i in plot_count():
         if plot_state[i] == Plot.FALLOW:
             _set_fertility(i, fertility(i) + FALLOW_RECOVERY);
+    if state == State.COMPLETE:
+        _pests_day();
+
+# Pests: a warm day may bring an outbreak to a plot with a crop growing (likelier where the same crop grows in
+# other fields nearby), an infested plot gets worse and spreads to its neighbours, and a frost clears them.
+func _pests_day() -> void:
+    var guard:float = SCARECROW_OUTBREAK if has_upgrade(&"scarecrow") else 1.0;
+    if Weather.mean_temperature() < PEST_MIN_TEMP:
+        for i in plot_count():
+            pests[i] = 0.0;
+        _visual_dirty = true;
+        return;
+    var growing:Array[int] = [];
+    for i in plot_count():
+        if plot_state[i] == Plot.PLANTED:
+            growing.append(i);
+    if growing.is_empty():
+        return;
+    var chance:float = PEST_OUTBREAK * guard * (1.0 + PEST_SAME_CROP * _same_crop_fields_near());
+    if world.rng.randf() < chance:
+        var pick:int = growing[world.rng.randi_range(0, growing.size() - 1)];
+        if pests[pick] <= 0.0:
+            pests[pick] = 0.1;
+            world.notify("Pests have got into a field of %s." % crop()["name"].to_lower());
+    var spread:float = PEST_SPREAD * (SCARECROW_SPREAD if has_upgrade(&"scarecrow") else 1.0);
+    var worse:float = PEST_GROWTH * (SCARECROW_GROWTH if has_upgrade(&"scarecrow") else 1.0);
+    var infect:Array[int] = [];
+    for i in growing:
+        if pests[i] <= 0.0:
+            continue;
+        pests[i] += worse;
+        for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+            var x:int = i % size.x + d.x;
+            var z:int = i / size.x + d.y;
+            if x >= 0 and z >= 0 and x < size.x and z < size.y and plot_state[z * size.x + x] == Plot.PLANTED and pests[z * size.x + x] <= 0.0 and world.rng.randf() < spread:
+                infect.append(z * size.x + x);
+    for j in infect:
+        pests[j] = 0.1;
+    for i in growing:
+        if pests[i] >= 1.0:
+            plot_state[i] = Plot.DEAD;
+            pests[i] = 0.0;
+    _visual_dirty = true;
+
+func _same_crop_fields_near() -> int:
+    var n:int = 0;
+    for b in world.buildings:
+        if b is Field and b != self and (b as Field).crop_id == crop_id and (b as Field).state == State.COMPLETE and Vector2(b.origin).distance_to(Vector2(origin)) <= PEST_NEARBY:
+            n += 1;
+    return n;
+
+func infested_count() -> int:
+    var n:int = 0;
+    for i in plot_count():
+        if pests[i] > 0.0 and plot_state[i] == Plot.PLANTED:
+            n += 1;
+    return n;
 
 # After an expansion: every plot keeps its crop and growth, new ones start fallow. The plot numbers change with the width.
 func on_resized(old:Rect2i) -> void:
@@ -331,7 +466,9 @@ func on_resized(old:Rect2i) -> void:
     var fh:PackedFloat32Array = PackedFloat32Array();
     var mo:PackedFloat32Array = PackedFloat32Array();
     var nw:PackedByteArray = PackedByteArray();
+    var pe:PackedFloat32Array = PackedFloat32Array();
     var pc:Array[StringName] = [];
+    pe.resize(n);
     st.resize(n);
     ct.resize(n);
     nw.resize(n);
@@ -350,6 +487,7 @@ func on_resized(old:Rect2i) -> void:
             fh[i] = frozen_hours[oi];
             mo[i] = moisture[oi];
             nw[i] = near_water[oi];
+            pe[i] = pests[oi];
         else:
             st[i] = Plot.FALLOW;
             pc[i] = crop_id;
@@ -362,6 +500,7 @@ func on_resized(old:Rect2i) -> void:
     frozen_hours = fh;
     moisture = mo;
     near_water = nw;
+    pests = pe;
     irrigated.resize(n);
     _irrigation_seen = -1;
     reserved.clear();
@@ -435,6 +574,8 @@ func info_text() -> String:
         hi = maxf(hi, fertility(i));
     s += "Soil fertility: %d%% (%d to %d)\n" % [roundi(fert / n * 100.0), roundi(lo * 100.0), roundi(hi * 100.0)];
     s += "Soil moisture: %d%%\n" % roundi(moist / n * 100.0);
+    if infested_count() > 0:
+        s += "Pests in %d plot%s\n" % [infested_count(), "" if infested_count() == 1 else "s"];
     var why:String = Weather.sow_block_reason(c);
     s += "Sowing now: %s\n" % ("yes" if why == "" else "no, " + why);
     return s;
@@ -487,4 +628,6 @@ func _rebuild_crops() -> void:
             var yaw:float = float(((cell.x * 73856093) ^ (cell.y * 19349663)) & 1023) / 1023.0 * TAU;       # no two plots look alike
             var p:Vector3 = world.terrain.cell_center(cell);
             mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(wide, h, wide)), p));
+            if pests[i] > 0.0 and (plot_state[i] == Plot.PLANTED or plot_state[i] == Plot.RIPE):
+                col = col.lerp(Color(0.5, 0.33, 0.16), pests[i] * 0.8);       # nibbled and browning
             mm.set_instance_color(j, col);
