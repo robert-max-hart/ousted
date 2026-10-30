@@ -26,12 +26,16 @@ const START_PROFESSIONS :Array[int] = [
 ];
 const RIVER_SOIL_BONUS :float = 0.2;                 # extra fertility right at the river, fading to nothing RIVER_NEAR cells out
 const START_RIVER_AT    :float = 12.0;              # the start site is picked this far from the river (near enough to use it, far enough to build)
+const SPARSE_FROM      :float = 0.7;               # lone trees use this slice of the cell's random roll (clear of the berry, rock, mushroom and hazel slices)
+const SPARSE_TREES     :float = 0.04;              # share of the open ground near the groves that holds a lone tree
 const START_ORE_MIN     :int = 2;                   # iron outcrops guaranteed in the ring START_ORE_NEAR..START_ORE_FAR cells from the start
 const START_ORE_NEAR    :float = 14.0;
 const START_ORE_FAR     :float = 30.0;
 const START_ROCKS_MIN   :int = 5;                   # loose rocks guaranteed near the start (8 stone each), whatever the seed
 const START_ROCKS_NEAR  :float = 10.0;              # ... in the ring this far from the start, no further than START_ROCKS_FAR
 const START_ROCKS_FAR   :float = 22.0;
+const START_ROCKS_CLOSE :int = 2;                   # ... and this many of them within START_ROCKS_CLOSE_FAR cells
+const START_ROCKS_CLOSE_FAR:float = 16.0;
 const MAX_BUILD_SLOPE   :float = 2.5;
 const MAX_WALK_SLOPE    :float = 2.2;
 
@@ -76,6 +80,9 @@ var road_kind:Dictionary = {};              # cell -> Terrain.Overlay.ROAD or CH
 var irrigation_version:int = 0;             # bumped when channels are dug, filled in or flow changes (fields re-check their plots)
 var pending_roads:Dictionary = {};          # cell -> true: road cells waiting for a tree or rock to be cleared
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
+var tree_orders :Dictionary = {};   # cell -> true: single trees the player asked for (the Plant tool), planted by laborers
+var tree_claimed:Dictionary = {};   # ... the ones a laborer is on the way to
+var _order_marks:Dictionary = {};   # cell -> a stake standing where a tree will go
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
 var _storage_warned:bool = false;
 var _spoiled_today:int = 0;
@@ -229,6 +236,9 @@ func _spawn_nature() -> void:
                 add_node(&"oak" if oak > 0.05 else &"tree", c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
+            elif slope < 1.4 and f > -0.35 and f <= 0.15 and r > SPARSE_FROM and r < SPARSE_FROM + (SPARSE_TREES if f > -0.1 else SPARSE_TREES * 0.55):
+                var kind:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);        # a lone tree here and there, thicker towards the groves
+                add_node(&"oak" if kind > 0.05 else &"tree", c);
             elif slope < 1.0 and r < 0.008:
                 add_node(&"rock", c);             # loose surface stone on open ground (twice what it was originally)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
@@ -262,29 +272,36 @@ func _find_start_cell() -> Vector2i:
                 best = c;
     return best;
 
-# Tops the ring around the start up to START_ROCKS_MIN loose rocks, so the first buildings always have stone close
-# by (the random scatter leaves some seeds with one or two). Picks level, dry, empty cells with the world's own rng.
+# Tops the rings around the start up with loose rocks, so the first buildings always have stone close by (the random
+# scatter leaves some seeds with one or two, and a start by the river has few): START_ROCKS_MIN in the whole ring, and
+# START_ROCKS_CLOSE of them within START_ROCKS_CLOSE_FAR cells.
 func _ensure_start_rocks(start:Vector2i) -> void:
+    _top_up(&"rock", start, START_ROCKS_NEAR, START_ROCKS_CLOSE_FAR, START_ROCKS_CLOSE);
+    _top_up(&"rock", start, START_ROCKS_NEAR, START_ROCKS_FAR, START_ROCKS_MIN);
+
+# Adds nodes of one kind on level, dry, empty ground in the ring near..far cells from the start until it holds at least
+# `minimum` of them (picked with the world's own rng).
+func _top_up(kind:StringName, start:Vector2i, near:float, far:float, minimum:int) -> void:
     var have:int = 0;
     for rn in nodes:
         var d:float = Vector2(rn.cell - start).length();
-        if rn.kind == &"rock" and d >= START_ROCKS_NEAR and d <= START_ROCKS_FAR:
+        if rn.kind == kind and d >= near and d <= far:
             have += 1;
     var free:Array[Vector2i] = [];
-    var reach:int = ceili(START_ROCKS_FAR);
+    var reach:int = ceili(far);
     for z in range(start.y - reach, start.y + reach + 1):
         for x in range(start.x - reach, start.x + reach + 1):
             var c:Vector2i = Vector2i(x, z);
             var d:float = Vector2(c - start).length();
-            if d < START_ROCKS_NEAR or d > START_ROCKS_FAR or not terrain.in_bounds(c):
+            if d < near or d > far or not terrain.in_bounds(c):
                 continue;
             if terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4 or terrain.cell_slope(c) > 1.4:
                 continue;
             if node_at[idx(c)] == null and occupant[idx(c)] == null:
                 free.append(c);
-    while have < START_ROCKS_MIN and not free.is_empty():
+    while have < minimum and not free.is_empty():
         var pick:int = rng.randi_range(0, free.size() - 1);
-        add_node(&"rock", free[pick]);
+        add_node(kind, free[pick]);
         free.remove_at(pick);
         have += 1;
 
@@ -322,28 +339,7 @@ func begin_colony(origin:Vector2i) -> String:
 # Iron is a little scarce on the bigger map, so the ring START_ORE_NEAR to START_ORE_FAR cells from the start always
 # holds at least START_ORE_MIN outcrops (placed on the gentler ground; the hills keep their own).
 func _ensure_start_ore(start:Vector2i) -> void:
-    var have:int = 0;
-    for rn in nodes:
-        var d:float = Vector2(rn.cell - start).length();
-        if rn.kind == &"ore" and d >= START_ORE_NEAR and d <= START_ORE_FAR:
-            have += 1;
-    var free:Array[Vector2i] = [];
-    var reach:int = ceili(START_ORE_FAR);
-    for z in range(start.y - reach, start.y + reach + 1):
-        for x in range(start.x - reach, start.x + reach + 1):
-            var c:Vector2i = Vector2i(x, z);
-            var d:float = Vector2(c - start).length();
-            if d < START_ORE_NEAR or d > START_ORE_FAR or not terrain.in_bounds(c):
-                continue;
-            if terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4 or terrain.cell_slope(c) > 1.4:
-                continue;
-            if node_at[idx(c)] == null and occupant[idx(c)] == null:
-                free.append(c);
-    while have < START_ORE_MIN and not free.is_empty():
-        var pick:int = rng.randi_range(0, free.size() - 1);
-        add_node(&"ore", free[pick]);
-        free.remove_at(pick);
-        have += 1;
+    _top_up(&"ore", start, START_ORE_NEAR, START_ORE_FAR, START_ORE_MIN);
 
 func _clear_nodes(c:Vector2i, radius:int) -> void:
     for rn in nodes.duplicate():
@@ -460,7 +456,7 @@ func serialize() -> Dictionary:
         "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "traders": traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
+        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "tree_orders": tree_orders.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "traders": traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
         "camera": camera_rig.save_state() if camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
     };
@@ -530,6 +526,9 @@ func _restore_entities(save:Dictionary) -> void:
     death_log = save.get("deaths", []);
     for c in save.get("pending_roads", []):
         pending_roads[c] = true;
+    for c in save.get("tree_orders", []):
+        tree_orders[c] = true;
+        _add_order_mark(c);
     for e in save.get("road_work", []):
         road_work[e[0]] = e[1];
     for e in save.get("road_kind", []):
@@ -571,6 +570,43 @@ func plant_tree(c:Vector2i) -> ResourceNode:
     saplings.append(rn);
     return rn;
 
+# The Plant tool: asks for a tree on this cell (the ground must take one and no other order or tree may touch it).
+func order_tree(c:Vector2i) -> bool:
+    if tree_orders.has(c) or not can_plant_tree(c):
+        return false;
+    for dz in range(-1, 2):
+        for dx in range(-1, 2):
+            if tree_orders.has(c + Vector2i(dx, dz)):
+                return false;
+    tree_orders[c] = true;
+    _add_order_mark(c);
+    return true;
+
+func cancel_tree_order(c:Vector2i) -> void:
+    if tree_orders.erase(c):
+        tree_claimed.erase(c);
+        _remove_order_mark(c);
+
+func _add_order_mark(c:Vector2i) -> void:
+    if _order_marks.has(c):
+        return;
+    var stake:MeshInstance3D = MeshInstance3D.new();
+    var pole:BoxMesh = BoxMesh.new();
+    pole.size = Vector3(0.07, 0.7, 0.07);
+    stake.mesh = pole;
+    var mat:StandardMaterial3D = StandardMaterial3D.new();
+    mat.albedo_color = Color(0.5, 0.82, 0.35);
+    stake.material_override = mat;
+    stake.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+    stake.position = Vector3(c.x + 0.5, terrain.height_at(c.x + 0.5, c.y + 0.5) + 0.35, c.y + 0.5);
+    _entities.add_child(stake);
+    _order_marks[c] = stake;
+
+func _remove_order_mark(c:Vector2i) -> void:
+    if _order_marks.has(c):
+        (_order_marks[c] as Node).queue_free();
+        _order_marks.erase(c);
+
 # Free, dry, gentle ground that is not road or field, and not touching another tree.
 # spacing: how many cells of clear ground a new tree needs on every side (0 lets trees stand shoulder to shoulder).
 func can_plant_tree(c:Vector2i, spacing:int = 1) -> bool:
@@ -578,7 +614,7 @@ func can_plant_tree(c:Vector2i, spacing:int = 1) -> bool:
         return false;
     if occupant[idx(c)] != null or node_at[idx(c)] != null or terrain.get_overlay(c) != Terrain.Overlay.NONE:
         return false;
-    if terrain.cell_slope(c) > 1.2 or planting.has(c):
+    if terrain.cell_slope(c) > 1.2 or planting.has(c) or tree_orders.has(c):
         return false;
     for dz in range(-spacing, spacing + 1):
         for dx in range(-spacing, spacing + 1):

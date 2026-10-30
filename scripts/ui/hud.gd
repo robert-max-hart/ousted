@@ -15,7 +15,8 @@ const REFRESH_RATE  :float = 0.25;
 
 var _date       :Label;
 var _weather    :Label;
-var _stock      :Label;
+var _stock      :HBoxContainer;         # the stock figures in the top bar, each an icon and a number
+var _stock_vals :Dictionary = {};       # entry id -> its number Label (the entry's box is the label's parent)
 var _speed_btns :Array[Button] = [];
 var _tool_btns  :Dictionary = {};       # key -> Button
 var _cat_btns   :Array[Button] = [];     # build categories (Housing, Storage, ...)
@@ -236,10 +237,9 @@ func _refresh_all() -> void:
     var w:World = World.instance;
     _date.text = "%s   %s" % [GameClock.date_string(), GameClock.time_string()];
     _weather.text = "%s, %.0f C" % [Weather.description(), Weather.temperature];
-    var parts:PackedStringArray = [];
     for item in SHOWN_ITEMS:
-        parts.append("%s %d" % [Defs.item_name(item), Stock.amount(item)]);
-    parts.append("Food %d" % Stock.food_total());
+        _set_stock(item, Stock.amount(item));
+    _set_stock(&"food", Stock.food_total());
     var governed:bool = w.has_governance();
     _policies_btn.disabled = not governed;
     _policies_btn.tooltip_text = "Colony-wide rules" if governed else "Needs the Town Hall's Governance upgrade";
@@ -249,22 +249,19 @@ func _refresh_all() -> void:
     _tool_row.visible = not w.awaiting_start;          # before the Town Hall is down there is only one thing to do
     if w.awaiting_start:
         _build_row.visible = false;
-    parts.append("Pop %d" % w.pawns.size());
+    _set_stock(&"pop", w.pawns.size());
     var idle:int = w.pawns.filter(func(p:Pawn) -> bool: return p.is_idle()).size();
-    if idle > 0:
-        parts.append("Idle %d" % idle);
+    _set_stock(&"idle", idle, idle > 0);
     var homeless:int = w.families.homeless_count();
-    if homeless > 0:
-        parts.append("Homeless %d" % homeless);
+    _set_stock(&"homeless", homeless, homeless > 0);
     var merchant_note:String = w.traders.top_text();
     _merchant_label.visible = merchant_note != "";
     _merchant_label.text = merchant_note;
-    _stock.text = "  ".join(parts);
     var food_tip:PackedStringArray = ["Storage: %d / %d" % [Stock.used(), Stock.capacity()]];
     for item in Defs.ITEMS:
         if Defs.ITEMS[item].get("food", false):
             food_tip.append("%s: %d" % [Defs.item_name(item), Stock.amount(item)]);
-    _stock.tooltip_text = "\n".join(food_tip);
+    (_stock_vals[&"food"] as Label).get_parent().tooltip_text = "\n".join(food_tip);
     for prof in JobManager.PROFESSION_NAMES.size():
         var have:int = w.jobs.count(prof);
         var want:int = w.jobs.target(prof);
@@ -654,12 +651,18 @@ func _build_top_bar(root:Control) -> void:
     _weather = Label.new();
     _weather.custom_minimum_size.x = 90;
     row.add_child(_weather);
-    _stock = Label.new();
+    _stock = HBoxContainer.new();
     _stock.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    _stock.clip_text = true;               # a long stock line shrinks instead of pushing the speed buttons off-screen
-    _stock.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS;
+    _stock.clip_contents = true;           # a long stock line is cut off instead of pushing the speed buttons off-screen
+    _stock.add_theme_constant_override("separation", 14);
     _stock.mouse_filter = Control.MOUSE_FILTER_PASS;
     row.add_child(_stock);
+    for id in SHOWN_ITEMS:
+        _stock_entry(id, Defs.item_name(id));
+    _stock_entry(&"food", "Food");
+    _stock_entry(&"pop", "Citizens");
+    _stock_entry(&"idle", "Citizens with nothing to do");
+    _stock_entry(&"homeless", "Citizens with no home");
     # panel toggles: each button opens and closes its panel
     _jobs_toggle = _panel_toggle(row, "Jobs");
     _citizens_toggle = _panel_toggle(row, "Citizens");
@@ -680,6 +683,29 @@ func _build_top_bar(root:Control) -> void:
         b.pressed.connect(GameClock.set_speed.bind(i));
         row.add_child(b);
         _speed_btns.append(b);
+
+# One figure in the top bar: its icon (StockIcons) and a number, with a tooltip.
+func _stock_entry(id:StringName, tip:String) -> void:
+    var box:HBoxContainer = HBoxContainer.new();
+    box.add_theme_constant_override("separation", 4);
+    box.mouse_filter = Control.MOUSE_FILTER_PASS;
+    box.tooltip_text = tip;
+    var icon:TextureRect = TextureRect.new();
+    icon.texture = StockIcons.texture(id);
+    icon.custom_minimum_size = Vector2(StockIcons.SIZE, StockIcons.SIZE);
+    icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED;
+    icon.mouse_filter = Control.MOUSE_FILTER_PASS;
+    box.add_child(icon);
+    var num:Label = Label.new();
+    num.mouse_filter = Control.MOUSE_FILTER_PASS;
+    box.add_child(num);
+    _stock.add_child(box);
+    _stock_vals[id] = num;
+
+func _set_stock(id:StringName, value:int, shown:bool = true) -> void:
+    var num:Label = _stock_vals[id];
+    num.text = str(value);
+    num.get_parent().visible = shown;
 
 # A toggle button that shows and hides a panel (and stays in step if the panel is closed some other way).
 func _bind_toggle(btn:Button, panel:Control, shown:bool) -> void:
@@ -712,7 +738,7 @@ func _build_toolbar(root:Control) -> void:
     var group:ButtonGroup = ButtonGroup.new();
     group.allow_unpress = false;
     var modes:Array = [
-        [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"],
+        [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"], [PlayerTools.Mode.PLANT, "Plant trees"],
         [PlayerTools.Mode.CHANNEL, "Channel"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
     ];
     for m in modes:

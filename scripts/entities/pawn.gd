@@ -74,7 +74,7 @@ var _failed         :Dictionary = {};       # target -> game hour it can be retr
 var _need_block_until:float = -1.0;
 var _rig            :Node3D;                  # the body and head, tilted to work and bobbed to walk (visual only)
 var _prop           :Node3D;                  # a hand tool that swings while they work
-var _idle_mark      :Label3D;                 # a small "idle" tag over a citizen with nothing to do
+var _idle_mark      :Sprite3D;                # a small icon over a citizen with nothing to do (StockIcons)
 var _anim_t         :float = 0.0;
 var _work_now       :bool = false;            # what the last frame did, for the animation
 var _move_now       :bool = false;
@@ -743,13 +743,13 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
     _prop.visible = false;
     _rig.add_child(_prop);
 
-    _idle_mark = Label3D.new();
-    _idle_mark.text = "idle";
+    _idle_mark = Sprite3D.new();
+    _idle_mark.texture = StockIcons.texture(&"idle");
     _idle_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
-    _idle_mark.pixel_size = 0.012;
-    _idle_mark.font_size = 30;
-    _idle_mark.outline_size = 8;
-    _idle_mark.modulate = Color(1.0, 0.85, 0.4);
+    _idle_mark.pixel_size = 0.02;
+    _idle_mark.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR;
+    _idle_mark.shaded = false;
+    _idle_mark.no_depth_test = true;
     _idle_mark.position = Vector3(0, 1.65, 0);
     _idle_mark.visible = false;
     add_child(_idle_mark);

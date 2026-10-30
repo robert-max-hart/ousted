@@ -9,7 +9,7 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND, CHANNEL };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND, CHANNEL, PLANT };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
@@ -21,6 +21,7 @@ const MODE_HINTS:Dictionary = {
     Mode.DEMOLISH: "Drag to demolish buildings, roads and channels.",
     Mode.EXPAND:   "Click on the ground beside it to grow it there. Right-click to stop.",
     Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
+    Mode.PLANT:    "Click a cell, or drag over an area, to mark where trees should be planted (one every other cell at most). Laborers plant them, no materials needed.",
     Mode.RAISE:    "Hold the left mouse button to raise the ground.",
     Mode.LOWER:    "Hold the left mouse button to lower the ground.",
     Mode.FLATTEN:  "Hold the left mouse button to level the ground to where you clicked.",
@@ -263,7 +264,7 @@ func _on_press() -> void:
                     var done:Building = expanding;
                     set_mode(Mode.SELECT);
                     select(done);
-        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.CHANNEL, Mode.DEMOLISH, Mode.CANCEL:
+        Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.CHANNEL, Mode.DEMOLISH, Mode.CANCEL, Mode.PLANT:
             _dragging = true;
             _drag_start = _hover_cell;
         Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
@@ -297,6 +298,14 @@ func _on_release() -> void:
                     w.set_designated(rn, true);
                     picked += 1;
             error = "" if picked > 0 else "Nothing to forage there.";
+        Mode.PLANT:
+            var pr:Rect2i = _drag_rect();
+            var marked:int = 0;
+            for z in range(pr.position.y, pr.end.y):
+                for x in range(pr.position.x, pr.end.x):
+                    if w.order_tree(Vector2i(x, z)):
+                        marked += 1;
+            error = "" if marked > 0 else "No tree can be planted there.";
         Mode.ROAD:
             for c in _road_cells():
                 w.plan_road(c);
@@ -323,6 +332,9 @@ func _on_release() -> void:
             for c in w.pending_roads.keys() + w.road_work.keys():
                 if cr.has_point(c):
                     w.cancel_road(c);
+            for c in w.tree_orders.keys():
+                if cr.has_point(c):
+                    w.cancel_tree_order(c);
 
 # --------------------------------
 # Per-frame
@@ -466,7 +478,7 @@ func _update_ghosts() -> void:
                 var why:String = Expansion.block_reason(w, expanding, grown);
                 _show_box(0, grown, 0.15, _mat_ok if why == "" else _mat_bad);
                 error = "" if why == "" or grown == expanding.rect() else why;
-        Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH, Mode.CANCEL:
+        Mode.HARVEST, Mode.FORAGE, Mode.DEMOLISH, Mode.CANCEL, Mode.PLANT:
             var r:Rect2i = _drag_rect() if _dragging else Rect2i(_hover_cell, Vector2i.ONE);
             _show_box(0, r, 0.4, _mat_bad if mode == Mode.DEMOLISH else _mat_area);
         Mode.ROAD, Mode.CHANNEL:

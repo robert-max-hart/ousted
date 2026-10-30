@@ -3,6 +3,11 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.4.6 | 30 Oct 2026 | Lone trees and the Plant tool
+- Open ground near the forests now has single trees standing here and there between the dense groves.
+- The top bar shows small icons instead of the words Wood, Stone, Food, Pop and so on, and an icon bubble floats over idle citizens (placeholders until the art pass).
+- New Plant trees tool (toolbar): click a cell, or drag over an area, to mark where trees should be planted, one every other cell at most. Laborers plant them for no materials. The Cancel tool removes marks.
+
 # 0.4.5 | 30 Oct 2026 | Rivers, bridges and playtest fixes
 - Every map has a winding river from one edge to the other, wider downstream. Citizens can wade through its shallow fords (at half speed); deep water still blocks them. The land beside it is richer soil, and you start a short walk from it.
 - New Bridge (Civic): drag a wooden deck at least 2 cells wide across the water, with its ends on land. Citizens walk over it at full speed.

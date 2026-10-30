@@ -136,7 +136,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _tree_order_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -544,6 +544,32 @@ func _herd_task(p:Pawn) -> Task:
 func _clear_task(p:Pawn) -> Task:
     return harvest_node_task(p, func(rn:ResourceNode) -> bool:
         return rn.designated);
+
+# Plants one of the single trees the player asked for with the Plant tool (nearest first).
+func _tree_order_task(p:Pawn) -> Task:
+    var best:Vector2i = Vector2i(-1, -1);
+    var best_d:float = INF;
+    var pc:Vector2 = Vector2(p.position.x, p.position.z);
+    for c in world.tree_orders:
+        if world.tree_claimed.has(c) or p.has_failed(c):
+            continue;
+        var d:float = pc.distance_squared_to(Vector2(c) + Vector2(0.5, 0.5));
+        if d < best_d:
+            best = c;
+            best_d = d;
+    if best.x < 0:
+        return null;
+    var spot:Vector2i = best;
+    world.tree_claimed[spot] = true;
+    var t:Task = Task.new(&"plant", "Planting a tree");
+    t.job = Profession.WOODCUTTER;
+    t.move_cell(spot, "Walking to plant a tree");
+    t.work_for(0.4, "Planting a tree", func(_pw:Pawn) -> void:
+        world.cancel_tree_order(spot);
+        world.plant_tree(spot));
+    t.on_cancel = func(_pw:Pawn) -> void:
+        world.tree_claimed.erase(spot);
+    return t;
 
 func _forage_task(p:Pawn) -> Task:
     return harvest_node_task(p, func(rn:ResourceNode) -> bool:
