@@ -25,16 +25,24 @@ func _ready() -> void:
         _finish();
         return;
     var o:Vector2i = spot[0];
-    _expect("a fishing hut is allowed on the shore", world.can_place(&"fishing_hut", o, Vector2i(3, 3)) == "");
-    _expect("but not on dry land", world.can_place(&"fishing_hut", world.town_hall.origin + Vector2i(8, 8), Vector2i(3, 3)) == "A fishing hut has to stand partly over the water" or world.terrain.is_water(world.town_hall.origin + Vector2i(8, 8)));
+    var size:Vector2i = spot[2];
+    var facing:int = spot[3];
+    _expect("a fishing hut is allowed with its pier over the water", world.can_place(&"fishing_hut", o, size, false, facing) == "");
+    var dry_spot:Vector2i = TestSite.near(world, Vector2i(0, 8));
+    _expect("but not on dry land (%s)" % world.can_place(&"fishing_hut", dry_spot, size, false, facing), world.terrain.is_water(dry_spot) or world.can_place(&"fishing_hut", dry_spot, size, false, facing) != "");
     _expect("and a house is still refused over water", world.can_place(&"house", o, Vector2i(3, 3)) == "Can't build on water");
-    _hut = world.place_building(&"fishing_hut", o, Vector2i(3, 3), true) as FishingHut;
+    _hut = world.place_building(&"fishing_hut", o, size, true, false, facing) as FishingHut;
+    var spot_cell:Vector2i = _hut.work_spot();
+    _expect("fishermen work at the end of the pier (%s)" % spot_cell, _hut.pier_rect().has_point(spot_cell) and world.nav.is_walkable(spot_cell) and world.terrain.is_water(spot_cell));
+    var door_side:Vector2i = _hut.origin + Vector2i(size.x / 2, size.y / 2);
+    _expect("the way from the hut's door to the end of the pier is walkable", world.nav.find_path(_hut.pier_rect().position, spot_cell).size() > 0 and _hut.deck_has(door_side));
+    _expect("a pier cell is a deck citizens stand above the water on", world.is_bridge(spot_cell) and world.stand_y(spot_cell.x + 0.5, spot_cell.y + 0.5) > Terrain.WATER_LEVEL);
     var share:float = _hut.water_share();
     var rate:float = _hut.catch_rate();
     _expect("the circle has water (%.0f%%) and a catch (%.2f an hour)" % [share * 100.0, rate], share > 0.05 and rate > 0.0 and _hut.overlap() == 0.0);
     # a second hut next to it shares the water: both catch less
     var o2:Vector2i = spot[1];
-    var second:FishingHut = world.place_building(&"fishing_hut", o2, Vector2i(3, 3), true) as FishingHut;
+    var second:FishingHut = world.place_building(&"fishing_hut", o2, size, true, false, facing) as FishingHut;
     _expect("a second hut with its circle over the first shares the water (%.0f%%)" % [_hut.overlap() * 100.0], _hut.overlap() > 0.2 and second.overlap() > 0.2);
     _expect("so the first hut catches less (%.2f now, %.2f before)" % [_hut.catch_rate(), rate], _hut.catch_rate() < rate);
     world.remove_building(second, false);
@@ -62,21 +70,19 @@ func _process(_delta:float) -> void:
         _expect("a fisherman brought fish within 40 hours (%d)" % Stock.amount(&"fish"), false);
         _finish();
 
-# A 3x3 spot with water in it and dry land too, and a second one 4 cells along the shore: [origin, origin2].
+# A spot for a fishing hut (a facing, so its pier is over the water) with a second one 5 cells along: [origin, origin2, size, facing].
 func _shore() -> Array:
-    var t:Terrain = world.terrain;
-    var found:Array = [];
-    for z in range(10, Terrain.SIZE - 14):
-        for x in range(10, Terrain.SIZE - 14):
-            var o:Vector2i = Vector2i(x, z);
-            if world.can_place(&"fishing_hut", o, Vector2i(3, 3)) != "":
-                continue;
-            for d in [Vector2i(4, 0), Vector2i(0, 4), Vector2i(-4, 0), Vector2i(0, -4)]:
-                if world.can_place(&"fishing_hut", o + d, Vector2i(3, 3)) == "" and Rect2i(o, Vector2i(3, 3)).intersects(Rect2i(o + d, Vector2i(3, 3))) == false:
-                    # near the Town Hall, so a fisherman can walk there
-                    if Vector2(o - world.town_hall.origin).length() < 45.0:
-                        return [o, o + d];
-    return found;
+    for facing in 4:
+        var size:Vector2i = Vector2i(3, 4) if facing % 2 == 0 else Vector2i(4, 3);
+        for z in range(10, Terrain.SIZE - 14):
+            for x in range(10, Terrain.SIZE - 14):
+                var o:Vector2i = Vector2i(x, z);
+                if Vector2(o - world.town_hall.origin).length() > 45.0 or world.can_place(&"fishing_hut", o, size, false, facing) != "":
+                    continue;
+                for d in [Vector2i(5, 0), Vector2i(0, 5), Vector2i(-5, 0), Vector2i(0, -5)]:
+                    if world.can_place(&"fishing_hut", o + d, size, false, facing) == "" and not Rect2i(o, size).intersects(Rect2i(o + d, size)):
+                        return [o, o + d, size, facing];
+    return [];
 
 func _finish() -> void:
     Engine.time_scale = 1.0;

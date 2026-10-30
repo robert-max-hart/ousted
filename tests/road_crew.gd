@@ -12,7 +12,7 @@ func _ready() -> void:
     SaveGame.autosave_enabled = false;
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
-    var o:Vector2i = world.town_hall.origin + Vector2i(-3, 6);
+    var o:Vector2i = TestSite.near(world, Vector2i(-3, 6));
     for i in 6:
         var c:Vector2i = o + Vector2i(i, 0);
         if world.node_at[world.idx(c)] != null:

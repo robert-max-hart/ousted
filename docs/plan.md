@@ -106,7 +106,7 @@ for harvest and stocking up, and winter is the test.
 - **Town Hall (decided 2026-10-25, built):**
   - **Base is only the well.** Everything else is an upgrade, built like the Mine's (materials only). An upgrade only **unlocks** a feature, not how it is reached.
   - **Upgrades:** storage (tier 1), more storage (tier 2, after tier 1), heating (a heated place to warm up, no sleeping or housing: the Town Hall never houses anyone), and **governance**, which unlocks the Policies panel and later the ledger and history.
-  - **Starting difficulty sets what it comes with:** hard is the bare well, normal is well plus storage tier 1, easy is both storage tiers plus heating. (The difficulty setting itself is M8; the data can be written now.)
+  - **Starting difficulty sets what it comes with:** hard is the bare well, normal is well plus storage tier 1, easy is both storage tiers plus heating. (The difficulty setting itself is M6; the data can be written now.)
   - **Unique, but never lost for good:** only one at a time, and if it is lost the player can build a new one. The player can also move it. A new one costs 30 wood and 10 stone and starts bare (the unlocks belong to the building). **Relocating** is on every building that can move (not fields, graveyards, shacks or carts): half the build cost and work for a new one at a chosen spot, the old one keeps working and then goes with no refund, and settings, filters, upgrades, fuel, inputs and residents carry over. Storage buildings must be emptied first.
   - **Hard-start supply cart:** the starting goods go into the Town Hall's store room as far as it goes and the rest into a cart beside it, which takes nothing new and vanishes when emptied (as in Banished).
 - **Teacher quality (decided 2026-10-25, built):** a teacher's teaching-job experience plus their own general experience raises how fast pupils gain general experience, up to 1.5x for a veteran.
@@ -200,7 +200,7 @@ Fields are player-placed rectangles (fixed 6×6 in the prototype, drag-sized lat
 - Barter uses item values. Luxury goods (TBD: wool, honey, pottery, spirits…) are mostly for trading.
 - Merchants can bring new seed types and livestock, which ties trade back into agriculture.
 
-**M6 plan (decided 2026-10-28, user's answers):** M5 is tabled (see CLAUDE.md), so trade comes next.
+**M5 plan, trade (decided 2026-10-28 as "M6", user's answers; renumbered 2026-10-30):** the terrain milestone was tabled and has since been removed, so trade came next.
 - **Goods are hauled by citizens.** A deal reserves what you sell in storage, laborers carry it to the Trading Post's yard, and what you buy is carried from the yard to storage. Nothing teleports.
 - **Merchants walk in from the map edge** to the Trading Post a few times a season, stay a few days and walk out again. Offers and wants are random per visit.
 - **Luxury goods:** honey (beehives), wool and cloth (sheep, then a weaver), pottery (clay and a kiln), spirits (a still, from barley or fruit), and **gold and silver, to be mined later**.
@@ -209,7 +209,7 @@ Fields are player-placed rectangles (fixed 6×6 in the prototype, drag-sized lat
 
 ### 3.10 UI
 - Top bar: date, time, weather, key resources, population, speed controls.
-- Bottom bar: tools (select, harvest, road, terraform, demolish) and the build menu.
+- Bottom bar: tools (select, harvest, forage, plant trees, channel, demolish, cancel) and the build menu grouped by category (the terraform brushes were taken off the toolbar on 2026-10-30; the road tool lives under Civic).
 - Left: profession counters and an event log. Right: inspector for the selected object.
 - Later: overlays (fertility, moisture, happiness), a ledger with graphs, and notifications.
 
@@ -264,16 +264,30 @@ Decisions and why:
 
 | # | Name | Contents |
 |---|---|---|
-| **M1** | **Core loop prototype** *(built: first pass)* | Terrain gen and editing, camera, clock/seasons/day-night, weather, trees/rocks/bushes, harvest designation, roads, construction with hauling, pawns with needs, professions, basic farming (wheat/beans, fertility, moisture, frost), HUD |
+| **M1** | **Core loop prototype** *(done)* | Terrain gen, camera, clock/seasons/day-night, weather, trees/rocks/bushes, harvest designation, roads, construction with hauling, pawns with needs, professions, basic farming (wheat/beans, fertility, moisture, frost), HUD |
 | M2 | Logistics & economy *(done)* | Per-storage inventories and capacity, granary/spoilage, woodcutter/quarry/mine buildings, firewood and warmth, tools, field drag-sizing |
 | M3 | Population *(done: death handling, profession targets, life stages, school and teacher, job experience, Policies panel, families and births, happiness, grief and the Graveyard with its Crematorium, homelessness and shacks, Town Hall upgrades, the Governance ledger and history; tuned 2026-10-26)* | Ageing, families, births, children and education, deaths from old age, happiness, homelessness effects |
-| M4 | Agriculture depth | More crops, sowing calendars, seeds, pests, irrigation channels, fertility overlay, orchards, livestock and manure |
-| M5 | Terrain as labor | Terraforming as worker jobs, dirt and stone moved, nicer terrain shader (texture splat, snow) |
-| M6 | Trade | Trading post, merchants, barter UI, luxury goods |
-| M7 | Content & art pass | Real models and animation, audio, UI theme |
-| M8 | Meta | Save and load, map seeds and settings, scenarios and difficulty, tutorial |
+| M4 | Agriculture depth *(done)* | More crops, sowing calendars, seeds, pests, irrigation channels, fertility overlay, orchards, livestock and manure |
+| M5 | Trade *(done, closed 2026-10-30 as 0.5.0; was M6 before the renumbering)* | Trading post, merchants and merchant types, barter UI, trade history, luxury goods (honey, wool and clothing, pottery, spirits, gold and silver), rivers, bridges and fishing came along with it |
+| **M6** | **Meta** *(next; was M8)* | See "M6 scope" below: save slots and a load menu, a settings screen, map and game setup (seed, size, river style, climate, difficulty, realism mode, choosing the start), scenarios, a tutorial, and the help overlays |
+| M7 | Content & art pass | Real models and animation, audio, UI theme, textures, nicer water, icons, wind sway (see "M7 scope") |
+| M8 | Additional features | Everything wanted that has no home in the milestones above (see "M8 scope"): a tavern and other happiness buildings, decorative items, fires, a map editor with terrain modification, more of the economy |
 
-Save and load was moved earlier and built at the end of M2 (quicksave, autosave and a round-trip test; see CLAUDE.md). M8 keeps the load menu, named slots, map seeds and settings.
+**Removed (2026-10-30):** the old **M5, "Terrain as labor"** (terraforming as worker jobs, dirt and stone moved). Player terrain modification is no longer part of the design; if it ever returns it belongs to a map editor (M8), not to the colony game. (The terrain brush code still exists but is not on the toolbar.) The texture-splat and snow terrain shader that M5 carried moved to M7.
+
+**Renumbering of 2026-10-30** (older notes, decisions and the history in CLAUDE.md use the old numbers): old M6 (trade) is now **M5**; old M8 (meta) is now **M6**; M7 is unchanged; the new **M8** is "Additional features". Old M5 (terrain as labor) is gone.
+
+**M6 scope (Meta).** The load menu with named slots (today only the quicksave and autosave exist, and the title's Continue picks one), a settings screen (also reachable from the Esc menu: graphics such as grass density and shadows, controls, audio later), map and game setup on the New Game screen: seed, **customizable map generation** (river style among other things, hills, size), **climates** picked at the start (temperate, desert, arctic, tropical; the sowing rule is already climate-driven), difficulty beyond the three presets, a **realism mode** (slower time, more realistic ageing), the optional **Banished-style start with no pre-built Town Hall** (choosing the site is built), scenarios, and a tutorial. The **steepness overlay** (which ground can be built on) joins the soil and water overlays here as a help aid.
+
+**M7 scope (Content and art).** Real models and animation, audio, the UI theme and art pass (the generated top-bar icons and the idle bubble are placeholders), **textures** (roads, ground, terrain texture splat and snow), a second look at the **palette** (it still reads a little washed out), **nicer water**, wind sway for grass and trees, real goods in stockpiles (logs, sacks) and the plain panels (Esc menu, Citizens).
+
+**M8 scope (Additional features).** Collected from the playtest notes, nothing here is scheduled:
+- **Happiness and daily life:** a tavern (and other happiness buildings, tied to honey and spirits), a **downside to drinking** spirits, **decorative items** (which, whether they affect happiness), **fires** (cold homeless citizens build little fires, maybe real ones that spread).
+- **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, other catches and boats for fishing and smoking or salting fish, a tannery step for leather, jewelry or coins from gold and silver, finite ore veins, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
+- **World and weather:** overheating as well as cold, more weather (thunderstorms), a **map editor** (the only home for terrain modification), shrinking buildings and growing others in place, expansion while a building is paused.
+- **Known issue to chase, not a feature:** laborers sometimes get stuck hauling in a loop (needs a repro or a save).
+
+Save and load was moved earlier and built at the end of M2 (quicksave, autosave and a round-trip test; see CLAUDE.md). M6 (Meta, was M8) keeps the load menu, named slots, map seeds and settings.
 
 ---
 
@@ -318,9 +332,9 @@ Save and load was moved earlier and built at the end of M2 (quicksave, autosave 
    storage has room, workers stop starting gather jobs for that item and any carried goods are
    dropped on the ground as a loose pile that can be hauled later. A storage building can't be
    demolished until it is empty.
-4. ~~**Terraforming cost**~~ **Decided (2026-10-23):** terraforming requires citizen labor (not
-   free and instant). Dirt is not a resource, for now. The current brush UI is too chunky and needs
-   fine-tuning later. Whether this lands in M5 as planned or earlier is not decided.
+4. ~~**Terraforming cost**~~ **Superseded (2026-10-30):** player terrain modification is no longer part of the design
+   (the old M5 was removed); it would belong to a map editor (M8). The older call, kept for reference: terraforming
+   requires citizen labor and dirt is not a resource.
 5. **Art direction:** low-poly stylised (it fits the procedural approach) or something more realistic?
 6. **Failure state:** does the game end when everyone dies, or are there "settler wave" recovery options?
 

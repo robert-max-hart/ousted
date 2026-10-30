@@ -31,6 +31,7 @@ func show_at(world:World, def_id:StringName, origin:Vector2i, size:Vector2i, tin
         _make_front();
     var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
     _model.position = Vector3(center.x, maxf(world.terrain.height_at(center.x, center.y), Terrain.WATER_LEVEL) if _model.def.get("bridge", false) or _model.def.get("fishing", false) else world.terrain.height_at(center.x, center.y), center.y);
+    _model.position += _model.fit_shift;          # (a building that was scaled to fit its footprint sits a little off its centre)
     if tint != _mat:
         _mat = tint;
         _tint(_model, tint);

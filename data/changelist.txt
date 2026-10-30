@@ -3,6 +3,28 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.5.0 | 30 Oct 2026 | Trade is complete: one-tile bridges, a fishing pier and playtest 4 fixes
+- This build closes the trade milestone: merchants and merchant types, barter, luxury goods, seeds and animals for sale, a trade history, rivers, bridges and fishing.
+- Crop fields now cost wood and graveyards cost stone (the cost grows with the length of their fence or wall).
+- Day and night now blend: the sun fades out as the moon fades in (two lights that never swap places), so dusk and dawn no longer jump.
+- The Fishing Hut now has a pier: the door faces the shore and the pier at the back must run out over the water (turn it with R). Fishermen walk out and work at the end of the pier. The ghost's red note says why a spot is refused.
+- The Harvest tool has Trees, Stone and Iron check boxes, so you can mark only some kinds in an area.
+- Young trees hold no wood: a tree gives nothing until it is about a third grown, and most of its wood arrives late, so planting a tree and chopping it at once no longer works.
+- New Water overlay (top bar, beside Soil): blue-green ground is within reach of water (open water, a well or the Town Hall), where a Distillery or Potter's Workshop works; brown ground is too far.
+- Five new orchard trees: cherry, peach and plum (fruit, which the Distillery can turn into spirits) and walnut and pecan (nuts, which keep a very long time and cannot be distilled).
+- Seeds and saplings cost ten times as much from merchants.
+- Clicking the merchant banner under the top bar now really takes the camera to the merchant (it did nothing before).
+- Rain and snow dim the daylight much more, so wet days no longer look bright.
+- River banks are gentler (easier to place a fishing hut) and a ford has a hand of water over it.
+- Hold Shift while dragging a road for a straight diagonal line.
+- The marks for single trees can be clicked and cancelled one by one.
+- The Goods held for trade window has +25 and -25 buttons.
+- The top and bottom bars have square corners where they meet the screen edge.
+- Every building now stays inside its footprint (anvils, racks and porches no longer reach onto a road beside it): buildings that stuck out are slightly smaller.
+- The title screen's town has a market stall, an apiary, a tailor, a still, a potter, a pasture, an orchard, and a fishing hut and bridge on the river.
+- Bridges are one tile wide, like roads: press at one end of the crossing and drag along it (up to 16 long). They cost 1 wood a tile.
+- While you drag a stockpile, field, graveyard, pasture, orchard or bridge, the note by the cursor now shows the cost as well as the size.
+
 # 0.4.6 | 30 Oct 2026 | Lone trees and the Plant tool
 - Open ground near the forests now has single trees standing here and there between the dense groves.
 - The top bar shows small icons instead of the words Wood, Stone, Food, Pop and so on, and an icon bubble floats over idle citizens (placeholders until the art pass).

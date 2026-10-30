@@ -16,7 +16,7 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(0);
-    var o:Vector2i = world.town_hall.origin + Vector2i(-14, -14);
+    var o:Vector2i = TestSite.near(world, Vector2i(-14, -14));
     for dz in range(-20, 20):       # a dry, free strip of five cells (the world is random)
         var ok:bool = true;
         for i in 5:
@@ -53,11 +53,11 @@ func _ready() -> void:
     world.work_road(cells[3], 99.0);
     _expect("the work finishes it", world.terrain.get_overlay(cells[1]) == Terrain.Overlay.ROAD and world.terrain.get_overlay(cells[3]) == Terrain.Overlay.ROAD);
 
-    var f:Building = world.place_building(&"field", world.town_hall.origin + Vector2i(14, 8), Vector2i(3, 3));
+    var f:Building = world.place_building(&"field", TestSite.spot(world, Vector2i(3, 3), Vector2i(14, 8)), Vector2i(3, 3));
     _expect("a field being built is a site", world.terrain.get_overlay(f.origin) == Terrain.Overlay.SITE);
     f.complete();
     _expect("a finished field is tilled", world.terrain.get_overlay(f.origin) == Terrain.Overlay.TILLED);
-    var g:Building = world.place_building(&"field", world.town_hall.origin + Vector2i(14, 14), Vector2i(2, 2));
+    var g:Building = world.place_building(&"field", TestSite.spot(world, Vector2i(2, 2), Vector2i(14, 14)), Vector2i(2, 2));
     world.remove_building(g, true);
     _expect("removing a site clears the ground", world.terrain.get_overlay(g.origin) == Terrain.Overlay.NONE);
 
@@ -67,7 +67,7 @@ func _ready() -> void:
     _expect("so does the graveyard tool", world.tools.build_size == Vector2i.ONE);
     world.tools.set_mode(PlayerTools.Mode.SELECT);
 
-    var house:Building = world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 6), Vector2i(3, 3), true);
+    var house:Building = world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 6)), Vector2i(3, 3), true);
     house.settings["heating"] = true;
     house.residents.append(world.pawns[0]);
     house.add_fuel(&"firewood", 10);

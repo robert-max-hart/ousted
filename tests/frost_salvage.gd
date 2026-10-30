@@ -16,7 +16,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     world.seeds.unlock_all();
-    var f:Field = world.place_building(&"field", world.town_hall.origin + Vector2i(8, 8), Vector2i(3, 3), true) as Field;
+    var f:Field = world.place_building(&"field", TestSite.spot(world, Vector2i(3, 3), Vector2i(8, 8)), Vector2i(3, 3), true) as Field;
     f.set_crop(&"pumpkin");
     var pawn:Pawn = world.pawns[0];
     var c:Dictionary = Defs.CROPS[&"pumpkin"];

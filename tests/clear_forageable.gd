@@ -23,7 +23,7 @@ func _ready() -> void:
     _begin(false);
 
 func _begin(full:bool) -> void:
-    var o:Vector2i = _dry_spot();
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10), Vector2i(16, 12));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);
@@ -41,22 +41,6 @@ func _begin(full:bool) -> void:
         _marked.append(rn);
         i += 1;
     _start = GameClock.total_hours;
-
-# A rectangle of dry level ground near the Town Hall (the river may run through the old fixed spot).
-func _dry_spot() -> Vector2i:
-    for r in range(8, 30, 2):
-        for dz in [-r, r]:
-            for dx in range(-r, r + 1, 2):
-                var c:Vector2i = world.town_hall.origin + Vector2i(dx, dz);
-                var ok:bool = true;
-                for z in range(c.y - 3, c.y + 9):
-                    for x in range(c.x - 3, c.x + 13):
-                        var cc:Vector2i = Vector2i(x, z);
-                        if not world.terrain.in_bounds(cc) or world.terrain.is_water(cc) or world.terrain.cell_slope(cc) > 1.0 or world.terrain.cell_height(cc) < Terrain.WATER_LEVEL + 0.5:
-                            ok = false;
-                if ok:
-                    return c;
-    return world.town_hall.origin + Vector2i(8, -10);
 
 func _process(_delta:float) -> void:
     var left:int = _marked.filter(func(rn:ResourceNode) -> bool: return not rn.removed).size();

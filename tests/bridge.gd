@@ -39,13 +39,15 @@ func _run() -> void:
     var x1:int = run[2];
     var mid:Vector2i = _cell(flip, (x0 + x1) / 2, z);
     _expect("deep water is not walkable", not world.nav.is_walkable(mid));
-    var rect:Rect2i = Rect2i(_cell(flip, x0 - 1, z), Vector2i(x1 - x0 + 3, 2) if not flip else Vector2i(2, x1 - x0 + 3));
+    var rect:Rect2i = Rect2i(_cell(flip, x0 - 1, z), Vector2i(x1 - x0 + 3, 1) if not flip else Vector2i(1, x1 - x0 + 3));
     _expect("an ordinary building cannot go on water", world.can_place(&"house", mid, Vector2i(3, 3)) == "Can't build on water");
     var why:String = world.can_place(&"bridge", rect.position, rect.size);
     _expect("a bridge across the water is allowed (%s)" % why, why == "");
     var b:Building = world.place_building(&"bridge", rect.position, rect.size, true);
     _expect("the deck is walkable", world.nav.is_walkable(mid) and world.is_bridge(mid));
     _expect("citizens stand on the deck, above the water (%.2f)" % world.stand_y(mid.x + 0.5, mid.y + 0.5), absf(world.stand_y(mid.x + 0.5, mid.y + 0.5) - Building.DECK_HEIGHT) < 0.01);
+    _expect("a bridge costs 1 wood a tile (%s)" % [Defs.sized_cost(&"bridge", rect.size)], Defs.sized_cost(&"bridge", rect.size)[&"wood"] == rect.size.x * rect.size.y);
+    _expect("a stockpile scales its cost by area, a field and a graveyard by their fence", Defs.sized_cost(&"stockpile", Vector2i(8, 8))[&"wood"] == 16 and Defs.sized_cost(&"field", Vector2i(6, 6))[&"wood"] == 8 and Defs.sized_cost(&"field", Vector2i(8, 8))[&"wood"] == 11 and Defs.sized_cost(&"graveyard", Vector2i(4, 3))[&"stone"] == 6);
     var path:Array[Vector2i] = world.nav.find_path(_cell(flip, x0, z), _cell(flip, x1, z));
     _expect("there is a path from bank to bank (%d steps)" % path.size(), path.size() >= x1 - x0 + 1);
     var args:PackedStringArray = OS.get_cmdline_user_args();

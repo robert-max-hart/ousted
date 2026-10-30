@@ -22,7 +22,7 @@ func _ready() -> void:
     GameClock.set_speed(0);
     world.seeds.unlock_all();
     var t:Traders = world.traders;
-    var o:Vector2i = world.town_hall.origin + Vector2i(5, -8);
+    var o:Vector2i = TestSite.near(world, Vector2i(5, -8));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(26, 18)).has_point(rn.cell):
             world.remove_node(rn);

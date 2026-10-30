@@ -17,7 +17,7 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(1);
-    var house:Building = world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);
+    var house:Building = world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);
     carer = world.pawns[0];
     carer.age = 30.0;
     world.families.move_home(carer, house);

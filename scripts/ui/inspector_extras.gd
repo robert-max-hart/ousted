@@ -19,6 +19,8 @@ var _workers_box:VBoxContainer;
 var _workers_sig:String = "";
 var _pupils_box :VBoxContainer;
 var _pupils_sig :String = "";
+var _order_btn  :Button;       # cancel a marked single tree
+var _order      :TreeOrder;
 var _node       :ResourceNode;
 
 func _init() -> void:
@@ -27,6 +29,15 @@ func _init() -> void:
     _mark_btn.visible = false;
     _mark_btn.pressed.connect(_on_mark);
     add_child(_mark_btn);
+    _order_btn = Button.new();
+    _order_btn.text = "Cancel this planting";
+    _order_btn.focus_mode = Control.FOCUS_NONE;
+    _order_btn.visible = false;
+    _order_btn.pressed.connect(func() -> void:
+        if _order != null and not _order.removed:
+            World.instance.cancel_tree_order(_order.cell);
+            World.instance.tools.select(null));
+    add_child(_order_btn);
     _grow_btn = Button.new();
     _grow_btn.focus_mode = Control.FOCUS_NONE;
     _grow_btn.visible = false;
@@ -45,6 +56,8 @@ func _init() -> void:
     add_child(_pupils_box);
 
 func refresh(obj:Variant) -> void:
+    _order = obj as TreeOrder if obj is TreeOrder else null;
+    _order_btn.visible = _order != null;
     _refresh_mark(obj);
     _refresh_grow(obj);
     _refresh_early(obj);

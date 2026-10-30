@@ -28,7 +28,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 12.0;
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -8);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -8));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(2, 2), Vector2i(40, 36)).has_point(rn.cell):
             world.remove_node(rn);

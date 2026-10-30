@@ -15,7 +15,7 @@ func _ready() -> void:
     var w:World = (load(SaveGame.MAIN_SCENE) as PackedScene).instantiate();
     add_child(w);
     _seed = w.world_seed;
-    w.place_building(&"house", w.town_hall.origin + Vector2i(8, 0), Vector2i(3, 3), true);
+    w.place_building(&"house", TestSite.spot(w, Vector2i(3, 3), Vector2i(8, 0)), Vector2i(3, 3), true);
     _expect("a save was written", SaveGame.write(w, SLOT) == "");
     w.queue_free();
 

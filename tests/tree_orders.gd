@@ -18,7 +18,7 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(0);
-    _spot = _free_cell();
+    _spot = TestSite.spot(world, Vector2i(3, 1), Vector2i(0, 8)) + Vector2i(1, 0);
     for rn in world.nodes.duplicate():
         if Vector2(rn.cell - _spot).length() < 4.0:
             world.remove_node(rn);
@@ -27,9 +27,13 @@ func _ready() -> void:
     _expect("nor the cell next to it (trees need room)", not world.order_tree(_spot + Vector2i(1, 0)));
     _expect("but one two cells off does", world.order_tree(_spot + Vector2i(2, 0)));
     _expect("the order shows a stake", world._order_marks.has(_spot));
+    var obj:TreeOrder = world.tree_order_at(_spot);
+    _expect("a mark can be selected as an object (%s)" % obj.display_name(), obj != null and obj.cell == _spot and World.alive(obj) and obj.info_text() != "");
     var data:Dictionary = world.serialize();
     _expect("orders are saved", (data["tree_orders"] as Array).has(_spot));
+    var other:TreeOrder = world.tree_order_at(_spot + Vector2i(2, 0));
     world.cancel_tree_order(_spot + Vector2i(2, 0));
+    _expect("a cancelled mark is gone as an object too", other.removed and world.tree_order_at(_spot + Vector2i(2, 0)) == null);
     _expect("an order can be cancelled", not world.tree_orders.has(_spot + Vector2i(2, 0)) and not world._order_marks.has(_spot + Vector2i(2, 0)));
     var wood:int = Stock.amount(&"wood");
     GameClock.set_speed(3);
@@ -51,14 +55,6 @@ func _process(_delta:float) -> void:
     elif hours > 20.0:
         _expect("the tree was planted within 20 hours", false);
         _finish();
-
-func _free_cell() -> Vector2i:
-    for r in range(6, 30):
-        for dx in range(-r, r + 1, 2):
-            var c:Vector2i = world.town_hall.origin + Vector2i(dx, r);
-            if world.can_plant_tree(c) and world.can_plant_tree(c + Vector2i(2, 0)):
-                return c;
-    return world.town_hall.origin + Vector2i(0, 8);
 
 func _finish() -> void:
     Engine.time_scale = 1.0;

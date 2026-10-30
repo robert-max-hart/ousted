@@ -23,7 +23,7 @@ func _ready() -> void:
     GameClock.set_speed(0);
     world.seeds.unlock_all();
     world.policies.set_on(&"treats", false);       # or citizens drink what the test is counting
-    var o:Vector2i = world.town_hall.origin + Vector2i(5, -7);
+    var o:Vector2i = TestSite.spot(world, Vector2i(3, 3), Vector2i(5, -7));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);
@@ -41,7 +41,7 @@ func _ready() -> void:
     world.town_hall.take(&"honey", 2);
     # recipes: three ways to one product
     var r:Dictionary = _still.def["recipes"];
-    _expect("three recipes make spirits", r.size() == 3 and r[&"spirits_barley"]["output"] == &"spirits" and r[&"spirits_apples"]["output"] == &"spirits");
+    _expect("six recipes make spirits (barley and five fruits)", r.size() == 6 and r[&"spirits_barley"]["output"] == &"spirits" and r[&"spirits_apples"]["output"] == &"spirits");
     _expect("the recipes are switched on", _still.recipe_enabled(&"spirits_barley") and _still.recipe_enabled(&"spirits_apples"));
     # water
     _expect("the Distillery needs water in reach", _still.needs_water() and _still.def["needs_water"] == 12.0);

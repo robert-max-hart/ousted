@@ -24,7 +24,7 @@ func _ready() -> void:
     Engine.time_scale = 4.0;
     GameClock.set_speed(3);
     _check_curves();
-    world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);     # nobody sleeps in the Town Hall
+    world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);     # nobody sleeps in the Town Hall
     _adult = world.pawns[0];
     _baby = world.pawns[1];
     _child = world.pawns[2];
@@ -37,6 +37,11 @@ func _ready() -> void:
     world.jobs.change_profession(JobManager.Profession.FARMER, 5);     # far more than there are adults: a child must not be drafted
     _elder.age = 98.0;
     Defs.ageing_days_per_year = 2.0;                       # faster, so the elder dies within the test
+    for p in world.pawns:                                  # the house has 6 beds for 12 settlers: move people in again now the ages are set (youngest first), so the baby has one
+        if p.home != null:
+            p.home.residents.erase(p);
+            p.home = null;
+    world.families.assign_homes();
     _start_hours = GameClock.total_hours;
 
 func _check_curves() -> void:

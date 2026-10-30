@@ -82,6 +82,7 @@ var pending_roads:Dictionary = {};          # cell -> true: road cells waiting f
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
 var tree_orders :Dictionary = {};   # cell -> true: single trees the player asked for (the Plant tool), planted by laborers
 var tree_claimed:Dictionary = {};   # ... the ones a laborer is on the way to
+var _order_objects:Dictionary = {}; # cell -> the TreeOrder that stands for it when selected
 var _order_marks:Dictionary = {};   # cell -> a stake standing where a tree will go
 var planting    :Dictionary = {};   # cells a pawn is walking to plant a tree on
 var _storage_warned:bool = false;
@@ -108,6 +109,7 @@ func _ready() -> void:
 
     terrain = Terrain.new();
     terrain.soil_source = func(i:int) -> float: return soil_fertility[i];
+    terrain.water_source = func(i:int) -> float: return water_reach()[i];
     terrain.name = "Terrain";
     add_child(terrain);
     terrain.generate(world_seed);
@@ -248,301 +250,24 @@ func _spawn_nature() -> void:
     renderer.mark_dirty();
 
 # Picks the flattest dry spot nearest the map center.
-@warning_ignore("integer_division")
-func _find_start_cell() -> Vector2i:
-    var center:Vector2i = Vector2i(Terrain.SIZE / 2, Terrain.SIZE / 2);
-    var best:Vector2i = center;
-    var best_score:float = INF;
-    for z in range(16, Terrain.SIZE - 16, 2):
-        for x in range(16, Terrain.SIZE - 16, 2):
-            var c:Vector2i = Vector2i(x, z);
-            var r:Rect2i = Rect2i(c - Vector2i(5, 5), Vector2i(10, 10));
-            var hr:Vector2 = terrain.rect_height_range(r);
-            if hr.x < Terrain.WATER_LEVEL + 0.5:
-                continue;
-            # level ground matters most close in (the first buildings), and a wider level apron leaves room to grow
-            var near:Vector2 = terrain.rect_height_range(Rect2i(c - Vector2i(8, 8), Vector2i(16, 16)));
-            var wide:Vector2 = terrain.rect_height_range(Rect2i(c - Vector2i(14, 14), Vector2i(28, 28)).intersection(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE)));
-            var score:float = (hr.y - hr.x) * 4.0 + (near.y - near.x) * 3.0 + (wide.y - wide.x) * 1.5 + Vector2(c - center).length() * 0.1;
-            if not terrain.river_path.is_empty():       # settle by the river: close, but not on its bank
-                var rd:float = minf(terrain.river_distance(c), 40.0);
-                score += absf(rd - START_RIVER_AT) * 0.7 + maxf(0.0, 9.0 - rd);
-            if score < best_score:
-                best_score = score;
-                best = c;
-    return best;
 
-# Tops the rings around the start up with loose rocks, so the first buildings always have stone close by (the random
-# scatter leaves some seeds with one or two, and a start by the river has few): START_ROCKS_MIN in the whole ring, and
-# START_ROCKS_CLOSE of them within START_ROCKS_CLOSE_FAR cells.
-func _ensure_start_rocks(start:Vector2i) -> void:
-    _top_up(&"rock", start, START_ROCKS_NEAR, START_ROCKS_CLOSE_FAR, START_ROCKS_CLOSE);
-    _top_up(&"rock", start, START_ROCKS_NEAR, START_ROCKS_FAR, START_ROCKS_MIN);
 
-# Adds nodes of one kind on level, dry, empty ground in the ring near..far cells from the start until it holds at least
-# `minimum` of them (picked with the world's own rng).
-func _top_up(kind:StringName, start:Vector2i, near:float, far:float, minimum:int) -> void:
-    var have:int = 0;
-    for rn in nodes:
-        var d:float = Vector2(rn.cell - start).length();
-        if rn.kind == kind and d >= near and d <= far:
-            have += 1;
-    var free:Array[Vector2i] = [];
-    var reach:int = ceili(far);
-    for z in range(start.y - reach, start.y + reach + 1):
-        for x in range(start.x - reach, start.x + reach + 1):
-            var c:Vector2i = Vector2i(x, z);
-            var d:float = Vector2(c - start).length();
-            if d < near or d > far or not terrain.in_bounds(c):
-                continue;
-            if terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4 or terrain.cell_slope(c) > 1.4:
-                continue;
-            if node_at[idx(c)] == null and occupant[idx(c)] == null:
-                free.append(c);
-    while have < minimum and not free.is_empty():
-        var pick:int = rng.randi_range(0, free.size() - 1);
-        add_node(kind, free[pick]);
-        free.remove_at(pick);
-        have += 1;
 
-# Founds the colony around a start cell: the Town Hall (already built), its goods and the first settlers.
-func _found_colony(start:Vector2i) -> void:
-    _ensure_start_rocks(start);
-    _ensure_start_ore(start);
-    town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
-    _start_colony_goods(start);
-    seeds.grant_trees(rng);
-    Defs.ageing_days_per_year = 4.0;
-    _spawn_settlers(start);
-    jobs.sync_targets();
 
-# The player's choice of start (see awaiting_start): returns "" once the colony is founded with the Town Hall at origin,
-# else why that spot will not do.
-func begin_colony(origin:Vector2i) -> String:
-    if not awaiting_start:
-        return "The colony is already founded";
-    var start:Vector2i = origin + Vector2i(2, 2);
-    var why:String = can_place(&"town_hall", origin, Vector2i(4, 4));
-    if why != "":
-        return why;
-    _clear_nodes(start, 13);        # the hall's ground and the settlers' first yard are cleared of trees and rocks
-    awaiting_start = false;
-    _found_colony(start);
-    GameClock.locked = false;
-    GameClock.set_speed(1);
-    camera_rig._distance = 40.0;
-    camera_rig._target_distance = 40.0;
-    camera_rig.focus_on(town_hall.position);
-    notify("Your settlers have arrived. Spring has begun.");
-    return "";
 
-# Iron is a little scarce on the bigger map, so the ring START_ORE_NEAR to START_ORE_FAR cells from the start always
-# holds at least START_ORE_MIN outcrops (placed on the gentler ground; the hills keep their own).
-func _ensure_start_ore(start:Vector2i) -> void:
-    _top_up(&"ore", start, START_ORE_NEAR, START_ORE_FAR, START_ORE_MIN);
 
-func _clear_nodes(c:Vector2i, radius:int) -> void:
-    for rn in nodes.duplicate():
-        if Vector2(rn.cell - c).length() <= radius:
-            remove_node(rn);
 
-# A citizen too unhappy to stay walks away: no body, and half the grief.
-func leave_colony(p:Pawn) -> void:
-    if p.removed:
-        return;
-    p.removed = true;
-    p.end_task(false);
-    if p.carry_amount > 0:
-        drop_pile(p.carry_item, p.carry_amount, p.cell());
-        p.clear_carry();
-    if p.home != null:
-        p.home.residents.erase(p);
-        p.home.update_windows();
-    pawns.erase(p);
-    families.on_death(p, -1);
-    jobs.reconcile();
-    notify("%s has left the colony, unhappy." % p.first_name);
-    if tools != null and tools.selected == p:
-        tools.select(null);
-    _end_tasks_aimed_at(p);
-    p.queue_free();
 
-# Stops what others are doing for a citizen who is about to be freed (a carer's callbacks still hold the baby).
-func _end_tasks_aimed_at(p:Pawn) -> void:
-    for q in pawns:
-        if q.task != null and is_same(q.task.target, p):
-            q.end_task(false);
 
-func add_body(p:Pawn, cause:String, at:Vector3) -> Body:
-    var b:Body = Body.new();
-    b.setup(self, _next_body_id, {"name": p.first_name, "age": int(p.age), "cause": cause, "died_hour": GameClock.total_hours}, at);
-    _next_body_id += 1;
-    b.kin = families.kin_of(p);
-    _entities.add_child(b);
-    bodies.append(b);
-    return b;
 
-func remove_body(b:Body) -> void:
-    if b.removed:
-        return;
-    b.removed = true;
-    bodies.erase(b);
-    b.queue_free();
 
-func add_pawn(p:Pawn) -> void:
-    _entities.add_child(p);
-    pawns.append(p);
 
-# The starting upgrades of the chosen difficulty, then the starting goods: into the Town Hall's store room as far as it
-# goes, the rest in a supply cart beside it (gone once empty).
-func _start_colony_goods(start:Vector2i) -> void:
-    for id in Defs.DIFFICULTIES[Defs.difficulty]["town_hall"]:
-        town_hall.upgrades_done[id] = true;
-    var left:Dictionary = {};
-    for item in START_STOCK:
-        var rest:int = START_STOCK[item] - town_hall.store(item, START_STOCK[item]);
-        if rest > 0:
-            left[item] = rest;
-    if left.is_empty():
-        return;
-    var size:Vector2i = Defs.BUILDINGS[&"cart"]["size"];
-    for r in range(3, 14):
-        for dz in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                if maxi(absi(dx), absi(dz)) != r:
-                    continue;
-                var o:Vector2i = start + Vector2i(dx, dz);
-                if can_place(&"cart", o, size) == "" and _rect_free_of_nodes(Rect2i(o, size)):
-                    var cart:Building = place_building(&"cart", o, size, true);
-                    for item in left:
-                        cart.store(item, left[item]);
-                    return;
 
-func _spawn_settlers(start:Vector2i) -> void:
-    var used:Array[String] = [];
-    for i in START_PAWNS:
-        var c:Vector2i = nav.nearest_walkable(start + Vector2i(rng.randi_range(-4, 4), 3 + rng.randi_range(0, 2)), 6);
-        var p:Pawn = Pawn.new();
-        p.setup(self, c, rng, used);
-        if i >= START_PAWNS - START_CHILDREN:
-            p.age = rng.randi_range(6, 14) + rng.randf();
-        used.append(p.first_name);
-        if i < START_PROFESSIONS.size():
-            p.profession = START_PROFESSIONS[i];
-        _entities.add_child(p);
-        pawns.append(p);
 
 # --------------------------------
 # Save and load (see SaveGame)
 
-# Everything needed to rebuild this world. Citizens' tasks are not saved: they restart idle.
-func serialize() -> Dictionary:
-    var node_list:Array = [];
-    for rn in nodes:
-        node_list.append(rn.to_array());
-    var building_list:Array = [];
-    for b in buildings:
-        building_list.append(b.to_dict());
-    var pawn_list:Array = [];
-    for p in pawns:
-        pawn_list.append(p.to_dict());
-    var body_list:Array = [];
-    for b in bodies:
-        body_list.append(b.to_dict());
-    var pile_list:Array = [];
-    for pl in piles:
-        pile_list.append(pl.to_dict());
-    return {
-        "seed": world_seed, "rng_state": rng.state, "wetness": wetness,
-        "clock": GameClock.save_state(), "weather": Weather.save_state(),
-        "heights": terrain.heights, "overlay": terrain.overlay, "soil": soil_fertility,
-        "road_kind": road_kind.keys().map(func(c:Vector2i) -> Array: return [c, road_kind[c]]), "pending_roads": pending_roads.keys(), "tree_orders": tree_orders.keys(), "road_work": road_work.keys().map(func(c:Vector2i) -> Array: return [c, road_work[c]]), "seeds": seeds.to_array(), "deaths": death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": jobs.targets, "policies": policies.to_dict(), "ledger": ledger.to_dict(), "traders": traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": _next_body_id,
-        "camera": camera_rig.save_state() if camera_rig != null else {},
-        "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": pawns.size()},
-    };
 
-# Rebuilds nature, buildings, piles and citizens from a save. The terrain and soil are loaded by the caller.
-func _restore_entities(save:Dictionary) -> void:
-    soil_fertility = save["soil"];
-    wetness = save["wetness"];
-    Defs.ageing_days_per_year = save.get("ageing_days_per_year", 4.0);
-    for a in save["nodes"]:
-        var rn:ResourceNode = ResourceNode.from_array(a, rng);
-        nodes.append(rn);
-        node_at[idx(rn.cell)] = rn;
-        if rn.growth < 1.0:
-            saplings.append(rn);
-    for bd in save["buildings"]:
-        if Defs.LEGACY_PASTURES.has(bd["id"]):       # saves from before there was one pasture building: the old ids were one animal each
-            if not bd.has("kind"):
-                bd["kind"] = Defs.LEGACY_PASTURES[bd["id"]];
-            bd["id"] = &"pasture";
-        var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true, bd.get("facing", 0));
-        b.restore_dict(bd);
-        if not b.expansion.is_empty():
-            Expansion.hold_cells(self, b);
-        if bd["id"] == &"town_hall" and b.is_complete():
-            town_hall = b;
-    for i in buildings.size():
-        var bd2:Dictionary = save["buildings"][i];
-        if bd2.get("reloc_from", -1) >= 0:
-            buildings[i].relocating_from = buildings[bd2["reloc_from"]];
-        if bd2.get("reloc_to", -1) >= 0:
-            buildings[i].relocating_to = buildings[bd2["reloc_to"]];
-    for pd in save["piles"]:
-        var pl:GroundPile = GroundPile.new();
-        pl.setup(self, pd["item"], pd["amount"], pd["cell"]);
-        pl._spoil_acc = pd["spoil_acc"];
-        _entities.add_child(pl);
-        piles.append(pl);
-    for pd in save["pawns"]:
-        var p:Pawn = Pawn.new();
-        p.restore(self, pd);
-        _entities.add_child(p);
-        pawns.append(p);
-        if pd["home"] >= 0 and pd["home"] < buildings.size():
-            p.home = buildings[pd["home"]];
-            p.home.residents.append(p);
-    for i in pawns.size():
-        var pd:Dictionary = save["pawns"][i];
-        var partner_i:int = pd.get("partner", -1);
-        if partner_i >= 0 and partner_i < pawns.size():
-            pawns[i].partner = pawns[partner_i];
-        for pi in pd.get("parents", []):
-            if pi >= 0 and pi < pawns.size():
-                pawns[i].parents.append(pawns[pi]);
-    _next_body_id = save.get("next_body_id", 1);
-    for bd in save.get("bodies", []):
-        var b:Body = Body.new();
-        b.setup(self, bd["id"], bd, bd["position"]);
-        for ki in bd["kin"]:
-            if ki >= 0 and ki < pawns.size():
-                b.kin.append(pawns[ki]);
-        _entities.add_child(b);
-        bodies.append(b);
-    _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
-    renderer.mark_dirty();
-    rng.state = save["rng_state"];
-    death_log = save.get("deaths", []);
-    for c in save.get("pending_roads", []):
-        pending_roads[c] = true;
-    for c in save.get("tree_orders", []):
-        tree_orders[c] = true;
-        _add_order_mark(c);
-    for e in save.get("road_work", []):
-        road_work[e[0]] = e[1];
-    for e in save.get("road_kind", []):
-        road_kind[e[0]] = e[1];
-    update_irrigation();
-    policies.restore(save.get("policies", {}));
-    seeds.restore(save.get("seeds", null));
-    ledger.restore(save.get("ledger", {}));
-    traders.restore(save.get("traders", {}));
-    var saved_targets:Variant = save.get("targets", null);       # saves made before targets existed
-    if saved_targets != null:
-        jobs.targets = saved_targets;
-    else:
-        jobs.sync_targets();
 
 # --------------------------------
 # Resource nodes
@@ -570,42 +295,10 @@ func plant_tree(c:Vector2i) -> ResourceNode:
     saplings.append(rn);
     return rn;
 
-# The Plant tool: asks for a tree on this cell (the ground must take one and no other order or tree may touch it).
-func order_tree(c:Vector2i) -> bool:
-    if tree_orders.has(c) or not can_plant_tree(c):
-        return false;
-    for dz in range(-1, 2):
-        for dx in range(-1, 2):
-            if tree_orders.has(c + Vector2i(dx, dz)):
-                return false;
-    tree_orders[c] = true;
-    _add_order_mark(c);
-    return true;
 
-func cancel_tree_order(c:Vector2i) -> void:
-    if tree_orders.erase(c):
-        tree_claimed.erase(c);
-        _remove_order_mark(c);
 
-func _add_order_mark(c:Vector2i) -> void:
-    if _order_marks.has(c):
-        return;
-    var stake:MeshInstance3D = MeshInstance3D.new();
-    var pole:BoxMesh = BoxMesh.new();
-    pole.size = Vector3(0.07, 0.7, 0.07);
-    stake.mesh = pole;
-    var mat:StandardMaterial3D = StandardMaterial3D.new();
-    mat.albedo_color = Color(0.5, 0.82, 0.35);
-    stake.material_override = mat;
-    stake.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-    stake.position = Vector3(c.x + 0.5, terrain.height_at(c.x + 0.5, c.y + 0.5) + 0.35, c.y + 0.5);
-    _entities.add_child(stake);
-    _order_marks[c] = stake;
 
-func _remove_order_mark(c:Vector2i) -> void:
-    if _order_marks.has(c):
-        (_order_marks[c] as Node).queue_free();
-        _order_marks.erase(c);
+
 
 # Free, dry, gentle ground that is not road or field, and not touching another tree.
 # spacing: how many cells of clear ground a new tree needs on every side (0 lets trees stand shoulder to shoulder).
@@ -693,7 +386,7 @@ func mark_for_clearing(rn:ResourceNode) -> void:
 
 # Returns "" when placement is allowed, otherwise a reason.
 # relocating: the building is being moved, so a unique one may be placed again.
-func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:bool = false) -> String:
+func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:bool = false, facing:int = 0) -> String:
     var r:Rect2i = Rect2i(origin, size);
     if Defs.BUILDINGS[def_id].get("unique", false) and not relocating:
         for b in buildings:
@@ -716,7 +409,7 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
                 wet += 1;
             else:
                 dry += 1;
-                if fishing and terrain.cell_slope(c) > 1.0:
+                if fishing and terrain.cell_slope(c) > 1.3:
                     return "The shore is too steep here";
             if occupant[idx(c)] != null:
                 return "Something is already built here";
@@ -727,9 +420,15 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
     if bridge:
         return "" if wet > 0 else "A bridge has to cross water";
     if fishing:
-        if wet == 0:
-            return "A fishing hut has to stand partly over the water";
-        return "" if dry > 0 else "A fishing hut needs some of its ground on the shore";
+        var pier:Rect2i = Building.pier_rect_for(Defs.BUILDINGS[def_id], origin, size, facing);
+        var pier_wet:int = 0;
+        for z in range(pier.position.y, pier.end.y):
+            for x in range(pier.position.x, pier.end.x):
+                if terrain.is_water(Vector2i(x, z)):
+                    pier_wet += 1;
+        if pier_wet * 3 < pier.size.x * pier.size.y * 2:
+            return "The pier (the back, away from the door) has to run out over the water: turn it with R";
+        return "" if dry * 3 >= size.x * size.y else "The door end of a fishing hut needs ground on the shore";
     var hr:Vector2 = terrain.rect_height_range(r);
     var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("drag_size", false) else 1.0);
     if hr.y - hr.x > limit:
@@ -797,6 +496,8 @@ func remove_building(b:Building, refund:bool) -> void:
     if tools != null and tools.selected == b:
         tools.select(null);       # the inspector must not be left holding a freed building
     buildings.erase(b);
+    if b.def.get("water", false):
+        water_sources_changed();
     if b == town_hall:
         town_hall = null;
         notify("The Town Hall is gone. Build a new one from the menu.");
@@ -832,10 +533,20 @@ func has_governance() -> bool:
     return alive(town_hall) and town_hall.is_complete() and town_hall.has_upgrade(&"governance");
 
 # Why this building can't be moved right now, or "" when it can.
+# --------------------------------
+# Water reach (the Water overlay)
+
+var _water_reach:PackedFloat32Array = PackedFloat32Array();
+var _water_reach_dirty:bool = true;
+
+
+
 # A bridge deck stands on this cell (walkers cross the water on it).
 func is_bridge(c:Vector2i) -> bool:
     var b:Building = occupant[idx(c)] if terrain.in_bounds(c) else null;
-    return b != null and b.def.get("bridge", false);
+    if b == null:
+        return false;
+    return b.def.get("bridge", false) or b.deck_has(c);       # (a fishing hut's pier is a deck too)
 
 # The height citizens stand at on this spot: the ground, or the deck of a bridge over water.
 func stand_y(x:float, z:float) -> float:
@@ -844,60 +555,12 @@ func stand_y(x:float, z:float) -> float:
         return Terrain.WATER_LEVEL + Building.DECK_HEIGHT;
     return y;
 
-func relocation_block_reason(b:Building) -> String:
-    if not b.def.get("relocatable", true):
-        return "Can't be moved";
-    if not b.is_complete():
-        return "Not finished";
-    if b.upgrading != &"":
-        return "Upgrade in progress" if b.upgrading != Expansion.ID else "Expansion in progress";
-    if b.relocating_to != null and alive(b.relocating_to):
-        return "Already being moved";
-    if b.relocating_from != null:
-        return "This is the new site";
-    if b.is_storage() and not b.is_empty():
-        return "Empty it first";
-    if b is TradingPost and not (b as TradingPost).idle():
-        return "Finish the trade first";
-    return "";
 
-# Starts building the same thing at a new spot for a share of the cost (Defs.RELOCATE_COST_MULT). The old building keeps
-# working, takes nothing new, and is replaced once the new one is finished.
-func relocate(b:Building, origin:Vector2i, size:Vector2i, facing:int = 0) -> Building:
-    if relocation_block_reason(b) != "" or can_place(b.def_id, origin, size, true) != "":
-        return null;
-    var site:Building = place_building(b.def_id, origin, size, false, false, facing);
-    site.cost_mult = Defs.RELOCATE_COST_MULT;
-    site.relocating_from = b;
-    b.relocating_to = site;
-    notify("Moving the %s: a new one is being built." % b.display_name());
-    return site;
 
-# The new building takes over: settings, filters, upgrades, fuel, inputs, residents, what is stored, and the Town Hall role.
-func _finish_relocation(site:Building) -> void:
-    var old:Building = site.relocating_from;
-    site.relocating_from = null;
-    old.relocating_to = null;
-    site.settings = old.settings.duplicate();
-    site.forbidden = old.forbidden.duplicate();
-    site.upgrades_done = old.upgrades_done.duplicate();
-    site.dig_progress = old.dig_progress.duplicate();
-    site.fuel = old.fuel;
-    site.fuel_coal = old.fuel_coal;
-    old.fuel = 0;
-    site.inputs = old.inputs.duplicate();
-    old.inputs.clear();
-    site.stored = old.stored.duplicate();
-    old.stored.clear();
-    for p in old.residents.duplicate():
-        families.move_home(p, site);
-    if old == town_hall:
-        town_hall = site;
-    old.in_reserved = 0;
-    old.out_reserved.clear();
-    remove_building(old, false);
 
 func on_building_completed(b:Building) -> void:
+    if b.def.get("water", false):
+        water_sources_changed();
     if b is Graveyard:
         for z in range(b.origin.y, b.origin.y + b.size.y):
             for x in range(b.origin.x, b.origin.x + b.size.x):
@@ -989,178 +652,30 @@ func shelter_for(p:Pawn) -> Building:
 # --------------------------------
 # Ground piles
 
-func pile_at(c:Vector2i) -> GroundPile:
-    for pl in piles:
-        if pl.cell == c:
-            return pl;
-    return null;
 
-# Leaves n units on the ground at the nearest suitable cell (merging with a pile of the same item).
-func drop_pile(item:StringName, n:int, near:Vector2i) -> void:
-    if n <= 0:
-        return;
-    for radius in 6:
-        for dz in range(-radius, radius + 1):
-            for dx in range(-radius, radius + 1):
-                if maxi(absi(dx), absi(dz)) != radius:
-                    continue;
-                var c:Vector2i = near + Vector2i(dx, dz);
-                if not terrain.in_bounds(c) or terrain.is_water(c) or occupant[idx(c)] != null or node_at[idx(c)] != null:
-                    continue;
-                var existing:GroundPile = pile_at(c);
-                if existing != null:
-                    if existing.item == item:
-                        existing.add(n);
-                        return;
-                    continue;
-                var pl:GroundPile = GroundPile.new();
-                pl.setup(self, item, n, c);
-                _entities.add_child(pl);
-                piles.append(pl);
-                return;
-    notify("No room to put down %d %s." % [n, Defs.item_name(item)]);
 
-func remove_pile(pl:GroundPile) -> void:
-    if pl.removed:
-        return;
-    # hidden now; the collecting task frees it when it ends (see JobManager._collect_task)
-    pl.removed = true;
-    pl.visible = false;
-    piles.erase(pl);
 
 # --------------------------------
 # Roads
 
-func can_road(c:Vector2i) -> bool:
-    return terrain.in_bounds(c) and not terrain.is_water(c) and occupant[idx(c)] == null and node_at[idx(c)] == null;
 
-# Whether the Road tool can work on this cell: not water and not under a building (a tree or rock is cleared first).
-func can_plan_road(c:Vector2i) -> bool:
-    return terrain.in_bounds(c) and not terrain.is_water(c) and occupant[idx(c)] == null;
 
-# Plans a road cell for the Road tool. Anything in the way is marked for clearing first; then the cell is staked out
-# and citizens do ROAD_WORK_HOURS of work on it (no materials). Returns true if it is waiting on something to be cleared.
-func plan_road(c:Vector2i, kind:int = Terrain.Overlay.ROAD) -> bool:
-    if not can_plan_road(c) or terrain.get_overlay(c) != Terrain.Overlay.NONE or road_work.has(c) or pending_roads.has(c):
-        return false;
-    road_kind[c] = kind;
-    var rn:ResourceNode = node_at[idx(c)];
-    if rn == null:
-        stake_road(c);
-        return false;
-    mark_for_clearing(rn);
-    pending_roads[c] = true;
-    return true;
 
-func stake_road(c:Vector2i) -> void:
-    if not can_road(c):
-        return;
-    road_work[c] = 0.0;
-    terrain.set_overlay(c, Terrain.Overlay.ROAD_SITE);       # faintly worn ground until the road is done
 
-func cancel_road(c:Vector2i) -> void:
-    pending_roads.erase(c);
-    road_kind.erase(c);
-    if road_work.erase(c):
-        road_claimed.erase(c);
-        terrain.set_overlay(c, Terrain.Overlay.NONE);
 
-# Adds work to a staked road cell; true once the road is laid.
-func work_road(c:Vector2i, dh:float) -> bool:
-    if not road_work.has(c):
-        return true;
-    road_work[c] += dh;
-    var channel:bool = road_kind.get(c, Terrain.Overlay.ROAD) == Terrain.Overlay.CHANNEL;
-    if road_work[c] < (Defs.CHANNEL_WORK_HOURS if channel else Defs.ROAD_WORK_HOURS):
-        return false;
-    road_work.erase(c);
-    road_kind.erase(c);
-    terrain.set_overlay(c, Terrain.Overlay.NONE);
-    if channel:
-        terrain.set_overlay(c, Terrain.Overlay.CHANNEL);
-        update_irrigation();
-    else:
-        set_road(c, true);
-    return true;
 
 # --------------------------------
 # Irrigation: a dug channel that connects (cell to cell, not diagonally) to water carries it; plots near such a
 # channel stay moist (Field).
 
-func is_channel(c:Vector2i) -> bool:
-    var o:int = terrain.get_overlay(c) if terrain.in_bounds(c) else Terrain.Overlay.NONE;
-    return o == Terrain.Overlay.CHANNEL or o == Terrain.Overlay.CHANNEL_WET;
 
-func remove_channel(c:Vector2i) -> void:
-    if is_channel(c):
-        terrain.set_overlay(c, Terrain.Overlay.NONE);
-        update_irrigation();
 
-# Marks every channel cell reachable from water as flowing.
-func update_irrigation() -> void:
-    var wet:Dictionary = {};
-    var open:Array[Vector2i] = [];
-    var dirs:Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)];
-    var cells:Array[Vector2i] = [];
-    for z in Terrain.SIZE:
-        for x in Terrain.SIZE:
-            if terrain.overlay[z * Terrain.SIZE + x] == Terrain.Overlay.CHANNEL or terrain.overlay[z * Terrain.SIZE + x] == Terrain.Overlay.CHANNEL_WET:
-                cells.append(Vector2i(x, z));
-    for c in cells:
-        for d in dirs:
-            if terrain.in_bounds(c + d) and terrain.is_water(c + d):
-                wet[c] = true;
-                open.append(c);
-                break;
-    while not open.is_empty():
-        var c:Vector2i = open.pop_back();
-        for d in dirs:
-            var n:Vector2i = c + d;
-            if not wet.has(n) and is_channel(n):
-                wet[n] = true;
-                open.append(n);
-    for c in cells:
-        terrain.set_overlay(c, Terrain.Overlay.CHANNEL_WET if wet.has(c) else Terrain.Overlay.CHANNEL);
-    irrigation_version += 1;
 
-func set_road(c:Vector2i, on:bool) -> void:
-    if on and not can_road(c):
-        return;
-    if not on and terrain.get_overlay(c) != Terrain.Overlay.ROAD:
-        return;
-    terrain.set_overlay(c, Terrain.Overlay.ROAD if on else Terrain.Overlay.NONE);
-    _refresh_nav(c);
 
 # --------------------------------
 # Pawns
 
 # at_home: a natural death (old age) happens in bed when the citizen has a home.
-@warning_ignore("integer_division")
-func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
-    if p.removed:
-        return;
-    p.removed = true;
-    p.end_task(false);
-    var spot:Vector3 = p.position;
-    if at_home and alive(p.home):
-        spot = terrain.cell_center(p.home.origin + Vector2i(p.home.size.x / 2, p.home.size.y));     # just outside the door
-    if p.carry_amount > 0:
-        drop_pile(p.carry_item, p.carry_amount, terrain.world_to_cell(spot));
-        p.clear_carry();
-    ledger.deaths_today += 1;
-    death_log.append({"name": p.first_name, "age": int(p.age), "cause": cause, "when": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "profession": p.profession_name()});
-    if p.home != null:
-        p.home.residents.erase(p);
-        p.home.update_windows();
-    var body:Body = add_body(p, cause, spot);
-    pawns.erase(p);
-    families.on_death(p, body.id);
-    jobs.reconcile();
-    notify("%s has died of %s." % [p.first_name, cause]);
-    if tools != null and tools.selected == p:
-        tools.select(null);
-    _end_tasks_aimed_at(p);
-    p.queue_free();
 
 # --------------------------------
 # Navigation
@@ -1176,11 +691,11 @@ func _refresh_nav(c:Vector2i) -> void:
     var solid:bool = (terrain.is_water(c) and not terrain.is_shallow(c)) or terrain.cell_slope(c) > MAX_WALK_SLOPE;
     var weight:float = 3.0 if terrain.is_water(c) else 1.0;       # wading is slow: a detour is cheaper than a short ford
     var b:Building = occupant[i];
-    if b != null and not b.is_walkable():
-        solid = true;
-    elif b != null and b.def.get("bridge", false):
-        solid = false;          # a deck (or the stakes of one) carries walkers over the water
+    if b != null and is_bridge(c):
+        solid = false;          # a deck (a bridge, or a fishing hut's pier; the stakes of one too) carries walkers over the water
         weight = 0.8;
+    elif b != null and not b.is_walkable():
+        solid = true;
     var rn:ResourceNode = node_at[i];
     if rn != null:
         if rn.solid:
@@ -1326,3 +841,126 @@ func _on_season(s:int) -> void:
     if GameClock.total_hours > GameClock.START_HOUR + 1.0:
         notify("%s has arrived." % GameClock.SEASON_NAMES[s]);
         SaveGame.autosave(self);
+
+# --------------------------------
+# Delegates: the work lives in StartSite, WorldSave, RoadWork, WaterReach, TreeOrders and GroundPiles
+
+func _find_start_cell() -> Vector2i:
+    return StartSite._find_start_cell(self);
+
+func _ensure_start_rocks(start:Vector2i) -> void:
+    StartSite._ensure_start_rocks(self, start);
+
+func _top_up(kind:StringName, start:Vector2i, near:float, far:float, minimum:int) -> void:
+    StartSite._top_up(self, kind, start, near, far, minimum);
+
+func _found_colony(start:Vector2i) -> void:
+    StartSite._found_colony(self, start);
+
+func begin_colony(origin:Vector2i) -> String:
+    return StartSite.begin_colony(self, origin);
+
+func _ensure_start_ore(start:Vector2i) -> void:
+    StartSite._ensure_start_ore(self, start);
+
+func _clear_nodes(c:Vector2i, radius:int) -> void:
+    StartSite._clear_nodes(self, c, radius);
+
+func _start_colony_goods(start:Vector2i) -> void:
+    StartSite._start_colony_goods(self, start);
+
+func _spawn_settlers(start:Vector2i) -> void:
+    StartSite._spawn_settlers(self, start);
+
+func serialize() -> Dictionary:
+    return WorldSave.serialize(self);
+
+func _restore_entities(save:Dictionary) -> void:
+    WorldSave._restore_entities(self, save);
+
+func can_road(c:Vector2i) -> bool:
+    return RoadWork.can_road(self, c);
+
+func can_plan_road(c:Vector2i) -> bool:
+    return RoadWork.can_plan_road(self, c);
+
+func plan_road(c:Vector2i, kind:int = Terrain.Overlay.ROAD) -> bool:
+    return RoadWork.plan_road(self, c, kind);
+
+func stake_road(c:Vector2i) -> void:
+    RoadWork.stake_road(self, c);
+
+func cancel_road(c:Vector2i) -> void:
+    RoadWork.cancel_road(self, c);
+
+func work_road(c:Vector2i, dh:float) -> bool:
+    return RoadWork.work_road(self, c, dh);
+
+func is_channel(c:Vector2i) -> bool:
+    return RoadWork.is_channel(self, c);
+
+func remove_channel(c:Vector2i) -> void:
+    RoadWork.remove_channel(self, c);
+
+func update_irrigation() -> void:
+    RoadWork.update_irrigation(self);
+
+func set_road(c:Vector2i, on:bool) -> void:
+    RoadWork.set_road(self, c, on);
+
+func water_reach() -> PackedFloat32Array:
+    return WaterReach.water_reach(self);
+
+func water_sources_changed() -> void:
+    WaterReach.water_sources_changed(self);
+
+func order_tree(c:Vector2i) -> bool:
+    return TreeOrders.order_tree(self, c);
+
+func tree_order_at(c:Vector2i) -> TreeOrder:
+    return TreeOrders.tree_order_at(self, c);
+
+func cancel_tree_order(c:Vector2i) -> void:
+    TreeOrders.cancel_tree_order(self, c);
+
+func _add_order_mark(c:Vector2i) -> void:
+    TreeOrders._add_order_mark(self, c);
+
+func _remove_order_mark(c:Vector2i) -> void:
+    TreeOrders._remove_order_mark(self, c);
+
+func relocation_block_reason(b:Building) -> String:
+    return Relocation.relocation_block_reason(self, b);
+
+func relocate(b:Building, origin:Vector2i, size:Vector2i, facing:int = 0) -> Building:
+    return Relocation.relocate(self, b, origin, size, facing);
+
+func _finish_relocation(site:Building) -> void:
+    Relocation._finish_relocation(self, site);
+
+func leave_colony(p:Pawn) -> void:
+    Citizens.leave_colony(self, p);
+
+func _end_tasks_aimed_at(p:Pawn) -> void:
+    Citizens._end_tasks_aimed_at(self, p);
+
+func add_body(p:Pawn, cause:String, at:Vector3) -> Body:
+    return Citizens.add_body(self, p, cause, at);
+
+func remove_body(b:Body) -> void:
+    Citizens.remove_body(self, b);
+
+func add_pawn(p:Pawn) -> void:
+    Citizens.add_pawn(self, p);
+
+func kill_pawn(p:Pawn, cause:String, at_home:bool = false) -> void:
+    Citizens.kill_pawn(self, p, cause, at_home);
+
+func pile_at(c:Vector2i) -> GroundPile:
+    return GroundPiles.pile_at(self, c);
+
+func drop_pile(item:StringName, n:int, near:Vector2i) -> void:
+    GroundPiles.drop_pile(self, item, n, near);
+
+func remove_pile(pl:GroundPile) -> void:
+    GroundPiles.remove_pile(self, pl);

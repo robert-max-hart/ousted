@@ -40,7 +40,7 @@ func _drought() -> void:
     Weather.drought_days = 0;
 
 func _free_spot() -> Vector2i:
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);
@@ -95,7 +95,7 @@ func _channels() -> void:
     _expect("and are held moist (%d)" % moist, moist == irrigated);
 
 func _buckets() -> void:
-    var o:Vector2i = world.town_hall.origin + Vector2i(-12, -14);
+    var o:Vector2i = TestSite.near(world, Vector2i(-12, -14));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(18, 12)).has_point(rn.cell):
             world.remove_node(rn);

@@ -11,7 +11,7 @@ class_name CropMeshes extends RefCounted;
 const SHAPE_OF:Dictionary = {
     &"wheat": &"grain", &"barley": &"grain", &"beans": &"bush", &"potato": &"bush",
     &"radish": &"leafy", &"lettuce": &"leafy", &"cabbage": &"leafy", &"pumpkin": &"vine",
-    &"apple": &"tree", &"pear": &"tree",
+    &"apple": &"tree", &"pear": &"tree", &"cherry": &"tree", &"peach": &"tree", &"plum": &"tree", &"walnut": &"tree", &"pecan": &"tree",
 };
 const SHAPES:Array[StringName] = [&"grain", &"bush", &"leafy", &"vine", &"tree"];
 

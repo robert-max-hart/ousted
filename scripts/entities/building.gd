@@ -61,6 +61,7 @@ var _body       :MeshInstance3D;
 var _roof       :MeshInstance3D;
 var _fence      :Fence;                            # a fence or wall round the footprint (graveyard, stockpile, field)
 var _decor      :Array[MeshInstance3D] = [];       # extra shapes (BuildingShapes), hidden while a site
+var fit_shift   :Vector3 = Vector3.ZERO;          # see _fit_to_footprint
 var _body_y0    :float = 0.0;                      # where the body starts and how tall it is, for the rising frame of a site
 var _body_h     :float = 0.0;
 var _chimney    :MeshInstance3D;
@@ -112,6 +113,59 @@ func on_resized(_old:Rect2i) -> void:
 func _ground_y(center:Vector2) -> float:
     var y:float = world.terrain.height_at(center.x, center.y);
     return maxf(y, Terrain.WATER_LEVEL) if def.get("bridge", false) or def.get("fishing", false) else y;
+
+# The strip at the back of the footprint (def "pier" rows deep) where a fishing hut's pier runs out over the water. Empty (no area) for
+# any other building. The back is the side away from the door: "front" is +z in the building's own frame.
+func pier_rect() -> Rect2i:
+    return Building.pier_rect_for(def, origin, size, facing);
+
+static func pier_rect_for(def:Dictionary, o:Vector2i, s:Vector2i, f:int) -> Rect2i:
+    var depth:int = def.get("pier", 0);
+    if depth <= 0:
+        return Rect2i();
+    var back:Vector3 = Vector3(0, 0, -1).rotated(Vector3.UP, -f * PI * 0.5);
+    var dx:int = roundi(back.x);
+    var dz:int = roundi(back.z);
+    if dz < 0:
+        return Rect2i(o, Vector2i(s.x, depth));
+    if dz > 0:
+        return Rect2i(Vector2i(o.x, o.y + s.y - depth), Vector2i(s.x, depth));
+    if dx < 0:
+        return Rect2i(o, Vector2i(depth, s.y));
+    return Rect2i(Vector2i(o.x + s.x - depth, o.y), Vector2i(depth, s.y));
+
+# Whether citizens walk over this cell of the footprint on a deck: a fishing hut's pier, and the centre line of the hut leading
+# to it from the door (a doorway through the hut, so the pier is never cut off by water on its sides).
+func deck_has(c:Vector2i) -> bool:
+    var pier:Rect2i = pier_rect();
+    if not pier.has_area():
+        return false;
+    if pier.has_point(c):
+        return true;
+    if not rect().has_point(c):
+        return false;
+    var back:Vector3 = Vector3(0, 0, -1).rotated(Vector3.UP, -facing * PI * 0.5);
+    if roundi(back.z) != 0:
+        return c.x == origin.x + size.x / 2;
+    return c.y == origin.y + size.y / 2;
+
+# Where a worker stands to work here, or (-1, -1) for the building's ordinary access cells. A fishing hut: the far end of its pier.
+func work_spot() -> Vector2i:
+    var pier:Rect2i = pier_rect();
+    if not pier.has_area():
+        return Vector2i(-1, -1);
+    var back:Vector3 = Vector3(0, 0, -1).rotated(Vector3.UP, -facing * PI * 0.5);
+    var best:Vector2i = pier.position;
+    var best_score:float = -INF;
+    var mid:Vector2 = Vector2(pier.position) + Vector2(pier.size) * 0.5;
+    for z in range(pier.position.y, pier.end.y):
+        for x in range(pier.position.x, pier.end.x):
+            var c:Vector2 = Vector2(x + 0.5, z + 0.5);
+            var score:float = Vector2(back.x, back.z).dot(c - mid) * 4.0 - (c - mid).length_squared() * 0.01;
+            if score > best_score:
+                best_score = score;
+                best = Vector2i(x, z);
+    return best;
 
 func display_name() -> String:
     return def["name"];
@@ -351,7 +405,7 @@ func cost() -> Dictionary:
         return expansion["cost"];
     if upgrading != &"":
         return def["upgrades"][upgrading]["cost"];
-    var mult:float = cost_mult * area_mult();
+    var mult:float = cost_mult * Defs.cost_scale(def, size);
     if is_equal_approx(mult, 1.0):
         return def["cost"];
     var c:Dictionary = {};
@@ -632,24 +686,6 @@ func update_smoke() -> void:
         var mat:StandardMaterial3D = _smoke.mesh.material as StandardMaterial3D;
         mat.albedo_color = Color(0.08, 0.08, 0.09, 0.85) if coal else Color(0.7, 0.7, 0.72, 0.75);
 
-# A dark door on the south face of a house-shaped body, and for homes a pair of windows that light up while
-# someone lives there. (Decoration only: citizens still walk to the building's edge.)
-func _build_door(body:Vector2, h:float) -> void:
-    var door_h:float = minf(1.3, h * 0.65);
-    var door:BoxMesh = BoxMesh.new();
-    door.size = Vector3(minf(0.8, body.x * 0.3), door_h, 0.1);
-    _door = _add_mesh(door, _flat_mat(Color(0.27, 0.17, 0.1)), Vector3(0, door_h * 0.5, body.y * 0.5 + 0.02));
-    if not def.has("beds") or body.x < 1.9:
-        return;
-    _window_mat = StandardMaterial3D.new();
-    _window_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
-    var pane:BoxMesh = BoxMesh.new();
-    pane.size = Vector3(0.42, 0.42, 0.08);
-    for sx in [-1.0, 1.0]:
-        var w:MeshInstance3D = _add_mesh(pane, _window_mat, Vector3(sx * (body.x * 0.5 - 0.5), h * 0.62, body.y * 0.5 + 0.02));
-        w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-        _windows.append(w);
-    update_windows();
 
 # Windows glow warm while the house is finished and has residents, and stay dark otherwise.
 func update_windows() -> void:
@@ -658,48 +694,6 @@ func update_windows() -> void:
     var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty());
     _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
 
-func _build_chimney(h:float) -> void:
-    var box:BoxMesh = BoxMesh.new();
-    var pitch:float = def.get("roof_pitch", 0.55);
-    var top:float = h + h * pitch + 0.35;
-    var base:float = h + h * pitch * 0.5;
-    box.size = Vector3(0.4, top - base, 0.4);
-    _chimney = _add_mesh(box, _flat_mat(Color(0.45, 0.32, 0.28)), Vector3(vsize.x * 0.22, (top + base) * 0.5, vsize.y * 0.15));
-    _smoke = CPUParticles3D.new();
-    var puff:SphereMesh = SphereMesh.new();
-    puff.radius = 0.32;
-    puff.height = 0.64;
-    puff.radial_segments = 6;
-    puff.rings = 3;
-    var mat:StandardMaterial3D = StandardMaterial3D.new();
-    mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
-    mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
-    mat.albedo_color = Color(0.7, 0.7, 0.72, 0.75);
-    puff.material = mat;
-    _smoke.mesh = puff;
-    _smoke.amount = 14;
-    _smoke.lifetime = 4.0;
-    _smoke.direction = Vector3.UP;
-    _smoke.spread = 12.0;
-    _smoke.initial_velocity_min = 0.6;
-    _smoke.initial_velocity_max = 0.9;
-    _smoke.gravity = Vector3(0.25, 0.0, 0.0);       # a light breeze
-    _smoke.scale_amount_min = 0.7;
-    _smoke.scale_amount_max = 1.1;
-    var grow:Curve = Curve.new();
-    grow.add_point(Vector2(0.0, 0.5));
-    grow.add_point(Vector2(1.0, 2.2));
-    _smoke.scale_amount_curve = grow;
-    var fade:Gradient = Gradient.new();
-    fade.set_color(0, Color(1, 1, 1, 1));
-    fade.set_color(1, Color(1, 1, 1, 0));
-    _smoke.color_ramp = fade;
-    _smoke.emitting = false;
-    _smoke.speed_scale = World.fx_speed();
-    GameClock.speed_changed.connect(_on_clock_speed);
-    _smoke.position = _chimney.position + Vector3(0, box.size.y * 0.5, 0);
-    _smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-    add_child(_smoke);
 
 # --------------------------------
 # Save and load. Reservations, incoming deliveries and who is working here are not saved: citizens
@@ -821,104 +815,14 @@ func info_text() -> String:
 # --------------------------------
 # Visuals
 
-func _build_visual() -> void:
-    var shape:String = def.get("shape", "house");
-    var h:float = def.get("height", 2.0);
-    _body_mat = SurfaceTextures.material(def.get("wall", &"planks"), def.get("color", Color.GRAY));
-    _body_h = h;
-    match shape:
-        "silo":
-            BuildingShapes.silo(self);
-        "market":
-            BuildingShapes.market(self);
-        "hall":
-            BuildingShapes.hall(self);
-            if def.has("fuel_capacity"):
-                _build_chimney(h);
-        "house":
-            var box:BoxMesh = BoxMesh.new();
-            box.size = Vector3(vsize.x - 0.5, h, vsize.y - 0.5);
-            _body = _add_mesh(box, _body_mat, Vector3(0, h * 0.5, 0));
-            var pitch:float = def.get("roof_pitch", 0.55);
-            var prism:PrismMesh = PrismMesh.new();
-            prism.size = Vector3(vsize.x - 0.1, h * pitch, vsize.y - 0.2);
-            _roof = _add_mesh(prism, SurfaceTextures.material(&"shingle", def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
-            _build_door(Vector2(vsize.x - 0.5, vsize.y - 0.5), h);
-            if def.has("fuel_capacity"):
-                _build_chimney(h);
-        "well":
-            var cyl:CylinderMesh = CylinderMesh.new();
-            cyl.top_radius = 0.7;
-            cyl.bottom_radius = 0.75;
-            cyl.height = h;
-            _body = _add_mesh(cyl, _body_mat, Vector3(0, h * 0.5, 0));
-            var cap:PrismMesh = PrismMesh.new();
-            cap.size = Vector3(1.6, 0.5, 1.2);
-            _roof = _add_mesh(cap, _flat_mat(def.get("roof", Color.BROWN)), Vector3(0, h + 0.9, 0));
-        "mine":
-            var pit:BoxMesh = BoxMesh.new();
-            pit.size = Vector3(vsize.x - 0.3, 0.2, vsize.y - 0.3);
-            _add_mesh(pit, _flat_mat(Color(0.32, 0.28, 0.25)), Vector3(0, 0.1, 0));
-            var shed:BoxMesh = BoxMesh.new();
-            shed.size = Vector3(vsize.x * 0.5, h, vsize.y * 0.4);
-            _body = _add_mesh(shed, _body_mat, Vector3(-vsize.x * 0.2, h * 0.5, -vsize.y * 0.25));
-            var cap:PrismMesh = PrismMesh.new();
-            cap.size = Vector3(vsize.x * 0.55, h * 0.4, vsize.y * 0.45);
-            _roof = _add_mesh(cap, SurfaceTextures.material(&"shingle", def.get("roof", Color.BROWN)), Vector3(-vsize.x * 0.2, h + h * 0.2, -vsize.y * 0.25));
-            BuildingShapes.mine_extras(self);
-        "graveyard":
-            _fence = Fence.new(self, &"stone", 1);       # the ground itself is a terrain overlay (Terrain.Overlay.GRAVE)
-            add_child(_fence);
-        "cart":
-            var bed:BoxMesh = BoxMesh.new();
-            bed.size = Vector3(vsize.x - 0.3, h * 0.5, vsize.y * 0.8);
-            _body = _add_mesh(bed, _body_mat, Vector3(0, h * 0.55, 0));
-            var load_mesh:BoxMesh = BoxMesh.new();
-            load_mesh.size = Vector3(vsize.x - 0.7, h * 0.35, vsize.y * 0.55);
-            _roof = _add_mesh(load_mesh, _flat_mat(Color(0.75, 0.65, 0.4)), Vector3(0, h * 0.95, 0));
-            var wheel:CylinderMesh = CylinderMesh.new();
-            wheel.top_radius = 0.28;
-            wheel.bottom_radius = 0.28;
-            wheel.height = 0.1;
-            for sx in [-0.55, 0.55]:
-                var w:MeshInstance3D = _add_mesh(wheel, _flat_mat(Color(0.25, 0.18, 0.12)), Vector3(sx, 0.28, vsize.y * 0.42));
-                w.rotation.z = PI * 0.5;
-        "bridge":
-            _build_bridge(h);
-        "pile":
-            var pad:BoxMesh = BoxMesh.new();
-            pad.size = Vector3(vsize.x - 0.3, h, vsize.y - 0.3);
-            _body = _add_mesh(pad, _body_mat, Vector3(0, h * 0.5, 0));
-            _fence = Fence.new(self, &"rope", 2);
-            add_child(_fence);
-            add_child(PileGoods.new(self));
-        _:
-            pass;
-    if def.has("decor"):
-        BuildingShapes.decorate(self, def["decor"]);
 
-# A plank deck with a low rail along each long side, standing on posts down to the water.
-func _build_bridge(h:float) -> void:
-    var deck:BoxMesh = BoxMesh.new();
-    deck.size = Vector3(vsize.x, h, vsize.y);
-    var top:float = DECK_HEIGHT;
-    _body = _add_mesh(deck, _body_mat, Vector3(0, top - h * 0.5, 0));
-    _body_y0 = top - h;
-    _body_h = h;
-    var along_x:bool = vsize.x >= vsize.y;
-    var rail_mat:StandardMaterial3D = _flat_mat(Color(0.36, 0.26, 0.16));
-    var post:BoxMesh = BoxMesh.new();
-    post.size = Vector3(0.14, 0.5, 0.14);
-    var rail:BoxMesh = BoxMesh.new();
-    rail.size = Vector3(vsize.x if along_x else 0.08, 0.07, 0.08 if along_x else vsize.y);
-    for side in [-1.0, 1.0]:
-        var off:float = (vsize.y if along_x else vsize.x) * 0.5 - 0.08;
-        add_decor(rail, rail_mat, Vector3(0.0 if along_x else side * off, top + 0.42, side * off if along_x else 0.0));
-        var length:float = vsize.x if along_x else vsize.y;
-        var n:int = maxi(2, int(length / 2.0) + 1);
-        for k in n:
-            var along:float = lerpf(-length * 0.5 + 0.1, length * 0.5 - 0.1, float(k) / float(n - 1));
-            add_decor(post, rail_mat, Vector3(along if along_x else side * off, top + 0.25, side * off if along_x else along));
+# Everything a building is made of must stay inside its footprint (a road or neighbour beside it is never overlapped by an
+# anvil, a rack or a stoop). The meshes are measured in the building's frame; if they reach outside, the whole building
+# is scaled down a little across the ground (not in height) and shifted so the result sits within the footprint.
+# `fit_shift` is that shift as a world offset, which whoever sets `position` adds again (see BuildGhost).
+const FIT_MARGIN:float = 0.04;
+
+
 
 # BuildingShapes: the body (which rises while a site) and roof of a custom shape, and loose extras.
 func set_body(mesh:MeshInstance3D, y0:float, height:float) -> void:
@@ -972,3 +876,12 @@ func _flat_mat(c:Color) -> StandardMaterial3D:
     m.albedo_color = c;
     m.roughness = 0.9;
     return m;
+
+# --------------------------------
+# Delegates: the shape of a building is made by BuildingVisuals
+
+func _build_visual() -> void:
+    BuildingVisuals._build_visual(self);
+
+func _build_door(body:Vector2, h:float) -> void:
+    BuildingVisuals._build_door(self, body, h);

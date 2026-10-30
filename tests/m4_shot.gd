@@ -34,7 +34,7 @@ func _ready() -> void:
     Weather._day_offset = 0.0;
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 3) * GameClock.HOURS_PER_DAY + 11.0;      # summer morning
     Weather._update_temperature();
-    _o = world.town_hall.origin + Vector2i(-22, -24);
+    _o = TestSite.near(world, Vector2i(-22, -24));
     for rn in world.nodes.duplicate():
         if Rect2i(_o - Vector2i(3, 3), Vector2i(48, 30)).has_point(rn.cell):
             world.remove_node(rn);

@@ -22,7 +22,7 @@ func _ready() -> void:
     Weather._day_offset = 0.0;
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 2) * GameClock.HOURS_PER_DAY + 12.0;      # early summer
     Weather._update_temperature();
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(26, 14)).has_point(rn.cell):
             world.remove_node(rn);
@@ -69,7 +69,7 @@ func _ready() -> void:
     var d:Dictionary = orch.to_dict();
     _expect("the orchard saves its tree", d["crop_id"] == &"apple");
     var trees:Array = Defs.CROPS.keys().filter(func(id:StringName) -> bool: return Defs.CROPS[id].get("tree", false));
-    _expect("two tree crops exist and are food", trees.size() == 2 and Defs.is_food(&"apples") and Defs.is_food(&"pears"));
+    _expect("the tree crops are food (apples, pears, cherries, peaches, plums, walnuts, pecans)", trees.size() == 7 and Defs.is_food(&"apples") and Defs.is_food(&"pears") and Defs.is_food(&"walnuts"));
     print("ORCHARD %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

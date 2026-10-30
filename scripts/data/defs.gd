@@ -31,6 +31,11 @@ const ITEMS:Dictionary = {
     &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 50.0},
     &"apples":  {"name": "Apples", "color": Color(0.8, 0.25, 0.2), "food": true, "nutrition": 0.3, "spoil_days": 45.0},
     &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
+    &"cherries": {"name": "Cherries", "color": Color(0.7, 0.1, 0.18), "food": true, "nutrition": 0.25, "spoil_days": 14.0},
+    &"peaches":  {"name": "Peaches", "color": Color(0.95, 0.62, 0.4), "food": true, "nutrition": 0.3, "spoil_days": 16.0},
+    &"plums":    {"name": "Plums", "color": Color(0.4, 0.2, 0.5), "food": true, "nutrition": 0.3, "spoil_days": 24.0},
+    &"walnuts":  {"name": "Walnuts", "color": Color(0.55, 0.42, 0.28), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 200.0},
+    &"pecans":   {"name": "Pecans", "color": Color(0.5, 0.33, 0.2), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 200.0},
     &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
     &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
@@ -82,6 +87,8 @@ const ITEMS:Dictionary = {
 # water:    citizens can drink here
 # beds:     shelter capacity
 # walkable: pawns can walk through the footprint
+# pier:     rows at the back of the footprint that must be water (a fishing hut's pier; its workers stand there, Building.work_spot)
+# fenced:   a drag-sized building whose cost grows with its fence (the perimeter), not its area (fields, graveyards)
 # bridge:   a deck over water (placeable on water, never levelled; citizens on it stand at Building.DECK_HEIGHT)
 const BUILDINGS:Dictionary = {
     &"town_hall": {
@@ -138,10 +145,10 @@ const BUILDINGS:Dictionary = {
         "desc": "An open area where citizens drop off goods. Drag to size it: a 4x4 holds 150 units, and cost and capacity grow with the area. Item filters can be set in the inspector.",
     },
     &"bridge": {
-        "name": "Bridge", "size": Vector2i(2, 4), "cost": {&"wood": 8}, "work": 6.0,
+        "name": "Bridge", "size": Vector2i(1, 4), "cost": {&"wood": 4}, "work": 3.0,
         "shape": "bridge", "height": 0.18, "color": Color(0.45, 0.33, 0.2), "wall": &"planks",
-        "walkable": true, "drag_size": true, "scalable": true, "bridge": true, "min_side": 2, "relocatable": false,
-        "desc": "A wooden deck over water, so citizens can cross a river without wading. Drag along the crossing: at least 2 wide, with the ends on land. Cost grows with the length.",
+        "walkable": true, "drag_size": true, "scalable": true, "bridge": true, "min_side": 1, "relocatable": false,
+        "desc": "A one-tile-wide wooden deck over water, so citizens can cross a river without wading. Drag along the crossing, with both ends on land (up to 16 long). Cost grows with the length.",
     },
     &"granary": {
         "name": "Granary", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 14.0,
@@ -191,13 +198,13 @@ const BUILDINGS:Dictionary = {
         "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
     },
     &"fishing_hut": {
-        "name": "Fishing Hut", "size": Vector2i(3, 3), "cost": {&"wood": 14}, "work": 10.0,
-        "shape": "house", "decor": "fishing", "roof_pitch": 0.7, "height": 1.5, "color": Color(0.5, 0.4, 0.3), "roof": Color(0.4, 0.45, 0.5),
-        "radius": 9.0, "worker_slots": 2, "profession": "FISHERMAN", "fishing": true, "no_flatten": true, "relocatable": false,
+        "name": "Fishing Hut", "size": Vector2i(3, 4), "cost": {&"wood": 14}, "work": 10.0,
+        "shape": "fishing", "height": 1.4, "color": Color(0.5, 0.4, 0.3), "roof": Color(0.4, 0.45, 0.5),
+        "radius": 9.0, "worker_slots": 2, "profession": "FISHERMAN", "fishing": true, "pier": 2, "no_flatten": true, "relocatable": false,
         "controls": [
             {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 150, "step": 20},
         ],
-        "desc": "Fishermen catch fish from the water around the hut and carry them to storage. Build it on the shore with some of it over the water. The more of the circle is water, the better the catch; two huts whose circles overlap share the water and both catch less. Fish spoil quickly.",
+        "desc": "Fishermen catch fish from the water around the hut and carry them to storage. The door faces the shore and the pier at the back must run out over the water (turn it with R); fishermen work at the end of the pier. The more of the circle is water, the better the catch; two huts whose circles overlap share the water and both catch less. Fish spoil quickly.",
     },
     &"mine": {
         "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
@@ -258,7 +265,7 @@ const BUILDINGS:Dictionary = {
         "desc": "A bare shelter for two, put up by the homeless. It keeps a little warmth in, counts as being homeless for happiness, and demolishing it returns nothing.",
     },
     &"field": {
-        "name": "Crop Field", "size": Vector2i(6, 6), "cost": {}, "work": 6.0,
+        "name": "Crop Field", "size": Vector2i(6, 6), "cost": {&"wood": 8}, "work": 6.0, "fenced": true,
         "shape": "field", "height": 0.0, "color": Color(0.4, 0.28, 0.18),
         "field": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
         "upgrades": {
@@ -312,11 +319,14 @@ const BUILDINGS:Dictionary = {
         "storage": true, "capacity": 40, "accepts_items": [&"spirits"],
         "worker_slots": 1, "profession": "ARTISAN", "needs_water": 12.0,
         "produces": [&"spirits"],
-        "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"firewood": 4},
+        "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"cherries": 8, &"peaches": 8, &"plums": 8, &"firewood": 4},
         "recipes": {
             &"spirits_barley": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"barley": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
             &"spirits_apples": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"apples": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
             &"spirits_pears":  {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"pears": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_cherries": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"cherries": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_peaches":  {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"peaches": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_plums":    {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"plums": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
         },
         "controls": [
             {"id": "cap_spirits", "type": "cap", "label": "Spirits cap", "item": &"spirits", "default": 20, "step": 5, "zero_label": "Off"},
@@ -324,6 +334,9 @@ const BUILDINGS:Dictionary = {
             {"id": "make_spirits_barley", "type": "toggle", "label": "Distil barley", "default": true},
             {"id": "make_spirits_apples", "type": "toggle", "label": "Distil apples", "default": true},
             {"id": "make_spirits_pears", "type": "toggle", "label": "Distil pears", "default": true},
+            {"id": "make_spirits_cherries", "type": "toggle", "label": "Distil cherries", "default": true},
+            {"id": "make_spirits_peaches", "type": "toggle", "label": "Distil peaches", "default": true},
+            {"id": "make_spirits_plums", "type": "toggle", "label": "Distil plums", "default": true},
         ],
         "desc": "Artisans distil barley, apples or pears (4 with a little firewood make 2 spirits) and store the spirits. It needs water: a well, the Town Hall or open water within 12 cells. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
     },
@@ -359,7 +372,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Merchants walk in from the edge of the map a few times a season, stay a few days and leave again. They bring goods to sell and name what they want to buy. Goods can be kept at the post for trading (the Goods held for trade window), and honey and spirits can be kept in storage for it: citizens only drink what is over that number.",
     },
     &"graveyard": {
-        "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,
+        "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {&"stone": 6}, "work": 6.0, "fenced": true,
         "shape": "graveyard", "height": 0.06, "color": Color(0.36, 0.42, 0.3),
         "graveyard": true, "drag_size": true, "min_side": 2, "walkable": true, "relocatable": false,
         "inputs": {&"coal": 4},
@@ -449,6 +462,31 @@ const CROPS:Dictionary = {
         "yield": 5, "fertility": -0.02, "color": Color(0.75, 0.6, 0.3), "find_weight": 0.5, "harvests": 999, "regrow_days": 9.0,
         "desc": "Slow to bear the first time, then fruit every year. Apples keep fairly well.",
     },
+    &"cherry": {
+        "name": "Cherry trees", "item": &"cherries", "grow_days": 16.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "cherry saplings",
+        "yield": 4, "fertility": -0.02, "color": Color(0.7, 0.25, 0.3), "find_weight": 0.35, "harvests": 999, "regrow_days": 8.0,
+        "desc": "Early, small crops of fruit that spoil fairly fast. Good for the still.",
+    },
+    &"peach": {
+        "name": "Peach trees", "item": &"peaches", "grow_days": 19.0, "min_temp": 7.0, "frost_temp": -40.0, "tree": true, "seed_word": "peach saplings",
+        "yield": 5, "fertility": -0.02, "color": Color(0.9, 0.6, 0.45), "find_weight": 0.3, "harvests": 999, "regrow_days": 10.0,
+        "desc": "Juicy fruit that likes warm weather and does not keep long.",
+    },
+    &"plum": {
+        "name": "Plum trees", "item": &"plums", "grow_days": 17.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "plum saplings",
+        "yield": 5, "fertility": -0.02, "color": Color(0.5, 0.3, 0.55), "find_weight": 0.35, "harvests": 999, "regrow_days": 9.0,
+        "desc": "Hardy trees with a steady crop of fruit that keeps a little longer than cherries.",
+    },
+    &"walnut": {
+        "name": "Walnut trees", "item": &"walnuts", "grow_days": 28.0, "min_temp": 5.0, "frost_temp": -40.0, "tree": true, "seed_word": "walnut saplings",
+        "yield": 3, "fertility": -0.02, "color": Color(0.5, 0.4, 0.3), "find_weight": 0.25, "harvests": 999, "regrow_days": 14.0,
+        "desc": "Slow trees that give nuts, not fruit: they keep for a very long time, and nuts cannot be distilled.",
+    },
+    &"pecan": {
+        "name": "Pecan trees", "item": &"pecans", "grow_days": 30.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "pecan saplings",
+        "yield": 3, "fertility": -0.02, "color": Color(0.45, 0.32, 0.2), "find_weight": 0.2, "harvests": 999, "regrow_days": 15.0,
+        "desc": "The slowest of the orchard trees, with rich nuts that keep for a very long time. Nuts cannot be distilled.",
+    },
     &"pear": {
         "name": "Pear trees", "item": &"pears", "grow_days": 20.0, "min_temp": 6.0, "frost_temp": -40.0, "tree": true, "seed_word": "pear saplings",
         "yield": 6, "fertility": -0.02, "color": Color(0.7, 0.7, 0.3), "find_weight": 0.4, "harvests": 999, "regrow_days": 10.0,
@@ -461,15 +499,15 @@ const CROPS:Dictionary = {
 const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
-    &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
+    &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3, &"cherries": 3, &"peaches": 3, &"plums": 3, &"walnuts": 4, &"pecans": 5,
     &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
 # are item ids, a seed is "seed:<crop>" and an animal is "animal:<kind>".
 const SEED_VALUE:Dictionary = {
-    &"wheat": 20, &"beans": 18, &"radish": 10, &"lettuce": 12, &"barley": 20, &"potato": 30, &"cabbage": 22, &"pumpkin": 35,
-    &"apple": 60, &"pear": 65,
+    &"wheat": 200, &"beans": 180, &"radish": 100, &"lettuce": 120, &"barley": 200, &"potato": 300, &"cabbage": 220, &"pumpkin": 350,
+    &"apple": 600, &"pear": 650, &"cherry": 550, &"peach": 600, &"plum": 580, &"walnut": 750, &"pecan": 800,
 };
 const SEED_PREFIX:String = "seed:";
 const ANIMAL_PREFIX:String = "animal:";
@@ -734,6 +772,27 @@ static func is_tool(item:StringName) -> bool:
 
 static func item_name(item:StringName) -> String:
     return ITEMS[item]["name"] if ITEMS.has(item) else String(item);
+
+# How a drag-sized building's cost grows with its size: a fenced one (fields, graveyards) with the length of its fence,
+# a scalable one (stockpiles, bridges) with its area, the rest not at all (1.0).
+static func cost_scale(def:Dictionary, size:Vector2i) -> float:
+    var d:Vector2i = def["size"];
+    if def.get("fenced", false):
+        return float(size.x + size.y) / float(d.x + d.y);
+    if def.get("scalable", false):
+        return float(size.x * size.y) / float(d.x * d.y);
+    return 1.0;
+
+# What a drag-sized building of this size costs (before any relocation or other multiplier).
+static func sized_cost(def_id:StringName, size:Vector2i) -> Dictionary:
+    var def:Dictionary = BUILDINGS[def_id];
+    var mult:float = cost_scale(def, size);
+    if is_equal_approx(mult, 1.0):
+        return def["cost"];
+    var c:Dictionary = {};
+    for item in def["cost"]:
+        c[item] = maxi(1, ceili(def["cost"][item] * mult));
+    return c;
 
 static func cost_string(cost:Dictionary) -> String:
     if cost.is_empty():

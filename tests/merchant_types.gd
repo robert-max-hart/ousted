@@ -38,7 +38,7 @@ func _ready() -> void:
     var herders:int = 0;
     var metal_with_animals:int = 0;
     world.add_child(Node.new());
-    var pen:Pasture = world.place_building(&"pasture", world.town_hall.origin + Vector2i(5, -8), Vector2i(5, 5), true) as Pasture;
+    var pen:Pasture = world.place_building(&"pasture", TestSite.spot(world, Vector2i(5, 5), Vector2i(5, -8)), Vector2i(5, 5), true) as Pasture;
     pen.set_kind(&"cow");
     for i in 400:
         var v:Dictionary = t._make_visit();
@@ -112,7 +112,7 @@ func _ready() -> void:
     old.restore({"samples": [], "events": []});
     _expect("an old save has an empty record", old.trades.is_empty() and old.deal_count == 0);
     # a real trade through the post
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);

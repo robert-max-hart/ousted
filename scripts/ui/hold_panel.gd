@@ -113,14 +113,14 @@ func _rows(items:Array[StringName]) -> void:
         name.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
         name.clip_text = true;
         row.add_child(name);
-        for step in [-5, -1]:
+        for step in [-25, -5, -1]:
             row.add_child(_button(step, item));
         var level:Label = Label.new();
         level.name = "Level";
         level.custom_minimum_size.x = 70;
         level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
         row.add_child(level);
-        for step in [1, 5]:
+        for step in [1, 5, 25]:
             row.add_child(_button(step, item));
         _list.add_child(row);
 

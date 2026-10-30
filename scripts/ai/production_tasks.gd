@@ -69,7 +69,11 @@ func fisherman_task(p:Pawn) -> Task:
         t.job = JobManager.Profession.FISHERMAN;
         t.target = hut;
         t.workplace = hut;
-        t.move_rect(hut.rect(), false, "Walking to %s" % hut.display_name().to_lower());
+        var spot:Vector2i = hut.work_spot();
+        if spot.x >= 0:
+            t.move_cell(spot, "Walking out on the pier");       # the end of the pier is where the fishing is done
+        else:
+            t.move_rect(hut.rect(), false, "Walking to %s" % hut.display_name().to_lower());
         var cast:Callable = func(pw:Pawn, dh:float) -> bool:
             if not World.alive(hut):
                 return true;

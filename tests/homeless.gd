@@ -108,7 +108,7 @@ func _check_penalties() -> void:
     _expect("sleeping out in the cold costs more", _factor(p, "Sleeping in the cold") < 0.0);
     Weather.temperature = 20.0;
     _expect("not in warm weather", _factor(p, "Sleeping in the cold") == 0.0);
-    var s:Building = world.place_building(&"shack", world.town_hall.origin + Vector2i(10, 12), Vector2i(2, 2), true);
+    var s:Building = world.place_building(&"shack", TestSite.spot(world, Vector2i(2, 2), Vector2i(10, 12)), Vector2i(2, 2), true);
     world.families.move_home(p, s);
     _expect("a shack dweller has the shack penalty, not the homeless one", _factor(p, "Lives in a shack") == -Defs.SHACK_MOOD and _factor(p, "No home") == 0.0);
     # warmth at 0 C: outside falls fast, a shack slowly, a heated house rises

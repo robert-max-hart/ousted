@@ -53,6 +53,47 @@ static func _roof_mat(b:Building) -> StandardMaterial3D:
     return SurfaceTextures.material(&"shingle", b.def.get("roof", Color.BROWN));
 
 # --------------------------------
+# Fishing hut: a small hut on the shore (the front half of the footprint, with the door) and a pier on stilts over the
+# water behind it (the back half, Building.pier_rect). Fishermen stand at the end of the pier.
+
+static func fishing(b:Building) -> void:
+    var s:Vector2 = Vector2(b.vsize);
+    var h:float = b.def.get("height", 1.5);
+    var half_d:float = s.y * 0.5;
+    var wood:StandardMaterial3D = SurfaceTextures.material(&"planks", Color(0.62, 0.5, 0.36));
+    var timber:StandardMaterial3D = _colour(TIMBER);
+    var front_d:float = s.y - float(b.def.get("pier", 2)) - 0.2;          # depth of the hut's floor on the shore side
+    var hut_z:float = half_d - front_d * 0.5 - 0.1;
+    var floor_y:float = 0.2;
+    var slab:BoxMesh = BoxMesh.new();
+    slab.size = Vector3(s.x - 0.3, floor_y, front_d);
+    b._add_mesh(slab, wood, Vector3(0, floor_y * 0.5, hut_z));
+    var walls:BoxMesh = BoxMesh.new();
+    walls.size = Vector3(s.x - 0.7, h, front_d - 0.3);
+    b.set_body(b._add_mesh(walls, b._body_mat, Vector3(0, floor_y + h * 0.5, hut_z)), floor_y, h);
+    var roof:PrismMesh = PrismMesh.new();
+    roof.size = Vector3(s.x - 0.3, h * 0.7, front_d + 0.1);
+    b.set_roof(b._add_mesh(roof, _roof_mat(b), Vector3(0, floor_y + h + h * 0.35, hut_z)));
+    _box(b, Vector3(0.7, 1.05, 0.08), _colour(Color(0.27, 0.17, 0.1)), Vector3(0, floor_y + 0.52, hut_z + (front_d - 0.3) * 0.5 + 0.03));       # the door, at the front
+    _box(b, Vector3(0.45, 0.45, 0.06), _colour(Color(0.16, 0.2, 0.26)), Vector3(-(s.x - 0.7) * 0.32, floor_y + h * 0.62, hut_z + (front_d - 0.3) * 0.5 + 0.03));
+    # the pier: planks on stilts running out behind the hut, a post and a crate at the far end
+    var pier_d:float = float(b.def.get("pier", 2)) + 0.05;
+    var pier_z:float = -half_d + pier_d * 0.5 + 0.02;
+    var plank:BoxMesh = BoxMesh.new();
+    plank.size = Vector3(minf(1.5, s.x - 0.8), 0.1, pier_d);
+    b._add_mesh(plank, wood, Vector3(0, floor_y - 0.05, pier_z));
+    for sx in [-1.0, 1.0]:
+        for sz in [-1.0, 1.0]:
+            _box(b, Vector3(0.12, 1.9, 0.12), timber, Vector3(sx * plank.size.x * 0.5, floor_y - 0.95, pier_z + sz * (pier_d * 0.5 - 0.1)));
+    _box(b, Vector3(0.1, 0.55, 0.1), timber, Vector3(plank.size.x * 0.5 - 0.05, floor_y + 0.27, -half_d + 0.15));
+    _box(b, Vector3(0.1, 0.55, 0.1), timber, Vector3(-plank.size.x * 0.5 + 0.05, floor_y + 0.27, -half_d + 0.15));
+    _box(b, Vector3(0.4, 0.3, 0.4), _colour(Color(0.5, 0.38, 0.22)), Vector3(0.0, floor_y + 0.15, -half_d + 0.5));
+    # a net hung to dry beside the door
+    for sx in [0.0, 0.8]:
+        _box(b, Vector3(0.06, 1.0, 0.06), timber, Vector3(s.x * 0.5 - 0.35 - sx, floor_y + 0.5, hut_z + front_d * 0.5 - 0.1));
+    _box(b, Vector3(0.9, 0.7, 0.03), _colour(Color(0.62, 0.6, 0.5)), Vector3(s.x * 0.5 - 0.75, floor_y + 0.6, hut_z + front_d * 0.5 - 0.1));
+
+# --------------------------------
 # Granary: a tall silo with a cone roof, a smaller one beside it, iron bands and a door.
 
 static func silo(b:Building) -> void:
@@ -332,16 +373,6 @@ static func decorate(b:Building, kind:String) -> void:
                 _box(b, Vector3(0.14, 1.0, 0.03), plank, Vector3(-body.x * 0.5 - 0.22 - k * 0.05, 0.5, -body.y * 0.1 + k * 0.17), Vector3(0, 0, 0.32 + k * 0.05));
             _cyl(b, 0.2, 0.22, 0.45, _colour(Color(0.4, 0.3, 0.2)), Vector3(body.x * 0.5 + 0.28, 0.22, front * 0.4), 8);
             _cyl(b, 0.2, 0.2, 0.03, _colour(IRON), Vector3(body.x * 0.5 + 0.28, 0.45, front * 0.4), 8);
-        "fishing":
-            var pile:StandardMaterial3D = _colour(TIMBER);
-            for sx in [-1.0, 1.0]:      # stilts down into the water, a plank landing in front, and a net hung to dry
-                for sz in [-1.0, 1.0]:
-                    _box(b, Vector3(0.16, 1.9, 0.16), pile, Vector3(sx * body.x * 0.5, -0.45, sz * body.y * 0.5));
-            _box(b, Vector3(body.x + 0.4, 0.12, body.y + 0.4), pile, Vector3(0, 0.03, 0));
-            _box(b, Vector3(1.4, 0.1, 1.1), pile, Vector3(0, 0.05, front + 0.7));
-            for sx in [-0.6, 0.6]:
-                _box(b, Vector3(0.06, 1.0, 0.06), pile, Vector3(body.x * 0.3 + sx, 0.55, front + 0.8));
-            _box(b, Vector3(1.2, 0.8, 0.03), _colour(Color(0.62, 0.6, 0.5)), Vector3(body.x * 0.3, 0.65, front + 0.8));
         "hut":
             var rack:StandardMaterial3D = _colour(TIMBER);
             var rz:float = front + 0.75;

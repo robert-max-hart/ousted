@@ -21,7 +21,7 @@ func _ready() -> void:
     GameClock.set_speed(0);
     GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 11.0;
     world.seeds.unlock_all();
-    field = world.place_building(&"field", world.town_hall.origin + Vector2i(8, 8), Vector2i(6, 6), true) as Field;
+    field = world.place_building(&"field", TestSite.spot(world, Vector2i(6, 6), Vector2i(8, 8)), Vector2i(6, 6), true) as Field;
     field.set_crop(&"lettuce");
     for i in 14:
         field.plot_state[i] = Field.Plot.PLANTED;

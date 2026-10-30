@@ -20,7 +20,6 @@ const STOCK_UP_BELOW  :float = 12.0;   # C, daily mean: below this the buffer is
 
 var kind        :StringName = &"chicken";   # which animal this pasture keeps (Defs.ANIMALS); changeable only while it is empty
 var animals     :int = 0;
-var arrived     :bool = false;         # (old saves: had its founding stock; unused now, animals are bought)
 var incoming_animals:int = 0;           # being led here now (not saved)
 var product_acc :float = 0.0;
 var manure_acc  :float = 0.0;
@@ -222,7 +221,6 @@ func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();
     d["kind"] = kind;
     d["animals"] = animals;
-    d["arrived"] = arrived;
     d["product_acc"] = product_acc;
     d["manure_acc"] = manure_acc;
     d["feed_acc"] = feed_acc;
@@ -236,7 +234,6 @@ func restore_dict(d:Dictionary) -> void:
     kind = d.get("kind", &"chicken");
     _herd.multimesh.mesh = _mesh_for(kind);
     animals = d.get("animals", 0);
-    arrived = d.get("arrived", false);
     product_acc = d.get("product_acc", 0.0);
     manure_acc = d.get("manure_acc", 0.0);
     feed_acc = d.get("feed_acc", 0.0);

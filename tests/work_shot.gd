@@ -19,7 +19,7 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 9.0;
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -3);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -3));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(10, 10)).has_point(rn.cell):
             world.remove_node(rn);

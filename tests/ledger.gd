@@ -22,7 +22,7 @@ func _ready() -> void:
     _expect("it has food and firewood", s["food"] == Stock.food_total() and s["firewood"] == Stock.amount(&"firewood"));
     _expect("it has an average happiness", s["mood"] > 0.0 and s["mood"] <= 100.0);
     world.kill_pawn(world.pawns[0], "old age");
-    var house:Building = world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);
+    var house:Building = world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);
     world.families.move_home(world.pawns[1], house);
     world.families._give_birth(world.pawns[1]);
     led.on_day(world);

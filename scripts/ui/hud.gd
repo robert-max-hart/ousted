@@ -24,6 +24,7 @@ var _build_row  :HFlowContainer;         # the buildings of the open category
 var _toast      :Label;
 var _toast_tween:Tween;
 var _tool_row   :HFlowContainer;
+var _harvest_opts:HBoxContainer;        # trees / stone / iron check boxes, shown while the Harvest tool is chosen
 var _road_cat   :int = -1;               # the category the Road tool button lives in
 var _open_cat   :int = -1;               # index into Defs.BUILD_CATEGORIES, or -1 when none is open
 var _jobs_rows  :Array[Label] = [];
@@ -45,6 +46,7 @@ var _copy_btn   :Button;               # start placing another building of the s
 var _dismiss_btn:Button;               # send the merchant on their way early
 var _jobs_panel :PanelContainer;
 var _jobs_toggle:Button;
+var _water_toggle:Button;               # colours the ground by reach of water (where a Distillery or Potter's Workshop may go)
 var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
 var _citizens_toggle:Button;
 var _log_toggle :Button;
@@ -545,6 +547,7 @@ func _on_filter_toggled(on:bool, item:StringName) -> void:
 # Callbacks
 
 func _on_mode_changed(mode:int) -> void:
+    _harvest_opts.visible = mode == PlayerTools.Mode.HARVEST;
     var key:String = World.instance.tools.build_id if mode == PlayerTools.Mode.BUILD else str(mode);
     for k in _tool_btns:
         (_tool_btns[k] as Button).set_pressed_no_signal(k == key);
@@ -639,68 +642,7 @@ func _animal_choices(pen:Pasture) -> void:
 # --------------------------------
 # Construction
 
-func _build_top_bar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root);
-    panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE);
-    var row:HBoxContainer = HBoxContainer.new();
-    row.add_theme_constant_override("separation", 8);
-    panel.add_child(row);
-    _date = Label.new();
-    _date.custom_minimum_size.x = 155;
-    row.add_child(_date);
-    _weather = Label.new();
-    _weather.custom_minimum_size.x = 90;
-    row.add_child(_weather);
-    _stock = HBoxContainer.new();
-    _stock.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    _stock.clip_contents = true;           # a long stock line is cut off instead of pushing the speed buttons off-screen
-    _stock.add_theme_constant_override("separation", 14);
-    _stock.mouse_filter = Control.MOUSE_FILTER_PASS;
-    row.add_child(_stock);
-    for id in SHOWN_ITEMS:
-        _stock_entry(id, Defs.item_name(id));
-    _stock_entry(&"food", "Food");
-    _stock_entry(&"pop", "Citizens");
-    _stock_entry(&"idle", "Citizens with nothing to do");
-    _stock_entry(&"homeless", "Citizens with no home");
-    # panel toggles: each button opens and closes its panel
-    _jobs_toggle = _panel_toggle(row, "Jobs");
-    _citizens_toggle = _panel_toggle(row, "Citizens");
-    _log_toggle = _panel_toggle(row, "Log");
-    _policies_btn = _panel_toggle(row, "Policies");
-    _soil_toggle = _panel_toggle(row, "Soil");
-    _soil_toggle.tooltip_text = "Show soil fertility on the ground (brown poor, green rich)";
-    _soil_toggle.toggled.connect(func(on:bool) -> void:
-        World.instance.terrain.set_soil_view(on);
-        _refresh_info());
-    var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
-    for i in labels.size():
-        var b:Button = Button.new();
-        b.text = labels[i];
-        b.toggle_mode = true;
-        b.focus_mode = Control.FOCUS_NONE;
-        b.custom_minimum_size.x = 36;
-        b.pressed.connect(GameClock.set_speed.bind(i));
-        row.add_child(b);
-        _speed_btns.append(b);
 
-# One figure in the top bar: its icon (StockIcons) and a number, with a tooltip.
-func _stock_entry(id:StringName, tip:String) -> void:
-    var box:HBoxContainer = HBoxContainer.new();
-    box.add_theme_constant_override("separation", 4);
-    box.mouse_filter = Control.MOUSE_FILTER_PASS;
-    box.tooltip_text = tip;
-    var icon:TextureRect = TextureRect.new();
-    icon.texture = StockIcons.texture(id);
-    icon.custom_minimum_size = Vector2(StockIcons.SIZE, StockIcons.SIZE);
-    icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED;
-    icon.mouse_filter = Control.MOUSE_FILTER_PASS;
-    box.add_child(icon);
-    var num:Label = Label.new();
-    num.mouse_filter = Control.MOUSE_FILTER_PASS;
-    box.add_child(num);
-    _stock.add_child(box);
-    _stock_vals[id] = num;
 
 func _set_stock(id:StringName, value:int, shown:bool = true) -> void:
     var num:Label = _stock_vals[id];
@@ -721,57 +663,11 @@ func _panel_toggle(row:Container, text:String) -> Button:
     row.add_child(b);
     return b;
 
-func _build_toolbar(root:Control) -> void:
-    var panel:PanelContainer = _panel(root);
-    _toolbar = panel;
-    panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE);
-    panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
-    var col:VBoxContainer = VBoxContainer.new();
-    panel.add_child(col);
-    _hint = Label.new();
-    _hint.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7));
-    col.add_child(_hint);
-    var row:HFlowContainer = HFlowContainer.new();     # wraps to a second line when the window is narrow
-    _tool_row = row;
-    col.add_child(row);
-    var tools:PlayerTools = World.instance.tools;
-    var group:ButtonGroup = ButtonGroup.new();
-    group.allow_unpress = false;
-    var modes:Array = [
-        [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"], [PlayerTools.Mode.PLANT, "Plant trees"],
-        [PlayerTools.Mode.CHANNEL, "Channel"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
-    ];
-    for m in modes:
-        var b:Button = _tool_button(row, group, m[1], PlayerTools.MODE_HINTS[m[0]]);
-        b.pressed.connect(tools.set_mode.bind(m[0], &""));
-        _tool_btns[str(m[0])] = b;
-    row.add_child(VSeparator.new());
-    # buildings are grouped: a button per category opens that category's buildings on a second line
-    _build_row = HFlowContainer.new();
-    col.add_child(_build_row);
-    var cat_group:ButtonGroup = ButtonGroup.new();
-    cat_group.allow_unpress = true;
-    for ci in Defs.BUILD_CATEGORIES.size():
-        var cb:Button = _tool_button(row, cat_group, Defs.BUILD_CATEGORIES[ci][0] + " >", "Show the %s buildings" % Defs.BUILD_CATEGORIES[ci][0].to_lower());
-        cb.pressed.connect(_on_category_pressed.bind(ci));
-        _cat_btns.append(cb);
-        for id in Defs.BUILD_CATEGORIES[ci][1]:
-            var def:Dictionary = Defs.BUILDINGS[id];
-            var b:Button = _tool_button(_build_row, group, def["name"], "Cost: %s" % Defs.cost_string(def["cost"]));
-            b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
-            _tool_btns[String(id)] = b;
-        if Defs.BUILD_CATEGORIES[ci][0] == "Civic":
-            var rb:Button = _tool_button(_build_row, group, "Road", PlayerTools.MODE_HINTS[PlayerTools.Mode.ROAD]);
-            rb.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.ROAD, &""));
-            _tool_btns[str(PlayerTools.Mode.ROAD)] = rb;
-            _road_cat = ci;
-    (_tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
-    _apply_category();
 
 func _on_merchant_label_input(ev:InputEvent) -> void:
     if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
         var m:Merchant = World.instance.traders.merchant;
-        if World.alive(m):
+        if is_instance_valid(m):          # (a Merchant has no `removed` flag, so World.alive does not apply)
             World.instance.camera_rig.focus_on(Vector3(m.position.x, 0.0, m.position.z));
 
 func _on_category_pressed(index:int) -> void:
@@ -792,56 +688,6 @@ func _apply_category() -> void:
     if _tool_btns.has(str(PlayerTools.Mode.ROAD)):
         (_tool_btns[str(PlayerTools.Mode.ROAD)] as Button).visible = _open_cat == _road_cat;
 
-func _build_jobs_panel(root:Control) -> void:
-    var panel:PanelContainer = _panel(root, &"jobs");
-    _jobs_panel = panel;
-    panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
-    panel.offset_left = 8;
-    panel.offset_top = 48;
-    var col:VBoxContainer = VBoxContainer.new();
-    panel.add_child(col);
-    var title:Button = Button.new();
-    title.text = "Professions  -";
-    title.flat = true;
-    title.alignment = HORIZONTAL_ALIGNMENT_LEFT;
-    title.focus_mode = Control.FOCUS_NONE;
-    title.tooltip_text = "Click to collapse or expand";
-    col.add_child(title);
-    var body:VBoxContainer = VBoxContainer.new();
-    col.add_child(body);
-    title.pressed.connect(func() -> void:
-        body.visible = not body.visible;
-        title.text = "Professions  -" if body.visible else "Professions  +";
-        PanelMover.refit_height(panel));
-    var jobs:JobManager = World.instance.jobs;
-    for prof in JobManager.PROFESSION_NAMES.size():
-        var row:HBoxContainer = HBoxContainer.new();
-        body.add_child(row);
-        var l:Label = Label.new();
-        l.custom_minimum_size.x = 150;
-        row.add_child(l);
-        _jobs_rows.append(l);
-        var flag:Label = Label.new();
-        flag.text = "!";
-        flag.visible = false;
-        flag.mouse_filter = Control.MOUSE_FILTER_STOP;
-        flag.add_theme_color_override("font_color", Color(1.0, 0.45, 0.3));
-        _jobs_flags.append(flag);
-        if prof == JobManager.Profession.GATHERER:
-            row.visible = false;       # retired profession, see JobManager.Profession
-            continue;
-        if prof == JobManager.Profession.LABORER:
-            l.tooltip_text = "Unassigned citizens. They harvest what is marked (trees, rocks, wild food), haul and help build.";
-            l.mouse_filter = Control.MOUSE_FILTER_PASS;
-            continue;
-        for d in [-1, 1]:
-            var b:Button = Button.new();
-            b.text = "-" if d < 0 else "+";
-            b.focus_mode = Control.FOCUS_NONE;
-            b.custom_minimum_size.x = 28;
-            b.pressed.connect(jobs.change_profession.bind(prof, d));
-            row.add_child(b);
-        row.add_child(flag);
 
 func menu_open() -> bool:
     return _menu.visible;
@@ -856,263 +702,9 @@ func toggle_menu() -> void:
         GameClock.set_speed(0);
         _menu.visible = true;
 
-func _build_menu(root:Control) -> void:
-    _menu = Control.new();
-    _menu.set_anchors_preset(Control.PRESET_FULL_RECT);
-    _menu.mouse_filter = Control.MOUSE_FILTER_STOP;       # nothing under the menu gets clicked
-    _menu.visible = false;
-    root.add_child(_menu);
-    var dim:ColorRect = ColorRect.new();
-    dim.color = Color(0.0, 0.0, 0.0, 0.45);
-    dim.set_anchors_preset(Control.PRESET_FULL_RECT);
-    dim.mouse_filter = Control.MOUSE_FILTER_IGNORE;
-    _menu.add_child(dim);
-    var center:CenterContainer = CenterContainer.new();
-    center.set_anchors_preset(Control.PRESET_FULL_RECT);
-    center.mouse_filter = Control.MOUSE_FILTER_IGNORE;
-    _menu.add_child(center);
-    var panel:PanelContainer = _panel(center);
-    var col:VBoxContainer = VBoxContainer.new();
-    col.custom_minimum_size.x = 220;
-    col.add_theme_constant_override("separation", 6);
-    panel.add_child(col);
-    var title:Label = Label.new();
-    title.text = "Paused";
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
-    title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE);
-    col.add_child(title);
-    var seed_label:Label = Label.new();
-    seed_label.text = "Map seed: %d" % World.instance.world_seed;
-    seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
-    col.add_child(seed_label);
-    var items:Array = [
-        ["Resume", toggle_menu],
-        ["Save (F5)", func() -> void: SaveGame.save(World.instance)],
-        ["Load (F9)", func() -> void: toggle_menu(); SaveGame.load_slot(World.instance)],
-        ["Quit to title", func() -> void: get_tree().change_scene_to_file(TITLE_SCENE)],
-        ["Quit game", func() -> void: get_tree().quit()],
-    ];
-    for item in items:
-        var b:Button = Button.new();
-        b.text = item[0];
-        b.focus_mode = Control.FOCUS_NONE;
-        b.pressed.connect(item[1]);
-        col.add_child(b);
 
-# The colony-wide rules as check boxes in a panel of their own, opened by the top bar's Policies button.
-func _build_policies_panel(root:Control) -> void:
-    var panel:PanelContainer = _panel(root, &"policies");
-    panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
-    panel.offset_left = 200;
-    panel.offset_top = 48;
-    panel.visible = false;
-    var box:VBoxContainer = VBoxContainer.new();
-    panel.add_child(box);
-    var title:Label = Label.new();
-    title.text = "Policies";
-    box.add_child(title);
-    _policies_btn.toggled.connect(func(on:bool) -> void: panel.visible = on);
-    var policies:Policies = World.instance.policies;
-    for id in Defs.POLICIES:
-        var check:CheckBox = CheckBox.new();
-        check.text = Defs.POLICIES[id]["name"];
-        check.tooltip_text = Defs.POLICIES[id]["desc"];
-        check.focus_mode = Control.FOCUS_NONE;
-        check.set_pressed_no_signal(policies.is_on(id));
-        var apply:Callable = func(on:bool, rule:StringName) -> void: policies.set_on(rule, on);
-        check.toggled.connect(apply.bind(id));
-        box.add_child(check);
 
-func _build_info_panel(root:Control) -> void:
-    _info = _panel(root, &"info");
-    _info.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT);
-    _info.grow_horizontal = Control.GROW_DIRECTION_BEGIN;
-    _info.custom_minimum_size = Vector2(300, 0);
-    _info.offset_right = -8;
-    _info.offset_left = -308;
-    _info.offset_top = 48;
-    # long inspectors (a blacksmith with its settings and filters) scroll instead of running off screen
-    _info_scroll = ScrollContainer.new();
-    _info_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
-    _info.add_child(_info_scroll);
-    var col:VBoxContainer = VBoxContainer.new();
-    col.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    _info_scroll.add_child(col);
-    _info_col = col;
-    var title_row:HBoxContainer = HBoxContainer.new();
-    col.add_child(title_row);
-    _info_title = Label.new();
-    _info_title.add_theme_font_size_override("font_size", TITLE_FONT_SIZE);
-    _info_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    title_row.add_child(_info_title);
-    _help_btn = Button.new();
-    _help_btn.text = "?";
-    _help_btn.toggle_mode = true;
-    _help_btn.focus_mode = Control.FOCUS_NONE;
-    _help_btn.tooltip_text = "Show or hide what this does";
-    _help_btn.toggled.connect(func(on:bool) -> void:
-        _help_open = on;
-        _help_label.visible = on and _help_label.text != "";
-        PanelMover.refit_height(_info));
-    title_row.add_child(_help_btn);
-    _help_label = Label.new();
-    _help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
-    _help_label.custom_minimum_size.x = 300;
-    _help_label.add_theme_color_override("font_color", Color(0.78, 0.8, 0.72));
-    _help_label.visible = false;
-    col.add_child(_help_label);
-    _info_body = Label.new();
-    _info_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
-    _info_body.custom_minimum_size.x = 300;
-    col.add_child(_info_body);
-    _info_btn = Button.new();
-    _info_btn.focus_mode = Control.FOCUS_NONE;
-    _info_btn.pressed.connect(_on_info_button);
-    col.add_child(_info_btn);
-    _crop_list = VBoxContainer.new();
-    _crop_list.visible = false;
-    col.add_child(_crop_list);
-    _move_btn = Button.new();
-    _move_btn.focus_mode = Control.FOCUS_NONE;
-    _move_btn.visible = false;
-    _move_btn.pressed.connect(func() -> void:
-        var sel:Variant = World.instance.tools.selected;
-        if sel is Building and World.alive(sel):
-            World.instance.tools.start_relocate(sel));
-    col.add_child(_move_btn);
-    _copy_btn = Button.new();
-    _copy_btn.text = "Build another";
-    _copy_btn.tooltip_text = "Place another building of this kind (same size and facing)";
-    _copy_btn.focus_mode = Control.FOCUS_NONE;
-    _copy_btn.visible = false;
-    _copy_btn.pressed.connect(func() -> void:
-        var sel:Variant = World.instance.tools.selected;
-        if sel is Building and World.alive(sel):
-            World.instance.tools.start_copy(sel));
-    col.add_child(_copy_btn);
-    _extras = InspectorExtras.new();
-    col.add_child(_extras);
-    _site_box = VBoxContainer.new();
-    _site_box.visible = false;
-    col.add_child(_site_box);
-    _cancel_btn = Button.new();
-    _cancel_btn.text = "Cancel construction";
-    _cancel_btn.focus_mode = Control.FOCUS_NONE;
-    _cancel_btn.pressed.connect(_on_cancel_build);
-    _site_box.add_child(_cancel_btn);
-    var prio_title:Label = Label.new();
-    prio_title.text = "Build priority:";
-    _site_box.add_child(prio_title);
-    var prio_row:HBoxContainer = HBoxContainer.new();
-    _site_box.add_child(prio_row);
-    for i in Building.PRIORITY_NAMES.size():
-        var pb:Button = Button.new();
-        pb.text = Building.PRIORITY_NAMES[i];
-        pb.toggle_mode = true;
-        pb.focus_mode = Control.FOCUS_NONE;
-        pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-        pb.tooltip_text = "No hauling or building here" if i == 0 else "Builders and haulers serve higher priorities first";
-        pb.pressed.connect(_on_priority_pressed.bind(i));
-        prio_row.add_child(pb);
-        _priority_btns.append(pb);
-    _ledger_btn = Button.new();
-    _ledger_btn.text = "Ledger";
-    _ledger_btn.focus_mode = Control.FOCUS_NONE;
-    _ledger_btn.visible = false;
-    _ledger_btn.pressed.connect(func() -> void: _ledger_panel.open());
-    col.add_child(_ledger_btn);
-    _trade_btn = Button.new();
-    _trade_btn.focus_mode = Control.FOCUS_NONE;
-    _trade_btn.visible = false;
-    _trade_btn.pressed.connect(func() -> void:
-        var sel:Variant = World.instance.tools.selected;
-        if sel is TradingPost:
-            _trade_panel.open(sel));
-    col.add_child(_trade_btn);
-    _dismiss_btn = Button.new();
-    _dismiss_btn.text = "Send the merchant away";
-    _dismiss_btn.tooltip_text = "The merchant leaves now. An unfinished order lapses and its goods come back.";
-    _dismiss_btn.focus_mode = Control.FOCUS_NONE;
-    _dismiss_btn.visible = false;
-    _dismiss_btn.pressed.connect(func() -> void:
-        if World.instance.traders.present():
-            _trade_panel.visible = false;
-            World.instance.traders.depart());
-    col.add_child(_dismiss_btn);
-    _hold_btn = Button.new();
-    _hold_btn.text = "Goods held for trade";
-    _hold_btn.focus_mode = Control.FOCUS_NONE;
-    _hold_btn.visible = false;
-    _hold_btn.pressed.connect(func() -> void:
-        var sel:Variant = World.instance.tools.selected;
-        if sel is TradingPost:
-            _hold_panel.open(sel));
-    col.add_child(_hold_btn);
-    _upgrade_box = VBoxContainer.new();
-    _upgrade_box.visible = false;
-    col.add_child(_upgrade_box);
-    _controls_box = VBoxContainer.new();
-    _controls_box.visible = false;
-    col.add_child(_controls_box);
-    _filter_box = VBoxContainer.new();
-    _filter_box.visible = false;
-    col.add_child(_filter_box);
-    _filter_head = Button.new();
-    _filter_head.flat = true;
-    _filter_head.alignment = HORIZONTAL_ALIGNMENT_LEFT;
-    _filter_head.focus_mode = Control.FOCUS_NONE;
-    _filter_head.tooltip_text = "Click to choose which goods this store takes";
-    _filter_box.add_child(_filter_head);
-    _filter_flow = HFlowContainer.new();
-    _filter_flow.visible = false;
-    _filter_flow.add_theme_constant_override("h_separation", 3);
-    _filter_flow.add_theme_constant_override("v_separation", 3);
-    _filter_box.add_child(_filter_flow);
-    _filter_head.pressed.connect(func() -> void:
-        _filter_flow.visible = not _filter_flow.visible;
-        if World.instance.tools.selected is Building:
-            _update_filter_head(World.instance.tools.selected);
-        PanelMover.refit_height(_info));
-    for item in Defs.ITEMS:
-        var check:Button = Button.new();       # a lit button is an item the store accepts
-        check.text = Defs.item_name(item);
-        check.toggle_mode = true;
-        check.focus_mode = Control.FOCUS_NONE;
-        check.add_theme_font_size_override("font_size", 11);
-        check.toggled.connect(_on_filter_toggled.bind(item));
-        _filter_flow.add_child(check);
-        _filter_checks[item] = check;
 
-func _build_log(root:Control) -> void:
-    _log_panel = _panel(root, &"log");
-    _log_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT);
-    _log_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN;
-    _log_panel.offset_left = 8;
-    _log_panel.offset_right = 8 + LOG_WIDTH;
-    _log_panel.offset_top = -(96 + LOG_HEIGHT);
-    _log_panel.offset_bottom = -96;
-    _log_panel.custom_minimum_size.x = LOG_WIDTH;
-    var col:VBoxContainer = VBoxContainer.new();
-    _log_panel.add_child(col);
-    var title:Button = Button.new();
-    title.text = "Log  -";
-    title.flat = true;
-    title.alignment = HORIZONTAL_ALIGNMENT_LEFT;
-    title.focus_mode = Control.FOCUS_NONE;
-    title.tooltip_text = "Click to collapse or expand";
-    col.add_child(title);
-    _log_scroll = ScrollContainer.new();
-    _log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
-    _log_scroll.custom_minimum_size = Vector2(LOG_WIDTH, LOG_HEIGHT);
-    col.add_child(_log_scroll);
-    title.pressed.connect(func() -> void:
-        _log_scroll.visible = not _log_scroll.visible;
-        title.text = "Log  -" if _log_scroll.visible else "Log  +";
-        PanelMover.refit_height(_log_panel);
-        _scroll_log_to_end.call_deferred());
-    _log = VBoxContainer.new();
-    _log.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    _log_scroll.add_child(_log);
 
 # A HUD panel. With an id it can be dragged by the strip along its top edge (see PanelMover).
 func _panel(root:Control, id:StringName = &"") -> PanelContainer:
@@ -1137,3 +729,27 @@ func _tool_button(row:Container, group:ButtonGroup, text:String, tip:String) -> 
     b.focus_mode = Control.FOCUS_NONE;
     row.add_child(b);
     return b;
+
+# --------------------------------
+# Delegates: the panels are built by HudBuild
+
+func _build_top_bar(root:Control) -> void:
+    HudBuild._build_top_bar(self, root);
+
+func _build_toolbar(root:Control) -> void:
+    HudBuild._build_toolbar(self, root);
+
+func _build_jobs_panel(root:Control) -> void:
+    HudBuild._build_jobs_panel(self, root);
+
+func _build_menu(root:Control) -> void:
+    HudBuild._build_menu(self, root);
+
+func _build_policies_panel(root:Control) -> void:
+    HudBuild._build_policies_panel(self, root);
+
+func _build_info_panel(root:Control) -> void:
+    HudBuild._build_info_panel(self, root);
+
+func _build_log(root:Control) -> void:
+    HudBuild._build_log(self, root);

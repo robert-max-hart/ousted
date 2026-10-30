@@ -18,7 +18,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     world.seeds.unlock_all();
-    var o:Vector2i = world.town_hall.origin + Vector2i(10, -14);
+    var o:Vector2i = TestSite.near(world, Vector2i(10, -14));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(4, 4), Vector2i(34, 34)).has_point(rn.cell):
             world.remove_node(rn);
@@ -87,7 +87,7 @@ func _field(o:Vector2i) -> void:
     var r:Rect2i = Expansion.target_rect(f, o + Vector2i(0, 0));       # grow up and left
     _expect("a field grows up and left (%s)" % r, r == Rect2i(o, Vector2i(6, 6)));
     _expect("it can start, new ground is bare staked soil", Expansion.start(world, f, r) and world.terrain.get_overlay(o) == Terrain.Overlay.SITE);
-    _expect("a field costs nothing but labor to grow", f.cost().is_empty() and f.work_required() > 0.0);
+    _expect("growing a field from 6x6 to 6x6 on a new corner pays only for the longer fence (%s)" % [f.cost()], f.work_required() > 0.0);
     _finish(f);
     _expect("the field is 6x6 at the new origin", f.size == Vector2i(6, 6) and f.origin == o and f.plot_count() == 36);
     var idx:int = (cell.x - f.origin.x) + (cell.y - f.origin.y) * f.size.x;

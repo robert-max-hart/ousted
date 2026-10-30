@@ -2,32 +2,27 @@
 # PlayerTools
 #     Turns mouse/keyboard input into world actions: selecting,
 #     placing buildings, painting roads, marking harvests, demolishing
-#     and terraforming. Draws the placement ghosts.
+#     and expanding or planting. Draws the placement ghosts.
 # ----------------------------------------------------------------
 class_name PlayerTools extends Node3D;
 
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
-enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, RAISE, LOWER, FLATTEN, FORAGE, CANCEL, EXPAND, CHANNEL, PLANT };
+enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, FORAGE, CANCEL, EXPAND, CHANNEL, PLANT };
 
 const MODE_HINTS:Dictionary = {
     Mode.SELECT:   "Click a citizen, building or resource to inspect it.",
     Mode.BUILD:    "Click to place. R rotates. Right-click to stop building.",
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
-    Mode.ROAD:     "Drag to lay a road. Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
+    Mode.ROAD:     "Drag to lay a road (hold Shift for a straight diagonal line). Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
     Mode.CHANNEL:  "Drag to dig an irrigation channel. One that connects to a river or lake carries water: plots within 2 cells of it stay moist, drought or not. Digging takes work, no materials.",
     Mode.DEMOLISH: "Drag to demolish buildings, roads and channels.",
     Mode.EXPAND:   "Click on the ground beside it to grow it there. Right-click to stop.",
     Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
     Mode.PLANT:    "Click a cell, or drag over an area, to mark where trees should be planted (one every other cell at most). Laborers plant them, no materials needed.",
-    Mode.RAISE:    "Hold the left mouse button to raise the ground.",
-    Mode.LOWER:    "Hold the left mouse button to lower the ground.",
-    Mode.FLATTEN:  "Hold the left mouse button to level the ground to where you clicked.",
 };
-const BRUSH_RADIUS  :float = 2.5;
-const BRUSH_RATE    :float = 3.0;      # metres per second
 const PICK_PIXELS   :float = 22.0;
 const FIELD_MAX_SIDE:int = 16;
 
@@ -38,6 +33,7 @@ var build_facing:int = 0;                # quarter turns (R); the footprint swap
 var selected    :Variant = null;
 var expanding   :Building = null;      # the field, stockpile or graveyard being grown (Mode.EXPAND)
 var relocating  :Building = null;     # while placing a moved building: the one being moved
+var harvest_kinds:Dictionary = {&"trees": true, &"stone": true, &"iron": true};       # what the Harvest tool marks
 var hint        :String = MODE_HINTS[Mode.SELECT];
 var error       :String = "";
 
@@ -46,8 +42,6 @@ var _hover_pt   :Vector3;
 var _hover_cell :Vector2i;
 var _dragging   :bool = false;
 var _drag_start :Vector2i;
-var _brushing   :bool = false;
-var _flatten_h  :float = 0.0;
 
 var _ghosts     :Array[MeshInstance3D] = [];
 var _radius_line:MeshInstance3D;
@@ -121,14 +115,15 @@ func set_mode(m:int, id:StringName = &"") -> void:
         if _is_field_mode():
             build_size = Vector2i.ONE;       # the cursor is one tile: press and drag to size it (anything under the minimum is refused)
         hint = "%s (%s). %s" % [Defs.BUILDINGS[id]["name"], Defs.cost_string(Defs.BUILDINGS[id]["cost"]), MODE_HINTS[m]];
-        if _is_field_mode():
+        if Defs.BUILDINGS[id].get("bridge", false):
+            hint = "Bridge. Press at one end of the crossing and drag along it to the other end (one tile wide, up to %d long, ends on land). The cost shows by the cursor." % FIELD_MAX_SIDE;
+        elif _is_field_mode():
             hint = "%s. Press on one corner and drag to size it (at least %dx%d, up to %d cells a side)." % [
                 Defs.BUILDINGS[id]["name"], _min_side(), _min_side(), FIELD_MAX_SIDE];
     else:
         hint = MODE_HINTS[m];
     error = "";
     _dragging = false;
-    _brushing = false;
     mode_changed.emit(mode);
 
 # Grows a finished field, stockpile or graveyard: click the ground beside it and it stretches to take in that cell.
@@ -248,7 +243,7 @@ func _on_press() -> void:
                     set_mode(Mode.SELECT);
                     select(World.instance.town_hall);
                 return;
-            error = World.instance.can_place(build_id, origin, build_size, relocating != null);
+            error = World.instance.can_place(build_id, origin, build_size, relocating != null, build_facing);
             if error == "" and relocating != null:
                 var moved:Building = relocating;
                 World.instance.relocate(moved, origin, build_size, build_facing);
@@ -267,12 +262,8 @@ func _on_press() -> void:
         Mode.HARVEST, Mode.FORAGE, Mode.ROAD, Mode.CHANNEL, Mode.DEMOLISH, Mode.CANCEL, Mode.PLANT:
             _dragging = true;
             _drag_start = _hover_cell;
-        Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
-            _brushing = true;
-            _flatten_h = _hover_pt.y;
 
 func _on_release() -> void:
-    _brushing = false;
     if not _dragging:
         return;
     _dragging = false;
@@ -287,7 +278,7 @@ func _on_release() -> void:
         Mode.HARVEST:
             var n:int = 0;
             for rn in w.nodes:
-                if _drag_rect().has_point(rn.cell) and not rn.is_auto() and not rn.is_forageable() and not rn.designated:
+                if _drag_rect().has_point(rn.cell) and _harvest_filter(rn):
                     w.set_designated(rn, true);
                     n += 1;
             error = "" if n > 0 else "No trees or rocks there.";
@@ -342,17 +333,6 @@ func _on_release() -> void:
 func _process(delta:float) -> void:
     _drop_gone_selection();
     _update_hover();
-    if _brushing and _hover_ok:
-        var w:World = World.instance;
-        var amount:float = BRUSH_RATE * delta;
-        var locked:Callable = w.is_corner_locked;
-        match mode:
-            Mode.RAISE:
-                w.terrain.apply_brush(_hover_pt, BRUSH_RADIUS, amount, NAN, locked);
-            Mode.LOWER:
-                w.terrain.apply_brush(_hover_pt, BRUSH_RADIUS, -amount, NAN, locked);
-            Mode.FLATTEN:
-                w.terrain.apply_brush(_hover_pt, BRUSH_RADIUS, amount, _flatten_h, locked);
     _update_ghosts();
     _update_ring();
     _update_radius();
@@ -391,6 +371,10 @@ func _field_rect() -> Rect2i:
     var lo:Vector2i = Vector2i(mini(_drag_start.x, far.x), mini(_drag_start.y, far.y));
     var hi:Vector2i = Vector2i(maxi(_drag_start.x, far.x), maxi(_drag_start.y, far.y));
     var size:Vector2i = hi - lo + Vector2i.ONE;
+    if Defs.BUILDINGS[build_id].get("bridge", false):         # a bridge is one tile wide: a straight line along the longer way of the drag
+        if absi(d.x) >= absi(d.y):
+            return Rect2i(Vector2i(lo.x, _drag_start.y), Vector2i(size.x, 1));
+        return Rect2i(Vector2i(_drag_start.x, lo.y), Vector2i(1, size.y));
     return Rect2i(lo, size);
 
 # The smallest side of a variable-sized building (min_side in its def, default 2 for the drag-sized ones).
@@ -412,6 +396,14 @@ func _road_cells() -> Array[Vector2i]:
     var out:Array[Vector2i] = [];
     var a:Vector2i = _drag_start;
     var b:Vector2i = _hover_cell;
+    if mode == Mode.ROAD and Input.is_key_pressed(KEY_SHIFT):         # Shift: a straight line of sight, diagonal where it needs to be
+        var dx:int = absi(b.x - a.x);
+        var dz:int = absi(b.y - a.y);
+        var steps:int = maxi(dx, dz);
+        for i in steps + 1:
+            var t:float = float(i) / float(maxi(1, steps));
+            out.append(Vector2i(roundi(lerpf(a.x, b.x, t)), roundi(lerpf(a.y, b.y, t))));
+        return out;
     var sx:int = 1 if b.x >= a.x else -1;
     for x in range(a.x, b.x + sx, sx):
         out.append(Vector2i(x, a.y));
@@ -444,6 +436,8 @@ func _pick() -> Variant:
     var i:int = w.idx(_hover_cell);
     if w.occupant[i] != null:
         return w.occupant[i];
+    if w.node_at[i] == null and w.tree_orders.has(_hover_cell):
+        return w.tree_order_at(_hover_cell);
     return w.node_at[i];
 
 # --------------------------------
@@ -466,9 +460,13 @@ func _update_ghosts() -> void:
                 return;
             var origin:Vector2i = _build_origin();
             if _is_field_mode() and relocating == null:
-                _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad);       # one tile is below the minimum until dragged out
+                var one:Rect2i = Rect2i(origin, build_size);       # one tile: below the minimum for most (until dragged out), enough for a bridge
+                var one_ok:bool = _field_rect_valid(one) and w.can_place(build_id, one.position, one.size) == "";
+                _show_box(0, one, 0.05, _mat_ok if one_ok else _mat_bad);
                 return;
-            var ok:bool = w.can_place(build_id, origin, build_size, relocating != null) == "";
+            var why:String = w.can_place(build_id, origin, build_size, relocating != null, build_facing);
+            var ok:bool = why == "";
+            error = why;          # the bar below says why the ghost is red
             var short:bool = ok and not _can_afford();
             _show_box(0, Rect2i(origin, build_size), 0.05, _mat_bad if not ok else _mat_area if short else _mat_ok);
             _model_ghost.show_at(w, build_id, origin, build_size, _mat_m_bad if not ok else _mat_m_short if short else _mat_m_ok, build_facing);
@@ -492,9 +490,6 @@ func _update_ghosts() -> void:
                     _show_box(1, Rect2i(Vector2i(b.x, mini(a.y, b.y)), Vector2i(1, absi(b.y - a.y) + 1)), 0.2, road_mat);
             else:
                 _show_box(0, Rect2i(_hover_cell, Vector2i.ONE), 0.2, _mat_ok if w.can_plan_road(_hover_cell) else _mat_bad);
-        Mode.RAISE, Mode.LOWER, Mode.FLATTEN:
-            var rr:int = ceili(BRUSH_RADIUS);
-            _show_box(0, Rect2i(_hover_cell - Vector2i(rr, rr) + Vector2i.ONE, Vector2i(rr * 2 - 1, rr * 2 - 1)), 0.3, _mat_area);
 
 # While marking trees, rocks or forage, the things the selection would mark change colour.
 func _update_preview() -> void:
@@ -506,7 +501,17 @@ func _update_preview() -> void:
     renderer.set_preview(r, _harvest_filter if mode == Mode.HARVEST else _forage_filter);
 
 func _harvest_filter(rn:ResourceNode) -> bool:
-    return not rn.is_auto() and not rn.is_forageable() and not rn.designated;
+    return not rn.is_auto() and not rn.is_forageable() and not rn.designated and harvest_allows(rn) and not (rn.is_tree() and not rn.has_wood());       # (a young tree has no wood to take)
+
+# The Harvest tool's kinds (switched in the toolbar while it is chosen): trees, loose rocks (stone), iron outcrops.
+func harvest_allows(rn:ResourceNode) -> bool:
+    if rn.is_tree():
+        return harvest_kinds.get(&"trees", true);
+    if rn.item == &"stone":
+        return harvest_kinds.get(&"stone", true);
+    if rn.item == &"iron":
+        return harvest_kinds.get(&"iron", true);
+    return true;
 
 func _forage_filter(rn:ResourceNode) -> bool:
     return rn.is_forageable() and not rn.designated;
@@ -522,9 +527,11 @@ func size_text() -> String:
     if mode != Mode.BUILD or not _is_field_mode() or not _hover_ok:
         return "";
     var r:Rect2i = _field_rect() if _dragging else Rect2i(_build_origin(), build_size);
+    var price:Dictionary = Defs.sized_cost(build_id, r.size);
+    var cost:String = ", " + Defs.cost_string(price) if not price.is_empty() else "";       # (fields and the like cost no materials)
     if r.size == Vector2i.ONE:
-        return "1x1 tile";
-    return "%dx%d tiles, %d total" % [r.size.x, r.size.y, r.size.x * r.size.y];
+        return "1x1 tile%s" % cost;
+    return "%dx%d tiles, %d total%s" % [r.size.x, r.size.y, r.size.x * r.size.y, cost];
 
 func _show_box(i:int, r:Rect2i, height:float, mat:Material) -> void:
     var t:Terrain = World.instance.terrain;
@@ -583,6 +590,9 @@ func _update_ring() -> void:
         _ring.visible = false;
         _update_frame((selected as Building).rect());
         return;
+    elif selected is TreeOrder:
+        _ring.scale = Vector3.ONE * 1.0;
+        _ring.position = World.instance.terrain.cell_center((selected as TreeOrder).cell) + Vector3(0, 0.05, 0);
     elif selected is ResourceNode:
         var rn:ResourceNode = selected;
         _ring.scale = Vector3.ONE * 1.0;

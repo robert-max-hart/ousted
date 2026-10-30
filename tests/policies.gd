@@ -30,7 +30,7 @@ func _ready() -> void:
         p.profession = JobManager.Profession.LABORER;
         p.age = 30.0;
     world.jobs.sync_targets();
-    world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);     # the child needs a bed: nobody sleeps in the Town Hall
+    world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);     # the child needs a bed: nobody sleeps in the Town Hall
     _child = world.pawns[2];
     _child.age = 10.0;
     _designate_work();

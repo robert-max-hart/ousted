@@ -40,6 +40,8 @@ var overlay :PackedByteArray;
 var _chunks :Array[MeshInstance3D] = [];
 var _dirty  :Dictionary = {};
 var soil_view :bool = false;            # colour the ground by soil fertility (set_soil_view)
+var water_view :bool = false;           # colour the ground by reach of water (where a building that needs a water source may stand)
+var water_source :Callable;              # cell index -> distance (cells) to the nearest water source, set by World
 var soil_source :Callable;               # cell index -> fertility 0..1, set by World
 var _material:StandardMaterial3D;
 var _season :int = 0;
@@ -81,11 +83,11 @@ const HILLS_AMP      :float = 15.0;     # how high the ridges stand
 # a few shallow fords where citizens can wade across. tests/river_probe prints what it makes for a set of seeds.
 const RIVER_HALF_UP   :float = 1.7;       # half the width (cells) at the source end
 const RIVER_HALF_DOWN :float = 4.2;       # ... and at the mouth
-const RIVER_BED       :float = -1.1;      # height of the bed in the middle of a deep stretch
-const RIVER_BANK      :float = 5.0;       # cells over which the banks blend into the land
+const RIVER_BED       :float = -0.95;      # height of the bed in the middle of a deep stretch
+const RIVER_BANK      :float = 8.0;       # cells over which the banks blend into the land
 const RIVER_STEP      :float = 1.6;       # cells between points of the centre line
 const FORDS           :int = 3;
-const FORD_BED        :float = -0.2;
+const FORD_BED        :float = -0.35;     # a hand deep: there is water over the ford, and it can still be waded (SHALLOW_FROM)
 const FORD_HALF       :int = 2;           # points on each side of a ford's middle that stay shallow
 const FORD_RAMP       :int = 3;           # points over which the bed deepens again
 const RIVER_FAR       :float = 45.0;      # how far from the centre line the distance field reaches
@@ -307,6 +309,7 @@ func flatten_rect(r:Rect2i) -> void:
             set_corner(x, z, target);
     _after_edit(r.grow(1));
 
+# (Not used by the game: player terrain modification left the design, and this stays for a future map editor, M8, and the soak test.)
 # Raises (amount > 0), lowers (amount < 0) or flattens toward flatten_to
 # (when not NAN) with a soft circular brush. is_locked(x, z) -> bool skips corners.
 func apply_brush(center:Vector3, radius:float, amount:float, flatten_to:float, is_locked:Callable) -> void:
@@ -378,9 +381,24 @@ func set_soil_view(on:bool) -> void:
     soil_view = on;
     mark_all_dirty();
 
-# Redraws a rect (the soil colours changed under a field).
+# The water overlay: ground within WATER_REACH of a water source shows blue-green (a Distillery or Potter's Workshop works
+# there), all else stays a dull brown.
+const WATER_REACH:float = 12.0;       # the "needs_water" radius of the Distillery and the Potter's Workshop
+
+func set_water_view(on:bool) -> void:
+    if water_view == on:
+        return;
+    water_view = on;
+    mark_all_dirty();
+
+static func water_color(d:float) -> Color:
+    if d > WATER_REACH:
+        return Color(0.42, 0.38, 0.32);
+    return Color(0.1, 0.5, 0.72).lerp(Color(0.4, 0.78, 0.5), clampf(d / WATER_REACH, 0.0, 1.0));
+
+# Redraws a rect (the soil or water colours changed).
 func refresh_rect(r:Rect2i) -> void:
-    if soil_view:
+    if soil_view or water_view:
         _mark_dirty_rect(r);
 
 static func soil_color(f:float) -> Color:
@@ -408,6 +426,8 @@ func _corner_normal(x:int, z:int) -> Vector3:
 
 func _cell_color(c:Vector2i) -> Color:
     var col:Color;
+    if water_view and water_source.is_valid() and overlay[index(c)] != Overlay.ROAD and not is_water(c):
+        return water_color(water_source.call(index(c)));
     if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and overlay[index(c)] != Overlay.CHANNEL and overlay[index(c)] != Overlay.CHANNEL_WET and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
         return soil_color(soil_source.call(index(c)));
     match overlay[index(c)]:

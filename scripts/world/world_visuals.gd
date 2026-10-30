@@ -9,6 +9,7 @@ var world:World;
 var _env        :Environment;
 var _sky        :ProceduralSkyMaterial;
 var _sun        :DirectionalLight3D;
+var _moon       :DirectionalLight3D;       # a second light: the moon fades in as the sun fades out (and back), so the light never jumps
 var _water      :MeshInstance3D;
 var _rain       :CPUParticles3D;
 var _snow       :CPUParticles3D;
@@ -41,6 +42,12 @@ func setup_environment() -> void:
     _sun.shadow_opacity = 0.8;
     _sun.directional_shadow_max_distance = 140.0;
     add_child(_sun);
+    _moon = DirectionalLight3D.new();
+    _moon.shadow_enabled = true;
+    _moon.shadow_opacity = 0.6;
+    _moon.directional_shadow_max_distance = 140.0;
+    _moon.light_color = Color(0.6, 0.72, 1.0);
+    add_child(_moon);
 
     _water = MeshInstance3D.new();
     var wm:StandardMaterial3D = StandardMaterial3D.new();
@@ -119,7 +126,37 @@ const LIGHT_KEYS:Array = [
     [22.5, Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
     [24.0, Color(0.6, 0.72, 1.0),  0.6,  Color(0.45, 0.55, 0.85), 0.36, Color(0.1, 0.15, 0.32),  Color(0.22, 0.3, 0.5)],
 ];
+# Each light's colour and energy over the day, as [hour, colour, energy]: the sun is warm and low at the edges of its day and
+# only reaches full strength by mid-morning; the moon's curve takes over as the sun's runs out.
+const SUN_KEYS:Array = [
+    [0.0,  Color(1.0, 0.72, 0.5),  0.0],
+    [4.5,  Color(1.0, 0.72, 0.5),  0.0],
+    [6.5,  Color(1.0, 0.72, 0.5),  0.5],
+    [9.0,  Color(1.0, 0.98, 0.93), 0.62],
+    [16.5, Color(1.0, 0.98, 0.93), 0.62],
+    [19.0, Color(1.0, 0.66, 0.45), 0.5],
+    [21.5, Color(1.0, 0.66, 0.45), 0.0],
+    [24.0, Color(1.0, 0.72, 0.5),  0.0],
+];
+const MOON_KEYS:Array = [
+    [0.0,  Color(0.6, 0.72, 1.0), 0.6],
+    [4.0,  Color(0.6, 0.72, 1.0), 0.6],
+    [7.0,  Color(0.6, 0.72, 1.0), 0.0],
+    [18.5, Color(0.6, 0.72, 1.0), 0.0],
+    [22.0, Color(0.6, 0.72, 1.0), 0.6],
+    [24.0, Color(0.6, 0.72, 1.0), 0.6],
+];
 const RAIN_GREY:Color = Color(0.55, 0.58, 0.62);
+
+# [colour, energy] at hour h from a list of [hour, colour, energy] keys (smoothly between the neighbours).
+func _keyed(keys:Array, h:float) -> Array:
+    var k:int = 0;
+    while k < keys.size() - 2 and h >= keys[k + 1][0]:
+        k += 1;
+    var a:Array = keys[k];
+    var b:Array = keys[k + 1];
+    var t:float = smoothstep(0.0, 1.0, (h - a[0]) / (b[0] - a[0]));
+    return [(a[1] as Color).lerp(b[1], t), lerpf(a[2], b[2], t)];
 
 func _update_lighting() -> void:
     var h:float = GameClock.hour();
@@ -130,19 +167,25 @@ func _update_lighting() -> void:
     var b:Array = LIGHT_KEYS[k + 1];
     var t:float = smoothstep(0.0, 1.0, (h - a[0]) / (b[0] - a[0]));
     var wet:float = Weather.intensity;
-    var gloom:float = lerpf(1.0, 0.6, wet);
+    var gloom:float = lerpf(1.0, 0.4, wet);
 
-    # the sun crosses the sky by day and the moon by night, along one
-    # continuous arc so the light never jumps at the handover
+    # the sun crosses the sky by day and the moon by night; each light has its own energy curve (SUN_KEYS, MOON_KEYS), and the
+    # curves overlap at dusk and dawn, so one fades out while the other fades in and nothing ever swaps places
     var day_t:float = (h - 5.0) / 16.0;      # 05:00 .. 21:00
-    var is_day:bool = day_t >= 0.0 and day_t <= 1.0;
-    var night_t:float = fposmod(h - 21.0, 24.0) / 8.0;
-    var arc:float = sin((day_t if is_day else night_t) * PI);
-    var elevation:float = lerpf(6.0, 62.0 if is_day else 45.0, arc);
-    var azimuth:float = lerpf(110.0, -110.0, day_t) if is_day else lerpf(110.0, -110.0, night_t);
-    _sun.rotation = Vector3(-deg_to_rad(elevation), deg_to_rad(azimuth), 0.0);
-    _sun.light_color = (a[1] as Color).lerp(b[1], t);
-    _sun.light_energy = lerpf(a[2], b[2], t) * gloom;
+    var sun_arc:float = sin(clampf(day_t, 0.0, 1.0) * PI);
+    var night_t:float = fposmod(h - 18.0, 24.0) / 13.0;      # the moon travels from 18:00 to 07:00, covering its whole fade in and out
+    var moon_arc:float = sin(clampf(night_t, 0.0, 1.0) * PI);
+    var sun_el:float = lerpf(6.0, 62.0, sun_arc);
+    var moon_el:float = lerpf(6.0, 45.0, moon_arc);
+    _sun.rotation = Vector3(-deg_to_rad(sun_el), deg_to_rad(lerpf(110.0, -110.0, clampf(day_t, 0.0, 1.0))), 0.0);
+    _moon.rotation = Vector3(-deg_to_rad(moon_el), deg_to_rad(lerpf(110.0, -110.0, clampf(night_t, 0.0, 1.0))), 0.0);
+    var sun_now:Array = _keyed(SUN_KEYS, h);
+    var moon_now:Array = _keyed(MOON_KEYS, h);
+    _sun.light_color = sun_now[0];
+    _sun.light_energy = sun_now[1] * gloom;
+    _moon.light_energy = moon_now[1] * gloom;
+    _sun.visible = _sun.light_energy > 0.005;
+    _moon.visible = _moon.light_energy > 0.005;
 
     var top:Color = (a[5] as Color).lerp(b[5], t);
     var horizon:Color = (a[6] as Color).lerp(b[6], t);
@@ -153,7 +196,7 @@ func _update_lighting() -> void:
     _sky.ground_horizon_color = horizon;
     _sky.ground_bottom_color = horizon.darkened(0.5);
     _env.ambient_light_color = (a[3] as Color).lerp(b[3], t);
-    _env.ambient_light_energy = lerpf(a[4], b[4], t);
+    _env.ambient_light_energy = lerpf(a[4], b[4], t) * lerpf(1.0, 0.72, wet);       # rain and snow dim the sky light too, not only the sun
     _env.fog_light_color = horizon;
     _env.fog_density = lerpf(0.0012, 0.004, wet);
 

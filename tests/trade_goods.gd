@@ -25,14 +25,14 @@ func _ready() -> void:
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 2) * GameClock.HOURS_PER_DAY + 12.0;      # early summer
     Weather._day_offset = 0.0;
     Weather._update_temperature();
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(24, 12)).has_point(rn.cell):
             world.remove_node(rn);
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(26, 14)));
     _post = world.place_building(&"trading_post", o, Vector2i(4, 3), true) as TradingPost;
     # names and values
-    _expect("a seed is worth something and has a name", Defs.trade_value(Defs.seed_key(&"potato")) == 30 and Defs.offer_name(Defs.seed_key(&"potato")) == "Seed potatoes" and Defs.offer_name(Defs.seed_key(&"wheat")) == "Wheat seeds");
+    _expect("a seed is worth something and has a name", Defs.trade_value(Defs.seed_key(&"potato")) == 300 and Defs.offer_name(Defs.seed_key(&"potato")) == "Seed potatoes" and Defs.offer_name(Defs.seed_key(&"wheat")) == "Wheat seeds");
     _expect("a sapling is named as one", Defs.offer_name(Defs.seed_key(&"apple")) == "Apple saplings");
     _expect("animals are worth more than eggs", Defs.trade_value(Defs.animal_key(&"cow")) == 70 and Defs.offer_name(Defs.animal_key(&"cow")) == "Cow");
     # what is offered: no animals without a pasture, none of the crops already known
@@ -68,14 +68,15 @@ func _ready() -> void:
     world.traders.start_visit();
     world.traders.merchant.state = Merchant.State.TRADING;
     world.traders.merchant.path = [];
-    world.traders.visit = {"stock": {Defs.seed_key(&"potato"): 1, Defs.animal_key(&"chicken"): 6}, "wants": {&"wheat": 1.0}, "days_left": 4, "arrived": true};
-    world.town_hall.store(&"wheat", 100);
+    world.traders.visit = {"stock": {Defs.seed_key(&"potato"): 1, Defs.animal_key(&"chicken"): 6}, "wants": {&"gold": 1.0}, "days_left": 4, "arrived": true};
+    world.town_hall.stored.erase(&"wheat");          # (a normal start fills the hall: make room)
+    world.town_hall.store(&"gold", 8);
     _expect("potatoes are not known yet", not world.seeds.has(&"potato"));
-    # seed 30 x 1.25 = 37.5, six chickens 6 x 15 = 90: 128 for 65 wheat at 2
-    var err:String = _post.place_order({&"wheat": 70}, {Defs.seed_key(&"potato"): 1, Defs.animal_key(&"chicken"): 4});
+    # seed 300 x 1.25 = 375, four chickens 4 x 15 = 60: 435 for 6 gold at 80
+    var err:String = _post.place_order({&"gold": 6}, {Defs.seed_key(&"potato"): 1, Defs.animal_key(&"chicken"): 4});
     _expect("an order for a seed and animals is accepted (%s)" % err, err == "" and _post.has_order());
-    _post.deliver(&"wheat", 70);
-    world.town_hall.take(&"wheat", 70);
+    _post.deliver(&"gold", 6);
+    world.town_hall.take(&"gold", 6);
     _expect("when it settles the seed is known at once", not _post.has_order() and world.seeds.has(&"potato"));
     _expect("and the chickens wait at the post (%s)" % [_post.animals_waiting], _post.animals_waiting.get(&"chicken", 0) == 4);
     _expect("the merchant has two chickens left", world.traders.visit["stock"].get(Defs.animal_key(&"chicken"), 0) == 2);

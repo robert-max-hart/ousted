@@ -21,7 +21,7 @@ func _ready() -> void:
     Defs.difficulty = &"easy";
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -8);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -8));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(20, 14)).has_point(rn.cell):
             world.remove_node(rn);

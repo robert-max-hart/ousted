@@ -21,7 +21,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     GameClock.total_hours = 3.0 * GameClock.HOURS_PER_DAY + 11.0;
-    hut = world.place_building(&"forager", world.town_hall.origin + Vector2i(-4, 8), Vector2i(3, 3), true);
+    hut = world.place_building(&"forager", TestSite.spot(world, Vector2i(3, 3), Vector2i(-4, 8)), Vector2i(3, 3), true);
     var n:int = 0;
     for dz in range(-8, 9, 2):
         for dx in range(-8, 9, 2):

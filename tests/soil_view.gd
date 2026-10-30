@@ -16,7 +16,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     world.seeds.unlock_all();
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for off in [Vector2i(8, -10), Vector2i(-14, -10), Vector2i(8, 10), Vector2i(-14, 10), Vector2i(0, -16), Vector2i(0, 16)]:       # dry land, not the shore
         var cand:Vector2i = world.town_hall.origin + off;
         if world.terrain.in_bounds(cand + Vector2i(8, 8)) and world.terrain.cell_height(cand + Vector2i(2, 2)) > Terrain.WATER_LEVEL + 1.5 and world.terrain.cell_height(cand) > Terrain.WATER_LEVEL + 1.5 and world.terrain.cell_height(cand + Vector2i(8, 8)) > Terrain.WATER_LEVEL + 1.5:

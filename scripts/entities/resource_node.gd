@@ -60,18 +60,23 @@ func display_name() -> String:
 func is_tree() -> bool:
     return def.get("tree", false);
 
+# Whether there is wood to take (a young tree has none, see set_growth).
+func has_wood() -> bool:
+    return amount > 0;
+
 func is_mature() -> bool:
     return growth >= 1.0;
 
-# Starts this node as a freshly planted sapling (it yields little until it grows up).
+# Starts this node as a freshly planted sapling: it holds no wood until it has grown a good deal.
 func make_sapling() -> void:
     growth = 0.0;
-    amount = 1;
+    amount = 0;
 
-# Sets growth and the wood a tree holds to match it.
+# Sets growth and the wood a tree holds to match it. Not in proportion: wood comes with the square of the growth, so a
+# young tree gives nothing (under about 35% grown), a half-grown one little, and most of the wood arrives late.
 func set_growth(g:float) -> void:
     growth = clampf(g, 0.0, 1.0);
-    amount = maxi(1, roundi(max_amount * growth)) if growth < 1.0 else max_amount;
+    amount = roundi(max_amount * growth * growth) if growth < 1.0 else max_amount;
 
 # Gathered without the player asking (berry bushes).
 func is_auto() -> bool:

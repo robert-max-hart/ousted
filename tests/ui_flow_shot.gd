@@ -23,7 +23,7 @@ func _ready() -> void:
     GameClock.set_speed(0);
     GameClock.total_hours = 11.0;
     world.town_hall.upgrades_done[&"governance"] = true;
-    house = world.place_building(&"house", world.town_hall.origin + Vector2i(-8, 2), Vector2i(3, 3), true);
+    house = world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);
     world.tools.select(house);
     world.camera_rig.focus_on(house.position);
     world.camera_rig._distance = 20.0;

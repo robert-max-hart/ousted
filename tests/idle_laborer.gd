@@ -15,7 +15,7 @@ func _ready() -> void:
     add_child(world);
     GameClock.set_speed(0);
     GameClock.total_hours = 12.0;       # midday: not a sleeping hour
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = TestSite.near(world, Vector2i(8, -10));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);
