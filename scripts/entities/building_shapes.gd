@@ -294,6 +294,19 @@ static func decorate(b:Building, kind:String) -> void:
             _box(b, Vector3(0.85, 0.9, 0.04), _colour(dye[0]), Vector3(body.x * 0.5 + 0.7, 0.75, front * 0.3));
             for k in 3:       # bolts of finished cloth by the door
                 _cyl(b, 0.14, 0.14, 0.5, _colour(dye[k]), Vector3(-body.x * 0.3 + k * 0.3, 0.14, front + 0.55), 8, Vector3(0, 0, PI * 0.5));
+        "still":
+            var copper:StandardMaterial3D = _colour(Color(0.72, 0.42, 0.2));
+            var oak:StandardMaterial3D = _colour(Color(0.42, 0.3, 0.19));
+            var hoop:StandardMaterial3D = _colour(IRON);
+            var px:float = body.x * 0.5 + 0.55;       # a copper pot still outside: a belly, a neck, a pipe over to a barrel
+            _ball(b, 0.5, copper, Vector3(px, 0.55, front * 0.2), 0.9);
+            _cyl(b, 0.14, 0.25, 0.55, copper, Vector3(px, 1.2, front * 0.2), 10);
+            _box(b, Vector3(0.7, 0.09, 0.09), copper, Vector3(px - 0.3, 1.5, front * 0.2));
+            for k in 2:
+                var bz:float = front * 0.2 + 0.2 + k * 0.62;
+                _cyl(b, 0.26, 0.26, 0.5, oak, Vector3(px + 0.1, 0.25, bz + 0.45), 10);
+                _cyl(b, 0.27, 0.27, 0.04, hoop, Vector3(px + 0.1, 0.12, bz + 0.45), 10);
+                _cyl(b, 0.27, 0.27, 0.04, hoop, Vector3(px + 0.1, 0.38, bz + 0.45), 10);
         "hives":
             var box:StandardMaterial3D = _colour(Color(0.86, 0.72, 0.38));
             var lid:StandardMaterial3D = _colour(Color(0.5, 0.36, 0.2));

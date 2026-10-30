@@ -215,10 +215,11 @@ func craft_task(p:Pawn, profession:String) -> Task:
 # (the Blacksmith makes one tool, the Woodcutter splits a couple of logs at a time).
 @warning_ignore("integer_division")
 func _forge_task(_p:Pawn, b:Building) -> Task:
-    for item in b.def["recipes"]:
-        var recipe:Dictionary = b.def["recipes"][item];
-        if not b.recipe_enabled(item):
+    for id in b.def["recipes"]:
+        var recipe:Dictionary = b.def["recipes"][id];
+        if not b.recipe_enabled(id):
             continue;
+        var item:StringName = recipe.get("output", id);       # alternative recipes for one product have their own ids and an "output"
         var per:int = recipe.get("yield", 1);
         var crafts:int = recipe.get("batch", 1);
         for in_item in recipe["inputs"]:

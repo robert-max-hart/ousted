@@ -259,11 +259,16 @@ func take_input(item:StringName, n:int) -> void:
 func cancel_input_incoming(item:StringName, n:int) -> void:
     input_incoming[item] = maxi(0, input_incoming.get(item, 0) - n);
 
-func recipe_enabled(item:StringName) -> bool:
-    var recipe:Dictionary = def["recipes"][item];
+# A recipe is named by its id, which is also its product unless it has an "output" (several recipes can make one item).
+# "food_reserve": id of a setting; the recipe (which uses food) only runs while the colony's food stock is above it.
+func recipe_enabled(id:StringName) -> bool:
+    var recipe:Dictionary = def["recipes"][id];
+    var item:StringName = recipe.get("output", id);
     if recipe.get("off_at_zero", false) and production_cap(item) <= 0:
         return false;
-    var toggle:String = recipe.get("toggle", "make_%s" % item);
+    if recipe.has("food_reserve") and Stock.food_total() < settings.get(recipe["food_reserve"], 0):
+        return false;
+    var toggle:String = recipe.get("toggle", "make_%s" % id);
     return settings.get(toggle, true) and production_allowed(item);
 
 func has_inputs(recipe:Dictionary) -> bool:

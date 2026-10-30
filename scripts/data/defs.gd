@@ -39,6 +39,7 @@ const ITEMS:Dictionary = {
     &"clothes_wool":    {"name": "Wool Clothes", "color": Color(0.82, 0.78, 0.66), "clothing": {"warm": 0.3, "days": 80.0}},
     &"clothes_leather": {"name": "Leather Clothes", "color": Color(0.5, 0.34, 0.2), "clothing": {"warm": 0.3, "days": 80.0}},
     &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
+    &"spirits": {"name": "Spirits", "color": Color(0.85, 0.7, 0.35), "treat": {"nutrition": 0.02, "mood": 0.2, "days": 3.0}},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
@@ -57,7 +58,8 @@ const ITEMS:Dictionary = {
 # locked_until: item -> upgrade id that must be built before the building handles that item (mine: coal)
 # inputs:   production buildings keep their own input inventory: item -> how many to keep stocked.
 #           Inputs are not part of the colony stock. Citizens fetch them from storage.
-# recipes:  (off_at_zero: a cap of 0 switches the recipe off) output item -> {inputs: item -> n per craft, hours: labor-hours per craft, yield: units made per craft
+# recipes:  (a recipe's id is its product, or give "output" to let several recipes make one item; "food_reserve": id of a setting,
+#           the recipe only runs while the food stock is above it) (off_at_zero: a cap of 0 switches the recipe off) output item -> {inputs: item -> n per craft, hours: labor-hours per craft, yield: units made per craft
 #           (default 1), batch: crafts per task (default 1), toggle: id of the on/off control (default "make_<item>")}.
 #           Recipes are tried in the order written, so list the preferred one first.
 # needs_tool: item -> minimum tool bonus to dig it at full speed; weaker or no tools dig it at HARD_ORE_UNTOOLED_SPEED
@@ -278,6 +280,27 @@ const BUILDINGS:Dictionary = {
         ],
         "desc": "Artisans make clothes that citizens wear against the cold: wool clothes from 3 wool, leather clothes from 2 leather, and fine clothes from both, which take twice as long but keep out twice as much cold and last nearly twice as long. Clothes wear out (2.5 years, 4.5 for fine) and are replaced from what is in storage. Wool comes from sheep, leather from slaughtered animals (set a pasture's keep-at-most level). Clothes also trade well.",
     },
+    &"still": {
+        "indoor_work": true, "wall": &"stone", "name": "Distillery", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 8}, "work": 14.0,
+        "shape": "house", "decor": "still", "height": 1.6, "color": Color(0.5, 0.42, 0.34), "roof": Color(0.32, 0.26, 0.22),
+        "storage": true, "capacity": 40, "accepts_items": [&"spirits"],
+        "worker_slots": 1, "profession": "ARTISAN",
+        "produces": [&"spirits"],
+        "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"firewood": 4},
+        "recipes": {
+            &"spirits_barley": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"barley": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_apples": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"apples": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_pears":  {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"pears": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+        },
+        "controls": [
+            {"id": "cap_spirits", "type": "cap", "label": "Spirits cap", "item": &"spirits", "default": 20, "step": 5, "zero_label": "Off"},
+            {"id": "keep_food", "type": "cap", "label": "Only while food stock is over", "default": 100, "step": 20, "zero_label": "Always"},
+            {"id": "make_spirits_barley", "type": "toggle", "label": "Distil barley", "default": true},
+            {"id": "make_spirits_apples", "type": "toggle", "label": "Distil apples", "default": true},
+            {"id": "make_spirits_pears", "type": "toggle", "label": "Distil pears", "default": true},
+        ],
+        "desc": "Artisans distil barley, apples or pears (4 with a little firewood make 2 spirits) and store the spirits. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
+    },
     &"apiary": {
         "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
         "shape": "house", "decor": "hives", "roof_pitch": 0.25, "height": 0.7, "color": Color(0.8, 0.62, 0.22), "roof": Color(0.55, 0.38, 0.16),
@@ -317,11 +340,11 @@ const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager"]],
-    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -394,7 +417,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"spirits": 25, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
