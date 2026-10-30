@@ -285,6 +285,14 @@ static func decorate(b:Building, kind:String) -> void:
             _cyl(b, 0.3, 0.32, 0.45, bark, Vector3(-body.x * 0.3, 0.22, front + 0.6), 10);
             _box(b, Vector3(0.06, 0.55, 0.06), _colour(TIMBER), Vector3(-body.x * 0.3 + 0.1, 0.72, front + 0.6), Vector3(0, 0, 0.5));
             _box(b, Vector3(0.22, 0.14, 0.05), _colour(IRON), Vector3(-body.x * 0.3 + 0.2, 0.95, front + 0.6), Vector3(0, 0, 0.5));
+        "hives":
+            var box:StandardMaterial3D = _colour(Color(0.86, 0.72, 0.38));
+            var lid:StandardMaterial3D = _colour(Color(0.5, 0.36, 0.2));
+            for k in 3:       # extra boxy hives on stands in front of the main one
+                var hx:float = (k - 1) * 0.6;
+                _box(b, Vector3(0.12, 0.2, 0.12), lid, Vector3(hx, 0.1, front + 0.5));
+                _box(b, Vector3(0.42, 0.34, 0.42), box, Vector3(hx, 0.37, front + 0.5));
+                _box(b, Vector3(0.48, 0.07, 0.48), lid, Vector3(hx, 0.58, front + 0.5));
         "shack":
             var plank:StandardMaterial3D = _colour(Color(0.5, 0.4, 0.28));
             for k in 3:       # spare boards leaning on the side wall

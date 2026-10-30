@@ -16,6 +16,9 @@ func trade_task(p:Pawn) -> Task:
     t = _collect_from_yard(p, post);
     if t != null:
         return t;
+    t = _return_excess(p, post);
+    if t != null:
+        return t;
     return _guide_animals(p, post);
 
 func _post() -> TradingPost:
@@ -77,6 +80,26 @@ func _collect_from_yard(p:Pawn, post:TradingPost) -> Task:
             var got:int = post.take_pickup(item, Pawn.CARRY_CAP);
             if got < 1:
                 return false;
+            pw.set_carry(item, got);
+            return true);
+        return t;
+    return null;
+
+# Held goods above their level go back to storage (the ordinary delivery step puts them away).
+func _return_excess(p:Pawn, post:TradingPost) -> Task:
+    if p.has_failed(post):
+        return null;
+    for item in post.excess():
+        if not Stock.has_room_for(item):
+            continue;
+        var t:Task = Task.new(&"trade", "Carrying %s back from the Trading Post" % Defs.item_name(item).to_lower());
+        t.target = post;
+        t.move_rect(post.rect(), post.is_walkable(), "Walking to the Trading Post");
+        t.act(func(pw:Pawn) -> bool:
+            var got:int = mini(Pawn.CARRY_CAP, post.excess().get(item, 0));
+            if got < 1:
+                return false;
+            post.take_input(item, got);
             pw.set_carry(item, got);
             return true);
         return t;

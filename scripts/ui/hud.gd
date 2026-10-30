@@ -51,6 +51,8 @@ var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the 
 var _ledger_btn :Button;
 var _trade_btn  :Button;               # opens the barter window at a Trading Post with a merchant
 var _trade_panel:TradePanel;
+var _hold_btn   :Button;               # opens the Trading Post's own inventory
+var _hold_panel :HoldPanel;
 var _ledger_panel:LedgerPanel;
 var _policies_btn:Button;
 var _menu       :Control;            # the Esc menu: a dimmed full-screen layer with a centred panel
@@ -102,6 +104,9 @@ func _ready() -> void:
     _trade_panel = TradePanel.new();
     root.add_child(_trade_panel);
     _trade_panel.setup();
+    _hold_panel = HoldPanel.new();
+    root.add_child(_hold_panel);
+    _hold_panel.setup();
     _citizens = CitizensPanel.new();
     root.add_child(_citizens);
     _citizens.setup();
@@ -269,6 +274,9 @@ func _refresh_trade_button(obj:Variant) -> void:
     _trade_btn.visible = post != null and post.is_complete();
     _trade_btn.disabled = not here;
     _trade_btn.text = "Trade with the merchant" if here else "No merchant here";
+    _hold_btn.visible = post != null and post.is_complete();
+    if post == null and _hold_panel.visible:
+        _hold_panel.visible = false;
     if not here and _trade_panel.visible:
         _trade_panel.visible = false;
 
@@ -851,6 +859,15 @@ func _build_info_panel(root:Control) -> void:
         if sel is TradingPost:
             _trade_panel.open(sel));
     col.add_child(_trade_btn);
+    _hold_btn = Button.new();
+    _hold_btn.text = "Goods held for trade";
+    _hold_btn.focus_mode = Control.FOCUS_NONE;
+    _hold_btn.visible = false;
+    _hold_btn.pressed.connect(func() -> void:
+        var sel:Variant = World.instance.tools.selected;
+        if sel is TradingPost:
+            _hold_panel.open(sel));
+    col.add_child(_hold_btn);
     _upgrade_box = VBoxContainer.new();
     _upgrade_box.visible = false;
     col.add_child(_upgrade_box);

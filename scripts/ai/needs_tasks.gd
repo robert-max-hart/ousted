@@ -43,6 +43,32 @@ func eat_task(p:Pawn) -> Task:
             s.release_out(item, n);
     return t;
 
+# A citizen with no treat boost running (and a random pause since the last, so they don't all go at once) eats one from storage.
+func treat_task(p:Pawn) -> Task:
+    if not world.policies.is_on(&"treats") or not p.wants_treat():
+        return null;
+    var item:StringName = Stock.best_treat();
+    if item == &"":
+        return null;
+    var s:Building = world.nearest_storage_with(item, p.position);
+    if s == null or s.reserve_out(item, 1) == 0:
+        return null;
+    var info:Dictionary = Defs.ITEMS[item]["treat"];
+    var st:Dictionary = {"taken": false};
+    var t:Task = Task.new(&"eat", "Fetching %s" % Defs.item_name(item).to_lower(), false);
+    t.target = s;
+    t.move_rect(s.rect(), s.is_walkable());
+    t.act(func(_pw:Pawn) -> bool:
+        s.take_reserved(item, 1);
+        st["taken"] = true;
+        return true);
+    t.work_for(0.25, "Enjoying %s" % Defs.item_name(item).to_lower(), func(pw:Pawn) -> void:
+        pw.enjoy_treat(item, info));
+    t.on_cancel = func(_pw:Pawn) -> void:
+        if not st["taken"] and World.alive(s):
+            s.release_out(item, 1);
+    return t;
+
 func warm_task(p:Pawn) -> Task:
     var b:Building = world.warm_shelter_for(p);
     if b == null:

@@ -80,7 +80,7 @@ func _process(_delta:float) -> void:
         _expect("and the wheat is gone from storage (-%d)" % (_wheat0 - Stock.amount(&"wheat")), Stock.amount(&"wheat") == _wheat0 - 10);
         _lapse();
     elif _phase == 4:
-        if _post.pickup.is_empty() and not _carrying() and not _post.has_order():
+        if _post.pickup.is_empty() and _post.excess().is_empty() and not _carrying() and not _post.has_order():
             _expect("an order the merchant left unfinished lapsed and the goods came home (wheat %d, was %d)" % [Stock.amount(&"wheat"), _wheat0 - 10], Stock.amount(&"wheat") == _wheat0 - 10);
             _expect("with no purchase made", Stock.amount(&"coal") == _coal0);
             print("TRADE %s" % ("PASS" if _fails == 0 else "FAIL"));
@@ -103,7 +103,7 @@ func _lapse() -> void:
     _expect("it is not complete", _post.has_order() and not _post.order_complete());
     world.traders.depart();
     _expect("when the merchant leaves the order lapses", not _post.has_order());
-    _expect("and what was brought is waiting to go back (%s)" % [_post.pickup], _post.pickup.get(&"wheat", 0) == 5);
+    _expect("and what was brought stays at the post, over its level (%s)" % [_post.inputs], _post.held(&"wheat") == 5 and _post.excess().get(&"wheat", 0) == 5);
     _phase = 4;
 
 func _carrying() -> bool:

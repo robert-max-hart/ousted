@@ -52,6 +52,10 @@ func _process(_delta:float) -> void:
             get_viewport().get_texture().get_image().save_png(_out.path_join("trade_a.png"));
             world.hud._trade_panel._on_place();
             GameClock.set_speed(2);
+            world.hud._trade_panel.visible = false;
+            _post.set_hold(&"barley", 10);
+            _post.set_hold(&"eggs", 4);
+            world.hud._hold_btn.pressed.emit();
         200:
             get_viewport().get_texture().get_image().save_png(_out.path_join("trade_b.png"));
             get_tree().quit();

@@ -18,20 +18,20 @@ const WATER_LEVEL       :float = 0.0;
 const MAX_HEIGHT        :float = 40.0;
 const MIN_HEIGHT        :float = -6.0;
 
-const COLOR_SAND        :Color = Color(0.74, 0.68, 0.5);
+const COLOR_SAND        :Color = Color(0.6, 0.54, 0.38);
 const COLOR_ROCK        :Color = Color(0.48, 0.46, 0.43);
 const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
-const COLOR_GRAVE       :Color = Color(0.3, 0.4, 0.27);        # a graveyard: mossy, mown grass
+const COLOR_GRAVE       :Color = Color(0.24, 0.33, 0.2);        # a graveyard: mossy, mown grass
 const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being dug: pale, bare soil
-const COLOR_ORCHARD     :Color = Color(0.33, 0.5, 0.26);       # an orchard: mown grass between the trees
+const COLOR_ORCHARD     :Color = Color(0.26, 0.4, 0.19);       # an orchard: mown grass between the trees
 const COLOR_CHANNEL     :Color = Color(0.34, 0.27, 0.19);      # a dug channel with no water in it
 const COLOR_CHANNEL_WET :Color = Color(0.2, 0.38, 0.5);        # one connected to water
 const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
 const DETAIL_AMOUNT     :float = 0.055;
 const DETAIL_SATURATION :float = 1.15;
 const GRASS_BY_SEASON   :Array[Color] = [
-    Color(0.3, 0.47, 0.2), Color(0.36, 0.47, 0.18), Color(0.5, 0.45, 0.22), Color(0.8, 0.83, 0.86),
+    Color(0.22, 0.37, 0.14), Color(0.28, 0.38, 0.12), Color(0.42, 0.34, 0.15), Color(0.78, 0.81, 0.85),
 ];
 
 var heights :PackedFloat32Array;

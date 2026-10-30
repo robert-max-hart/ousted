@@ -605,7 +605,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var is_ground:bool = is_field or def.get("graveyard", false) or def.get("pasture", false);       # drawn as a terrain overlay: bare while it goes up
     if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
         terrain.flatten_rect(r);
-    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else TradingPost.new() if def.get("trade_post", false) else Building.new();
+    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else TradingPost.new() if def.get("trade_post", false) else Apiary.new() if def.get("apiary", false) else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);

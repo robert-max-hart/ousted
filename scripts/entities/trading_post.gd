@@ -6,17 +6,78 @@
 #     sold unit has arrived does the merchant take them, hand over the
 #     purchases (`pickup`, carried to storage by citizens) and the deal
 #     is settled. An order the merchant leaves before it is complete
-#     lapses and the delivered goods go back to `pickup`.
+#     lapses and the delivered goods go back to the held goods.
+#     The post also has an inventory (the building's `inputs`, so it is
+#     not colony stock: nobody can eat or burn what is in it). The player
+#     sets how much of each item to hold for trade (`hold`); laborers
+#     top the post up from storage and carry any excess back. An order
+#     takes held goods first, so a prepared order completes at once.
+#     Purchases wait in `pickup` until laborers carry them to storage.
 # ----------------------------------------------------------------
 class_name TradingPost extends Building;
 
 var order     :Dictionary = {};        # {sell: item -> units, buy: item -> units, delivered: item -> units, sold_value: float}
 var en_route  :Dictionary = {};        # item -> units citizens are carrying to the yard now (not saved)
 var pickup    :Dictionary = {};        # item -> units waiting at the post for citizens to carry to storage
+const HOLD_CAP :int = 120;             # most units the post holds for trade, in all
+
+var hold      :Dictionary = {};        # item -> how many to keep at the post for trading (the target; the goods are in `inputs`)
 var animals_waiting:Dictionary = {};    # animal kind -> bought animals waiting at the post for a citizen to lead them to a pasture
 
 func has_order() -> bool:
     return not order.is_empty();
+
+# --------------------------------
+# The inventory
+
+func held(item:StringName) -> int:
+    return input_amount(item);
+
+func held_total() -> int:
+    var n:int = 0;
+    for item in inputs:
+        n += inputs[item];
+    return n;
+
+func hold_total() -> int:
+    var n:int = 0;
+    for item in hold:
+        n += hold[item];
+    return n;
+
+# What the colony could sell: spare goods in storage plus what the post already holds.
+func spare(item:StringName) -> int:
+    return Stock.available(item) + held(item);
+
+# Sets the level to keep at the post (0 stops holding it); it is capped by HOLD_CAP over all items. Returns the level set.
+func set_hold(item:StringName, n:int) -> int:
+    var others:int = hold_total() - hold.get(item, 0);
+    var level:int = clampi(n, 0, maxi(0, HOLD_CAP - others));
+    if level == 0:
+        hold.erase(item);
+    else:
+        hold[item] = level;
+    return level;
+
+# Laborers fetch what is short of its level and is in storage (the generic input hauling, see ProductionTasks).
+func inputs_wanted() -> Dictionary:
+    var want:Dictionary = {};
+    if not is_complete():
+        return want;
+    for item in hold:
+        var n:int = hold[item] - input_amount(item) - input_incoming.get(item, 0);
+        if n > 0 and Stock.available(item) > 0:
+            want[item] = n;
+    return want;
+
+# Held goods above their level (the player lowered it): laborers carry them back to storage.
+func excess() -> Dictionary:
+    var out:Dictionary = {};
+    for item in inputs:
+        var n:int = inputs[item] - hold.get(item, 0);
+        if n > 0:
+            out[item] = n;
+    return out;
 
 func idle() -> bool:
     return order.is_empty() and pickup.is_empty() and animals_waiting.is_empty();
@@ -41,14 +102,19 @@ func place_order(sell:Dictionary, buy:Dictionary) -> String:
         cost += buy[item] * traders.buy_price(item);
     var income:float = 0.0;
     for item in sell:
-        if sell[item] <= 0 or sell[item] > Stock.available(item):
+        if sell[item] <= 0 or sell[item] > spare(item):
             return "The colony does not have that much %s to spare." % Defs.item_name(item).to_lower();
         income += sell[item] * traders.sell_price(item);
     if income + 0.0001 < cost:
         return "What you offer is worth %.1f, what you ask for costs %.1f." % [income, cost];
     order = {"sell": sell.duplicate(), "buy": buy.duplicate(), "delivered": {}, "sold_value": income};
-    if sell.is_empty():
-        settle();       # nothing to haul: a gift is only possible at zero cost, so this never happens
+    for item in sell:       # goods already at the post go into the deal at once
+        var here:int = mini(held(item), sell[item]);
+        if here > 0:
+            take_input(item, here);
+            order["delivered"][item] = here;
+    if order_complete():
+        settle();
     return "";
 
 # Units of a sold item still to be carried here (not counting what is on the way).
@@ -68,7 +134,7 @@ func owed_items() -> Array[StringName]:
 # A citizen drops sold goods in the yard.
 func deliver(item:StringName, n:int) -> void:
     if not has_order():
-        pickup[item] = pickup.get(item, 0) + n;       # the order ended on the way: take it back
+        add_input(item, n);       # the order ended on the way: it stays here (carried back if over its level)
         return;
     order["delivered"][item] = order["delivered"].get(item, 0) + n;
     en_route[item] = maxi(0, en_route.get(item, 0) - n);
@@ -101,13 +167,13 @@ func settle() -> void:
     world.notify("Trade done: %s.%s" % [_summary(order["sell"], order["buy"]), tail]);
     order = {};
 
-# The merchant has gone with the order unfinished: what was delivered goes back to storage.
+# The merchant has gone with the order unfinished: what was delivered stays at the post (and goes back to storage if over its level).
 func lapse() -> void:
     if not has_order():
         return;
     for item in order["delivered"]:
-        pickup[item] = pickup.get(item, 0) + order["delivered"][item];
-    world.notify("The merchant left before the deal was done. The goods already brought are being carried back.");
+        add_input(item, order["delivered"][item]);
+    world.notify("The merchant left before the deal was done. The goods already brought stay at the post.");
     order = {};
     en_route.clear();
 
@@ -150,6 +216,7 @@ func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();
     d["order"] = order.duplicate(true);
     d["pickup"] = pickup.duplicate();
+    d["hold"] = hold.duplicate();
     d["animals_waiting"] = animals_waiting.duplicate();
     return d;
 
@@ -157,6 +224,7 @@ func restore_dict(d:Dictionary) -> void:
     super.restore_dict(d);
     order = d.get("order", {});
     pickup = d.get("pickup", {});
+    hold = d.get("hold", {});
     animals_waiting = d.get("animals_waiting", {});
 
 func info_text() -> String:
@@ -167,6 +235,14 @@ func info_text() -> String:
         s += "Order in progress:\n";
         for item in order["sell"]:
             s += "  %s: %d of %d delivered\n" % [Defs.item_name(item), order["delivered"].get(item, 0), order["sell"][item]];
+    if held_total() > 0 or not hold.is_empty():
+        var kept:PackedStringArray = [];
+        for item in hold:
+            kept.append("%s %d/%d" % [Defs.item_name(item), held(item), hold[item]]);
+        for item in inputs:
+            if inputs[item] > 0 and not hold.has(item):
+                kept.append("%s %d (going back)" % [Defs.item_name(item), inputs[item]]);
+        s += "Held for trade (%d of %d): %s\n" % [held_total(), HOLD_CAP, ", ".join(kept)];
     for kind in animals_waiting:
         s += "Waiting to be led to a pasture: %d %s\n" % [animals_waiting[kind], Defs.ANIMALS[kind]["name"].to_lower()];
     if not pickup.is_empty():

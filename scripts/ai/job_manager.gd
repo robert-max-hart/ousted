@@ -78,6 +78,11 @@ func choose_task(p:Pawn) -> Task:
         if t != null:
             return t;
 
+    if not night and p.wants_treat():
+        t = needs.treat_task(p);
+        if t != null:
+            return t;
+
     if p.tool == &"":
         t = production.equip_task(p);
         if t != null:

@@ -12,7 +12,7 @@ const CANOPY_BY_SEASON:Array[Color] = [
 ];
 # Oak leaves over the year: [position in seasons (0 = first day of spring), colour]. They fall at the start of winter.
 const OAK_LEAVES:Array = [
-    [0.0, Color(0.56, 0.72, 0.34)], [0.6, Color(0.3, 0.58, 0.22)], [1.3, Color(0.17, 0.42, 0.17)],
+    [0.0, Color(0.45, 0.58, 0.27)], [0.6, Color(0.26, 0.48, 0.18)], [1.3, Color(0.15, 0.36, 0.15)],
     [2.0, Color(0.34, 0.47, 0.16)], [2.4, Color(0.76, 0.56, 0.14)], [2.75, Color(0.72, 0.3, 0.12)], [3.0, Color(0.5, 0.28, 0.14)],
 ];
 # Shrubs are clumps of lobes: [centre, radius, shade]. A berry bush is low and spread; a hazel stool taller.

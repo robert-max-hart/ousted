@@ -33,6 +33,7 @@ const ITEMS:Dictionary = {
     &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
     &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
+    &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
     &"tool_wood":  {"name": "Wooden Tool", "color": Color(0.7, 0.55, 0.35), "tool": {"bonus": 0.10, "uses": 100.0}},
@@ -256,6 +257,12 @@ const BUILDINGS:Dictionary = {
         "inputs": {&"barley": 20, &"wheat": 20},
         "desc": "Fenced grazing for cows. It starts empty: buy cows from a merchant and a citizen leads them here. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
     },
+    &"apiary": {
+        "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
+        "shape": "house", "decor": "hives", "roof_pitch": 0.25, "height": 0.7, "color": Color(0.8, 0.62, 0.22), "roof": Color(0.55, 0.38, 0.16),
+        "apiary": true, "radius": 12.0, "relocatable": true,
+        "desc": "Beehives. In warm weather the bees make honey, more of it the more berry bushes, hazel groves and orchard trees bloom within the radius. Farmers collect it. Honey never spoils and is a good trade good.",
+    },
     &"trading_post": {
         "name": "Trading Post", "size": Vector2i(4, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
         "shape": "market", "height": 2.6, "color": Color(0.62, 0.5, 0.32), "wall": &"planks",
@@ -288,12 +295,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"forager"]],
+    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"apiary", &"forager"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"apiary", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -366,7 +373,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
@@ -571,6 +578,10 @@ const POLICIES:Dictionary = {
         "name": "Clear empty shacks", "default": false,
         "desc": "Pull down shacks that nobody lives in any more (nothing is refunded). Off, they stay until you demolish them: shacks are a nuisance for not having built enough houses.",
     },
+    &"treats": {
+        "name": "Citizens enjoy treats", "default": true,
+        "desc": "Citizens now and then eat a treat from storage (honey) for a happiness boost that lasts several days; they only want another once it has worn off. Off, treats are kept for trading.",
+    },
     &"child_labor": {
         "name": "Child labor", "default": true,
         "desc": "Children (5 to 17) with no school to attend work as laborers at half speed. Forbidden, they stay home instead.",
@@ -613,6 +624,11 @@ static func sow_text(crop_id:StringName) -> String:
 
 static func is_food(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].get("food", false);
+
+# Treats (honey, later spirits) are not food: citizens enjoy one now and then for a happiness boost that lasts a few days
+# ("treat" in Defs.ITEMS: nutrition gained, mood boost, days it lasts), and want another only once it has worn off.
+static func is_treat(item:StringName) -> bool:
+    return ITEMS.has(item) and ITEMS[item].has("treat");
 
 static func is_tool(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].has("tool");

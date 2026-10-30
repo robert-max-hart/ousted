@@ -38,6 +38,10 @@ var conceive_ready_hour:float = 0.0;   # nor conceive again before this
 var mood        :float = Defs.MOOD_BASE;   # happiness: follows the target from happiness_factors() slowly
 var grief       :Array[Dictionary] = [];   # {amount, start, until, body}: fades linearly from start to until
 var homeless_hours:float = 0.0;            # with no home at all (a shack is a home here)
+var treat_item  :StringName = &"";         # the treat whose boost is running (named in the mood list)
+var treat_mood  :float = 0.0;              # that boost
+var treat_until :float = 0.0;              # game hour it wears off
+var treat_ready :float = 0.0;              # game hour from which they may want another
 var _unhappy_hours:float = 0.0;            # in a row, below Defs.LEAVE_BELOW
 
 # needs, 0..1 (1 = fully satisfied)
@@ -106,6 +110,7 @@ func to_dict() -> Dictionary:
         "partner": world.pawns.find(partner) if partner != null else -1,
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
         "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
+        "treat_item": treat_item, "treat_mood": treat_mood, "treat_until": treat_until, "treat_ready": treat_ready,
         "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
@@ -134,6 +139,10 @@ func restore(w:World, d:Dictionary) -> void:
     pair_ready_hour = d.get("pair_ready_hour", 0.0);
     conceive_ready_hour = d.get("conceive_ready_hour", 0.0);
     mood = d.get("mood", Defs.MOOD_BASE);
+    treat_item = d.get("treat_item", &"");
+    treat_mood = d.get("treat_mood", 0.0);
+    treat_until = d.get("treat_until", 0.0);
+    treat_ready = d.get("treat_ready", 0.0);
     for g in d.get("grief", []):
         grief.append(g);
     _unhappy_hours = d.get("unhappy_hours", 0.0);
@@ -333,6 +342,8 @@ func happiness_factors() -> Array:
             kinds += 1;
     if kinds >= 2:
         f.append(["Varied diet", 0.05 if kinds == 2 else 0.1]);
+    if treat_boost_now() > 0.0:
+        f.append(["Enjoyed %s" % Defs.item_name(treat_item).to_lower(), treat_boost_now()]);
     var sorrow:float = grief_now();
     if sorrow > 0.0:
         f.append(["Grieving", -sorrow]);
@@ -350,6 +361,25 @@ func target_mood() -> float:
     for f in happiness_factors():
         t += f[1];
     return clampf(t, 0.0, 1.0);
+
+func treat_boost_now() -> float:
+    return treat_mood if GameClock.total_hours < treat_until else 0.0;
+
+# Fed up with nothing sweet: the last boost has worn off and the random pause after it has passed.
+func wants_treat() -> bool:
+    if is_baby():
+        return false;
+    if treat_ready <= 0.0:       # never had one: the first craving comes within two days, differently for each
+        treat_ready = GameClock.total_hours + world.rng.randf_range(0.0, 2.0 * GameClock.HOURS_PER_DAY);
+    return GameClock.total_hours >= maxf(treat_until, treat_ready);
+
+# Eats a treat: a little food, and a mood boost for a few days. The next one is wanted after the boost, plus up to a day more.
+func enjoy_treat(item:StringName, info:Dictionary) -> void:
+    hunger = minf(1.0, hunger + info["nutrition"]);
+    treat_item = item;
+    treat_mood = info["mood"];
+    treat_until = GameClock.total_hours + info["days"] * GameClock.HOURS_PER_DAY;
+    treat_ready = treat_until + world.rng.randf_range(0.0, GameClock.HOURS_PER_DAY);
 
 func grief_now() -> float:
     var total:float = 0.0;

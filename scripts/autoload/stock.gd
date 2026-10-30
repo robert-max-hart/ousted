@@ -57,6 +57,16 @@ func food_total() -> int:
             total += amount(item);
     return total;
 
+# The treat with the biggest mood boost that has units available, or &"" if none.
+func best_treat() -> StringName:
+    var best:StringName = &"";
+    var best_mood:float = 0.0;
+    for item in Defs.ITEMS:
+        if Defs.is_treat(item) and available(item) > 0 and Defs.ITEMS[item]["treat"]["mood"] > best_mood:
+            best = item;
+            best_mood = Defs.ITEMS[item]["treat"]["mood"];
+    return best;
+
 # The most plentiful food item with available units, or &"" if none.
 func best_food() -> StringName:
     var best:StringName = &"";

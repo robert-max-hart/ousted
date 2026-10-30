@@ -121,7 +121,7 @@ func _refresh() -> void:
         items.append(item);
     var mine:Array[StringName] = [];
     for item in Defs.TRADE_VALUE:
-        if Stock.available(item) > 0:
+        if _post.spare(item) > 0:
             mine.append(item);
     var sig:String = "%s|%s|%s" % [items, mine, _post.has_order()];
     if sig != _sig:
@@ -170,7 +170,7 @@ func _update_rows(list:VBoxContainer, buying:bool) -> void:
     var qtys:Dictionary = _buy_qty if buying else _sell_qty;
     for row in list.get_children():
         var item:StringName = row.get_meta("item");
-        var have:int = t.visit["stock"].get(item, 0) if buying else Stock.available(item);
+        var have:int = t.visit["stock"].get(item, 0) if buying else _post.spare(item);
         var price:float = t.buy_price(item) if buying else t.sell_price(item);
         (row.get_node("Name") as Label).text = "%s  (%s each, %d)" % [Defs.offer_name(item) if buying else Defs.item_name(item), _fmt(price), have];
         (row.get_node("Qty") as Label).text = str(qtys.get(item, 0));
@@ -181,7 +181,7 @@ func _update_rows(list:VBoxContainer, buying:bool) -> void:
 func _change(item:StringName, buying:bool, delta:int) -> void:
     var t:Traders = _traders();
     var qtys:Dictionary = _buy_qty if buying else _sell_qty;
-    var cap:int = t.visit["stock"].get(item, 0) if buying else Stock.available(item);
+    var cap:int = t.visit["stock"].get(item, 0) if buying else _post.spare(item);
     qtys[item] = clampi(qtys.get(item, 0) + delta, 0, cap);
     if qtys[item] == 0:
         qtys.erase(item);
