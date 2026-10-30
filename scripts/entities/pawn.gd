@@ -58,6 +58,8 @@ var carry_item  :StringName = &"";
 var carry_amount:int = 0;
 
 var tool        :StringName = &"";      # equipped tool item, or &"" for none
+var clothing    :StringName = &"";         # the clothes worn (an item with "clothing" in Defs.ITEMS), or none
+var clothing_hours:float = 0.0;            # game hours of wear left in them
 var tool_uses   :float = 0.0;           # game hours of work left in it
 
 var task        :Task = null;
@@ -105,7 +107,7 @@ func to_dict() -> Dictionary:
     return {
         "name": first_name, "is_male": is_male, "age": age, "profession": profession, "look_seed": look_seed,
         "hunger": hunger, "thirst": thirst, "energy": energy, "warmth": warmth, "health": health,
-        "general_xp": general_xp, "job_xp": job_xp.duplicate(), "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses,
+        "general_xp": general_xp, "job_xp": job_xp.duplicate(), "carry_item": carry_item, "carry_amount": carry_amount, "tool": tool, "tool_uses": tool_uses, "clothing": clothing, "clothing_hours": clothing_hours,
         "position": position, "home": world.buildings.find(home) if home != null else -1,
         "partner": world.pawns.find(partner) if partner != null else -1,
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
@@ -135,6 +137,8 @@ func restore(w:World, d:Dictionary) -> void:
     carry_amount = d["carry_amount"];
     tool = d["tool"];
     tool_uses = d["tool_uses"];
+    clothing = d.get("clothing", &"");
+    clothing_hours = d.get("clothing_hours", 0.0);
     due_hour = d.get("due_hour", -1.0);
     pair_ready_hour = d.get("pair_ready_hour", 0.0);
     conceive_ready_hour = d.get("conceive_ready_hour", 0.0);
@@ -191,6 +195,25 @@ func _wear_tool(dh:float) -> void:
     if tool_uses <= 0.0:
         world.notify("%s's %s broke." % [first_name, Defs.item_name(tool).to_lower()]);
         tool = &"";
+
+# --------------------------------
+# Clothing
+
+# The share of the cold drain the clothes stop (0 with none).
+func cold_resist() -> float:
+    return Defs.ITEMS[clothing]["clothing"]["warm"] if clothing != &"" else 0.0;
+
+func dress(item:StringName) -> void:
+    clothing = item;
+    clothing_hours = Defs.ITEMS[item]["clothing"]["days"] * GameClock.HOURS_PER_DAY;
+
+func _wear_clothing(dh:float) -> void:
+    if clothing == &"":
+        return;
+    clothing_hours -= dh;
+    if clothing_hours <= 0.0:
+        world.notify("%s's %s wore out." % [first_name, Defs.item_name(clothing).to_lower()]);
+        clothing = &"";
 
 func cell() -> Vector2i:
     return world.terrain.world_to_cell(position);
@@ -259,17 +282,19 @@ func _update_needs(dh:float) -> void:
     else:
         energy = maxf(0.0, energy - dh / ENERGY_HOURS);
     var temp:float = Weather.temperature;
+    var chill:float = 1.0 - cold_resist();
+    _wear_clothing(dh);
     if indoors and (shelter == null or not World.alive(shelter) or shelter.is_heated()):
         warmth = minf(1.0, warmth + dh * 0.25);
     elif indoors and shelter.def.get("shack", false):
-        warmth = clampf(warmth + dh * (Defs.SHACK_WARMTH_RATE - maxf(0.0, 8.0 - temp) * Defs.SHACK_COLD_DRAIN), 0.0, 1.0);
+        warmth = clampf(warmth + dh * (Defs.SHACK_WARMTH_RATE - maxf(0.0, 8.0 - temp) * Defs.SHACK_COLD_DRAIN * chill), 0.0, 1.0);
     elif indoors and temp < 8.0:
         # a cold house keeps the wind off, but nobody warms up in it
-        warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.004);
+        warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.004 * chill);
     elif indoors:
         warmth = minf(1.0, warmth + dh * 0.1);
     elif temp < 8.0:
-        warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.006);
+        warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.006 * chill);
     else:
         warmth = minf(1.0, warmth + dh * 0.1);
     _update_mood(dh);
@@ -595,6 +620,10 @@ func info_text() -> String:
         s += "Tool: %s (%d%% left)\n" % [Defs.item_name(tool), roundi(100.0 * tool_uses / Defs.ITEMS[tool]["tool"]["uses"])];
     else:
         s += "Tool: none\n";
+    if clothing != &"":
+        s += "Clothes: %s (%d days left)\n" % [Defs.item_name(clothing), ceili(clothing_hours / GameClock.HOURS_PER_DAY)];
+    else:
+        s += "Clothes: none\n";
     if carry_amount > 0:
         s += "Carrying: %d %s\n" % [carry_amount, Defs.item_name(carry_item)];
     s += "Home: %s\n" % (home.display_name() if home != null else "none");

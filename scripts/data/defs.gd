@@ -34,7 +34,11 @@ const ITEMS:Dictionary = {
     &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
     &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
-    &"cloth":   {"name": "Cloth", "color": Color(0.55, 0.62, 0.8)},
+    &"leather": {"name": "Leather", "color": Color(0.55, 0.36, 0.2)},
+    &"meat":    {"name": "Meat", "color": Color(0.72, 0.28, 0.25), "food": true, "nutrition": 0.5, "spoil_days": 8.0},
+    &"clothes_wool":    {"name": "Wool Clothes", "color": Color(0.82, 0.78, 0.66), "clothing": {"warm": 0.3, "days": 80.0}},
+    &"clothes_leather": {"name": "Leather Clothes", "color": Color(0.5, 0.34, 0.2), "clothing": {"warm": 0.3, "days": 80.0}},
+    &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
@@ -249,6 +253,9 @@ const BUILDINGS:Dictionary = {
         "name": "Chicken Run", "size": Vector2i(4, 4), "cost": {&"wood": 6}, "work": 4.0,
         "shape": "field", "height": 0.0, "color": Color(0.5, 0.42, 0.28),
         "pasture": true, "animal": &"chicken", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
+        "controls": [
+            {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
+        ],
         "inputs": {&"barley": 8, &"wheat": 8},
         "desc": "A fenced run for chickens. It starts empty: buy chickens from a merchant and a citizen leads them here. They lay eggs, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain.",
     },
@@ -256,6 +263,9 @@ const BUILDINGS:Dictionary = {
         "name": "Cow Pasture", "size": Vector2i(6, 6), "cost": {&"wood": 10}, "work": 8.0,
         "shape": "field", "height": 0.0, "color": Color(0.36, 0.5, 0.28),
         "pasture": true, "animal": &"cow", "drag_size": true, "min_side": 4, "walkable": true, "relocatable": false,
+        "controls": [
+            {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
+        ],
         "inputs": {&"barley": 20, &"wheat": 20},
         "desc": "Fenced grazing for cows. It starts empty: buy cows from a merchant and a citizen leads them here. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
     },
@@ -263,23 +273,30 @@ const BUILDINGS:Dictionary = {
         "name": "Sheep Pasture", "size": Vector2i(5, 5), "cost": {&"wood": 8}, "work": 6.0,
         "shape": "field", "height": 0.0, "color": Color(0.42, 0.52, 0.3),
         "pasture": true, "animal": &"sheep", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
+        "controls": [
+            {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
+        ],
         "inputs": {&"barley": 12, &"wheat": 12},
         "desc": "Fenced grazing for sheep. It starts empty: buy sheep from a merchant and a citizen leads them here. They grow wool (about a fleece a season each; farmers shear and collect it), breed slowly while there is room, and leave some manure. In the cold months they need grain.",
     },
-    &"weaver": {
-        "indoor_work": true, "wall": &"planks", "name": "Weaver's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
+    &"tailor": {
+        "indoor_work": true, "wall": &"planks", "name": "Tailor's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
         "shape": "house", "decor": "loom", "height": 1.7, "color": Color(0.58, 0.46, 0.34), "roof": Color(0.4, 0.3, 0.42),
-        "storage": true, "capacity": 40, "accepts_items": [&"cloth"],
+        "storage": true, "capacity": 40, "accepts_items": [&"clothes_wool", &"clothes_leather", &"clothes_fine"],
         "worker_slots": 2, "profession": "ARTISAN",
-        "produces": [&"cloth"],
-        "inputs": {&"wool": 6},
+        "produces": [&"clothes_fine", &"clothes_wool", &"clothes_leather"],
+        "inputs": {&"wool": 6, &"leather": 4},
         "recipes": {
-            &"cloth": {"inputs": {&"wool": 3}, "hours": 2.0},
+            &"clothes_fine":    {"off_at_zero": true, "inputs": {&"wool": 3, &"leather": 2}, "hours": 4.0},
+            &"clothes_wool":    {"off_at_zero": true, "inputs": {&"wool": 3}, "hours": 2.0},
+            &"clothes_leather": {"off_at_zero": true, "inputs": {&"leather": 2}, "hours": 2.0},
         },
         "controls": [
-            {"id": "cap_cloth", "type": "cap", "label": "Cloth cap", "item": &"cloth", "default": 20, "step": 5, "zero_label": "Off"},
+            {"id": "cap_clothes_fine", "type": "cap", "label": "Fine clothes cap", "item": &"clothes_fine", "default": 2, "step": 2, "zero_label": "Off"},
+            {"id": "cap_clothes_wool", "type": "cap", "label": "Wool clothes cap", "item": &"clothes_wool", "default": 6, "step": 2, "zero_label": "Off"},
+            {"id": "cap_clothes_leather", "type": "cap", "label": "Leather clothes cap", "item": &"clothes_leather", "default": 4, "step": 2, "zero_label": "Off"},
         ],
-        "desc": "Artisans weave wool fetched from storage into cloth (3 wool make 1 cloth) and store it. Cloth is a luxury merchants pay well for.",
+        "desc": "Artisans make clothes that citizens wear against the cold: wool clothes from 3 wool, leather clothes from 2 leather, and fine clothes from both, which take twice as long but keep out twice as much cold and last nearly twice as long. Clothes wear out (2.5 years, 4.5 for fine) and are replaced from what is in storage. Wool comes from sheep, leather from slaughtered animals (set a pasture's keep-at-most level). Clothes also trade well.",
     },
     &"apiary": {
         "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
@@ -320,11 +337,11 @@ const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
     ["Food", [&"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"forager"]],
-    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"weaver"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"weaver", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"tailor", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -397,7 +414,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"wool": 4, &"cloth": 14, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
@@ -444,12 +461,13 @@ static func offer_name(key:StringName) -> String:
 # Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: how many a
 # merchant brings at most (a pasture starts empty: animals are bought); value: trade value of one; guide: how many a
 # citizen can lead to a pasture at once; breed: chance a day of one more while there is room (two or more are needed);
+# meat, leather: what one slaughtered animal gives (a pasture's "keep at most" setting culls the surplus);
 # product/rate: item and units per animal per day; manure: units per animal per day; feed: grain per animal per day
 # when nothing grows to graze (the cold months).
 const ANIMALS:Dictionary = {
-    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
-    &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
-    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
+    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "meat": 1, "leather": 0, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
+    &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "meat": 3, "leather": 1, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
+    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "meat": 8, "leather": 3, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
 };
 const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the animals graze and need no feed
 
@@ -637,6 +655,7 @@ static func old_age_death_per_hour(age:float) -> float:
 const WOOD_FUEL_BELOW_SHARE:float = 0.5;   # a house burns raw wood only while its fuel is under this share of its target
 const HEATING_BELOW      :float = 15.0;   # C: houses burn firewood below this
 const FIREWOOD_PER_DAY_AT_0C:float = 2.0;   # burn rate at 0 C; scales linearly with how far below HEATING_BELOW it is
+const CLOTHING_PRIORITY:Array[StringName] = [&"clothes_fine", &"clothes_wool", &"clothes_leather"];   # best first, for dressing
 const TOOL_PRIORITY:Array[StringName] = [&"tool_steel", &"tool_iron", &"tool_wood"];   # best first, for equipping
 const HARD_ORE_UNTOOLED_SPEED:float = 0.25;
 const MINE_BATCH        :int = 4;       # units dug per task
@@ -654,6 +673,11 @@ static func is_food(item:StringName) -> bool:
 # ("treat" in Defs.ITEMS: nutrition gained, mood boost, days it lasts), and want another only once it has worn off.
 static func is_treat(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].has("treat");
+
+# Clothing ("clothing" in Defs.ITEMS: warm = share of the cold drain it stops, days = how long it lasts, 32 days a year):
+# a citizen wears one piece, which wears out (2.5 years, 4.5 for fine clothes made of both wool and leather).
+static func is_clothing(item:StringName) -> bool:
+    return ITEMS.has(item) and ITEMS[item].has("clothing");
 
 static func is_tool(item:StringName) -> bool:
     return ITEMS.has(item) and ITEMS[item].has("tool");

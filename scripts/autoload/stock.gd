@@ -67,6 +67,13 @@ func best_treat() -> StringName:
             best_mood = Defs.ITEMS[item]["treat"]["mood"];
     return best;
 
+# The best clothes with units available, or &"" if none.
+func best_clothing() -> StringName:
+    for item in Defs.CLOTHING_PRIORITY:
+        if available(item) > 0:
+            return item;
+    return &"";
+
 # The most plentiful food item with available units, or &"" if none.
 func best_food() -> StringName:
     var best:StringName = &"";

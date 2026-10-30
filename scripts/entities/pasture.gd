@@ -12,6 +12,8 @@ class_name Pasture extends Building;
 
 const COLLECT_AT      :int = 4;        # units ready before a farmer is sent
 const READY_CAP       :int = 60;       # what piles up uncollected (the rest is lost)
+const SLAUGHTER_PER_DAY:int = 2;       # most animals slaughtered a day when over the "keep at most" level
+const EXTRA_COLLECT_AT:int = 2;        # meat or leather ready before a farmer is sent
 const STARVE_CHANCE   :float = 0.35;   # chance a day that each unfed animal dies
 const FEED_DAYS       :float = 12.0;   # the grain buffer a herd is topped up to, in days of feed
 const STOCK_UP_BELOW  :float = 12.0;   # C, daily mean: below this the buffer is kept stocked (autumn, winter, early spring)
@@ -24,6 +26,7 @@ var manure_acc  :float = 0.0;
 var feed_acc    :float = 0.0;
 var ready_product:int = 0;
 var ready_manure:int = 0;
+var ready_extra :Dictionary = {};      # item -> units from slaughtered animals (meat, leather) waiting for a farmer
 var claimed     :bool = false;         # a citizen is on the way to collect (not saved)
 var _herd       :MultiMeshInstance3D;
 var _t          :float = 0.0;
@@ -82,6 +85,20 @@ func on_day() -> void:
     ready_manure = mini(READY_CAP, ready_manure + m);
     if animals >= 2 and animals < capacity_animals() and world.rng.randf() < a["breed"]:
         animals += 1;
+    _cull();
+
+# A herd over its "keep at most" level has a few animals slaughtered a day for their meat and leather.
+func _cull() -> void:
+    var keep:int = settings.get("keep", 0);
+    if keep <= 0 or animals <= keep:
+        return;
+    var n:int = mini(animals - keep, SLAUGHTER_PER_DAY);
+    var a:Dictionary = animal();
+    animals -= n;
+    for item in [&"meat", &"leather"]:
+        var got:int = n * a.get(String(item), 0);
+        if got > 0:
+            ready_extra[item] = mini(READY_CAP, ready_extra.get(item, 0) + got);
 
 # Room for more, counting animals already on the way.
 func free_room() -> int:
@@ -142,6 +159,9 @@ func collectable() -> Dictionary:
         return {"item": animal()["product"], "n": ready_product};
     if ready_manure >= COLLECT_AT:
         return {"item": &"manure", "n": ready_manure};
+    for item in ready_extra:
+        if ready_extra[item] >= EXTRA_COLLECT_AT:
+            return {"item": item, "n": ready_extra[item]};
     return {};
 
 func take_ready(item:StringName, n:int) -> int:
@@ -149,6 +169,12 @@ func take_ready(item:StringName, n:int) -> int:
         var m:int = mini(n, ready_manure);
         ready_manure -= m;
         return m;
+    if ready_extra.has(item):
+        var e:int = mini(n, ready_extra[item]);
+        ready_extra[item] -= e;
+        if ready_extra[item] <= 0:
+            ready_extra.erase(item);
+        return e;
     var p:int = mini(n, ready_product);
     ready_product -= p;
     return p;
@@ -165,6 +191,7 @@ func to_dict() -> Dictionary:
     d["feed_acc"] = feed_acc;
     d["ready_product"] = ready_product;
     d["ready_manure"] = ready_manure;
+    d["ready_extra"] = ready_extra.duplicate();
     return d;
 
 func restore_dict(d:Dictionary) -> void:
@@ -176,6 +203,7 @@ func restore_dict(d:Dictionary) -> void:
     feed_acc = d.get("feed_acc", 0.0);
     ready_product = d.get("ready_product", 0);
     ready_manure = d.get("ready_manure", 0);
+    ready_extra = d.get("ready_extra", {});
 
 func info_text() -> String:
     if state != State.COMPLETE:
@@ -185,6 +213,13 @@ func info_text() -> String:
     if animals == 0:
         s += "Empty: buy %s from a merchant at the Trading Post.\n" % a["name"].to_lower();
     s += "%s ready: %d, manure ready: %d\n" % [Defs.item_name(a["product"]), ready_product, ready_manure];
+    if not ready_extra.is_empty():
+        var parts:PackedStringArray = [];
+        for item in ready_extra:
+            parts.append("%d %s" % [ready_extra[item], Defs.item_name(item).to_lower()]);
+        s += "Slaughtered, waiting to be collected: %s\n" % ", ".join(parts);
+    if settings.get("keep", 0) > 0:
+        s += "Keeping at most %d: the surplus is slaughtered.\n" % settings["keep"];
     s += "Feed: %s\n" % ("grazing" if grazing() else "grain in store %d" % feed_units());
     if not grazing() and animals > 0 and feed_units() < ceili(animals * a["feed"] * 3.0):
         s += "Running short of grain!\n";
