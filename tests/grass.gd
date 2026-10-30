@@ -32,7 +32,7 @@ func _process(_delta:float) -> void:
     _frame += 1;
     if _frame == 30:
         var total:int = _count();
-        _expect("every block was built (%d blocks)" % grass._blocks.size(), grass._blocks.size() == 64 and grass._dirty.is_empty());
+        _expect("every block was built (%d blocks)" % grass._blocks.size(), grass._blocks.size() == (Terrain.SIZE / GrassDetail.BLOCK) * (Terrain.SIZE / GrassDetail.BLOCK) and grass._dirty.is_empty());
         _expect("a sensible number of tufts (%d)" % total, total > 2000 and total < 20000);
         var mmi:MultiMeshInstance3D = grass._blocks.values()[0];
         _expect("blocks are only drawn near the camera", mmi.visibility_range_end > 0.0 and mmi.visibility_range_end < 100.0);

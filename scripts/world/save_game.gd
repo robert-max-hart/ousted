@@ -6,7 +6,8 @@
 # ----------------------------------------------------------------
 class_name SaveGame extends RefCounted;
 
-const VERSION   :int = 1;
+const VERSION   :int = 2;
+const MIN_VERSION:int = 2;        # version 1 saves are from the 128-cell map (the map is 160 now) and cannot be loaded
 const DIR       :String = "user://saves";
 const QUICKSAVE :String = "quicksave";
 const AUTOSAVE  :String = "autosave";
@@ -49,7 +50,15 @@ static func read(slot:String, error:Array) -> Dictionary:
     if data["version"] > VERSION:
         error.append("That save is from a newer version of the game.");
         return {};
+    if data["version"] < MIN_VERSION:
+        error.append("That save was made on a smaller map and cannot be loaded.");
+        return {};
     return data;
+
+# A save that exists and can be loaded by this version (an old one from the smaller map cannot).
+static func loadable(slot:String) -> bool:
+    var error:Array = [];
+    return not read(slot, error).is_empty();
 
 static func save(world:World, slot:String = QUICKSAVE) -> void:
     var err:String = write(world, slot);

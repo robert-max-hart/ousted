@@ -11,9 +11,9 @@ signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting
 
 enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET, ORCHARD };      # (new ids go last: saves keep the numbers)
 
-const SIZE              :int = 128;
+const SIZE              :int = 160;
 const CHUNK             :int = 32;
-const CHUNKS            :int = 4;       # SIZE / CHUNK
+const CHUNKS            :int = 5;       # SIZE / CHUNK
 const WATER_LEVEL       :float = 0.0;
 const MAX_HEIGHT        :float = 40.0;
 const MIN_HEIGHT        :float = -6.0;
@@ -66,6 +66,16 @@ func _process(_delta:float) -> void:
 # --------------------------------
 # Generation
 
+# Shape of the land (the numbers behind generate): a gentle base, mostly level in the lowlands, with a few ridged hill
+# regions on top. tests/terrain_probe prints the share of level, rolling and steep ground for a set of seeds.
+const BASE_AMP       :float = 5.5;      # height range of the gentle base, +- this at most
+const BASE_OFFSET    :float = 1.4;      # lifts the base so most of it is dry land
+const BASE_OCTAVES   :int = 3;          # more octaves, more small bumps
+const BASE_FREQ      :float = 0.010;
+const HILLS_FREQ     :float = 0.008;    # how big the hill regions are
+const HILLS_FROM     :float = 0.19;     # hill mask noise above this raises hills (higher: fewer hill regions)
+const HILLS_AMP      :float = 15.0;     # how high the ridges stand
+
 func generate(world_seed:int) -> void:
     _tint_noise = FastNoiseLite.new();
     _tint_noise.seed = world_seed + 3;
@@ -80,11 +90,11 @@ func generate(world_seed:int) -> void:
     var base:FastNoiseLite = FastNoiseLite.new();
     base.seed = world_seed;
     base.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH;
-    base.frequency = 0.012;
-    base.fractal_octaves = 4;
+    base.frequency = BASE_FREQ;
+    base.fractal_octaves = BASE_OCTAVES;
     var hills_mask:FastNoiseLite = FastNoiseLite.new();
     hills_mask.seed = world_seed + 1;
-    hills_mask.frequency = 0.009;
+    hills_mask.frequency = HILLS_FREQ;
     var ridges:FastNoiseLite = FastNoiseLite.new();
     ridges.seed = world_seed + 2;
     ridges.frequency = 0.03;
@@ -95,9 +105,9 @@ func generate(world_seed:int) -> void:
     heights.resize(n * n);
     for z in n:
         for x in n:
-            var h:float = base.get_noise_2d(x, z) * 9.0 + 2.0;
-            var mask:float = clampf((hills_mask.get_noise_2d(x, z) - 0.15) * 3.0, 0.0, 1.0);
-            h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * 14.0;
+            var h:float = base.get_noise_2d(x, z) * BASE_AMP + BASE_OFFSET;
+            var mask:float = clampf((hills_mask.get_noise_2d(x, z) - HILLS_FROM) * 3.0, 0.0, 1.0);
+            h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * HILLS_AMP;
             heights[z * n + x] = h;
     overlay = PackedByteArray();
     overlay.resize(SIZE * SIZE);

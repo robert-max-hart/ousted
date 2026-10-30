@@ -517,11 +517,11 @@ const RESOURCE_NODES:Dictionary = {
     &"rock": {"name": "Rock",         "item": &"stone",   "amount": 8,  "work": 0.6,  "solid": true,  "verb": "Quarrying"},
     &"ore":  {"name": "Iron Deposit", "item": &"iron",    "amount": 6,  "work": 1.2,  "solid": true,  "verb": "Mining"},
     &"bush": {"name": "Berry Bush",   "item": &"berries", "amount": 5,  "work": 0.3,  "solid": false, "verb": "Foraging", "auto": true, "regrows": true,
-              "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1, "spread_chance": 0.006, "max_total": 140},
+              "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1, "spread_chance": 0.006, "max_total": 220},
     &"mushroom": {"name": "Mushrooms", "item": &"mushrooms", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking", "regrows": true,
-              "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2, "spread_chance": 0.008, "max_total": 110},
+              "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2, "spread_chance": 0.008, "max_total": 170},
     &"hazel": {"name": "Hazel Grove", "item": &"hazelnuts", "amount": 6, "work": 0.5, "solid": false, "verb": "Gathering nuts", "regrows": true,
-              "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.004, "max_total": 80},
+              "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.004, "max_total": 125},
 };
 
 # How much faster or slower things spoil at an air temperature (1.0 at 10 C). Doubles for every

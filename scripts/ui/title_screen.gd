@@ -90,7 +90,7 @@ func _build_ui() -> void:
     _menu = VBoxContainer.new();
     _menu.add_theme_constant_override("separation", 10);
     stack.add_child(_menu);
-    _continue_slot = "quicksave" if SaveGame.exists(SaveGame.QUICKSAVE) else "autosave" if SaveGame.exists(SaveGame.AUTOSAVE) else "";
+    _continue_slot = "quicksave" if SaveGame.loadable(SaveGame.QUICKSAVE) else "autosave" if SaveGame.loadable(SaveGame.AUTOSAVE) else "";
     var cont:Button = _menu_button("Continue");
     cont.disabled = _continue_slot == "";
     cont.tooltip_text = "Load your last saved game" if _continue_slot != "" else "There is no saved game yet";
