@@ -16,6 +16,9 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(0);
+    for id in world.seeds.known.keys():       # a new game starts with random saplings: this test starts without
+        if Defs.CROPS.get(id, {}).get("tree", false):
+            world.seeds.known.erase(id);
     Weather._day_offset = 0.0;
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 2) * GameClock.HOURS_PER_DAY + 12.0;      # early summer
     Weather._update_temperature();

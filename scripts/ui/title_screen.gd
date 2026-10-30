@@ -254,7 +254,8 @@ func _pick_difficulty(id:StringName) -> void:
     var seeds:PackedStringArray = [];
     for crop in d["seeds"]:
         seeds.append(Defs.CROPS[crop]["name"]);
-    _diff_text.text = "Town Hall: %s\nSeeds to start: %s" % [", ".join(upgrades) if not upgrades.is_empty() else "bare (build storage yourself)", ", ".join(seeds)];
+    var trees:int = d.get("trees", 0);
+    _diff_text.text = "Town Hall: %s\nSeeds to start: %s%s" % [", ".join(upgrades) if not upgrades.is_empty() else "bare (build storage yourself)", ", ".join(seeds), "\nOrchard saplings: %d, chosen at random" % trees if trees > 0 else ""];
 
 func _show_new_game() -> void:
     _menu.visible = false;

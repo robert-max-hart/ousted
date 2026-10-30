@@ -139,6 +139,7 @@ func _ready() -> void:
         _ensure_start_rocks(start);
         town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
         _start_colony_goods(start);
+        seeds.grant_trees(rng);
         Defs.ageing_days_per_year = 4.0;
         _spawn_settlers(start);
         jobs.sync_targets();
@@ -395,6 +396,10 @@ func _restore_entities(save:Dictionary) -> void:
         if rn.growth < 1.0:
             saplings.append(rn);
     for bd in save["buildings"]:
+        if Defs.LEGACY_PASTURES.has(bd["id"]):       # saves from before there was one pasture building: the old ids were one animal each
+            if not bd.has("kind"):
+                bd["kind"] = Defs.LEGACY_PASTURES[bd["id"]];
+            bd["id"] = &"pasture";
         var b:Building = place_building(bd["id"], bd["origin"], bd["size"], false, true, bd.get("facing", 0));
         b.restore_dict(bd);
         if not b.expansion.is_empty():

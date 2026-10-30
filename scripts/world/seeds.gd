@@ -19,6 +19,17 @@ func _init() -> void:
     for id in Defs.DIFFICULTIES[Defs.difficulty]["seeds"]:
         known[id] = true;
 
+# New game: the difficulty's number of randomly chosen orchard crops (saplings) are known from the start.
+func grant_trees(rng:RandomNumberGenerator) -> void:
+    var trees:Array[StringName] = [];
+    for id in Defs.CROPS:
+        if Defs.CROPS[id].get("tree", false) and not known.has(id):
+            trees.append(id);
+    for i in mini(Defs.DIFFICULTIES[Defs.difficulty].get("trees", 0), trees.size()):
+        var k:int = rng.randi_range(0, trees.size() - 1);
+        known[trees[k]] = true;
+        trees.remove_at(k);
+
 func has(crop:StringName) -> bool:
     return known.has(crop);
 

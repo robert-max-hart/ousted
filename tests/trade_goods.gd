@@ -53,7 +53,7 @@ func _ready() -> void:
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 2) * GameClock.HOURS_PER_DAY + 12.0;
     Weather._update_temperature();
     # a pasture with room gets animals offered
-    _pen = world.place_building(&"coop", o + Vector2i(8, 0), Vector2i(4, 4), true) as Pasture;
+    _pen = world.place_building(&"pasture", o + Vector2i(8, 0), Vector2i(4, 4), true) as Pasture;
     offered.clear();
     for i in 200:
         var stock2:Dictionary = world.traders._make_visit()["stock"];

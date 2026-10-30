@@ -169,7 +169,7 @@ func _offer_animals(stock:Dictionary) -> void:
     for kind in Defs.ANIMALS:
         var room:int = 0;
         for b in world.buildings:
-            if b is Pasture and b.is_complete() and b.def["animal"] == kind:
+            if b is Pasture and b.is_complete() and b.kind == kind:
                 room += (b as Pasture).free_room();
         var post:Building = trading_post();
         if post is TradingPost:

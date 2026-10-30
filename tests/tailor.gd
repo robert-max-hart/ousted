@@ -31,9 +31,11 @@ func _ready() -> void:
         if Rect2i(o - Vector2i(3, 3), Vector2i(26, 14)).has_point(rn.cell):
             world.remove_node(rn);
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(28, 16)));
-    _pen = world.place_building(&"sheepfold", o, Vector2i(5, 5), true) as Pasture;
+    _pen = world.place_building(&"pasture", o, Vector2i(5, 5), true) as Pasture;
+    _expect("a new pasture keeps chickens until told otherwise", _pen.kind == &"chicken");
+    _expect("an empty one can change animal", _pen.set_kind(&"sheep") and _pen.kind == &"sheep");
     _shop = world.place_building(&"tailor", o + Vector2i(10, 0), Vector2i(3, 3), true);
-    _expect("sheep: a pasture of 8 (%d)" % _pen.capacity_animals(), _pen.def["animal"] == &"sheep" and _pen.capacity_animals() == 8);
+    _expect("sheep: a pasture of 8 (%d)" % _pen.capacity_animals(), _pen.kind == &"sheep" and _pen.capacity_animals() == 8);
     _expect("Artisan is a profession with two positions here", JobManager.PROFESSION_NAMES[JobManager.Profession.ARTISAN] == "Artisan" and world.jobs.total_slots(JobManager.Profession.ARTISAN) == 2);
     _expect("clothing is not food and has trade value", Defs.is_clothing(&"clothes_fine") and not Defs.is_food(&"clothes_wool") and Defs.trade_value(&"clothes_fine") > Defs.trade_value(&"clothes_wool"));
     var basic:Dictionary = Defs.ITEMS[&"clothes_wool"]["clothing"];

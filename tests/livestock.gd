@@ -21,6 +21,7 @@ func _ready() -> void:
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(0);
+    world.rng.seed = 4242;       # breeding is a daily chance: keep the run the same every time
     world.seeds.unlock_all();
     Weather._day_offset = 0.0;
     GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 2) * GameClock.HOURS_PER_DAY + 12.0;      # early summer
@@ -30,7 +31,7 @@ func _ready() -> void:
         if Rect2i(o - Vector2i(3, 3), Vector2i(28, 14)).has_point(rn.cell):
             world.remove_node(rn);
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(30, 16)));
-    _pen = world.place_building(&"coop", o, Vector2i(4, 4), true) as Pasture;
+    _pen = world.place_building(&"pasture", o, Vector2i(4, 4), true) as Pasture;
     _pen.on_day();
     _expect("a new run is empty and stays empty (animals are bought)", _pen.animals == 0 and _pen.ready_product == 0);
     _expect("it has room for ten chickens", _pen.free_room() == 10);

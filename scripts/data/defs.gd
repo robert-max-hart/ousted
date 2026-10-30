@@ -249,35 +249,15 @@ const BUILDINGS:Dictionary = {
         },
         "desc": "Farmers plant fruit trees here once and pick the fruit every year. It takes a couple of years to bear the first time. Choose the tree in the inspector; it needs saplings found by foragers.",
     },
-    &"coop": {
-        "name": "Chicken Run", "size": Vector2i(4, 4), "cost": {&"wood": 6}, "work": 4.0,
-        "shape": "field", "height": 0.0, "color": Color(0.5, 0.42, 0.28),
-        "pasture": true, "animal": &"chicken", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
-        "controls": [
-            {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
-        ],
-        "inputs": {&"barley": 8, &"wheat": 8},
-        "desc": "A fenced run for chickens. It starts empty: buy chickens from a merchant and a citizen leads them here. They lay eggs, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain.",
-    },
     &"pasture": {
-        "name": "Cow Pasture", "size": Vector2i(6, 6), "cost": {&"wood": 10}, "work": 8.0,
-        "shape": "field", "height": 0.0, "color": Color(0.36, 0.5, 0.28),
-        "pasture": true, "animal": &"cow", "drag_size": true, "min_side": 4, "walkable": true, "relocatable": false,
-        "controls": [
-            {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
-        ],
+        "name": "Pasture", "size": Vector2i(5, 5), "cost": {&"wood": 8}, "work": 6.0,
+        "shape": "field", "height": 0.0, "color": Color(0.4, 0.5, 0.29),
+        "pasture": true, "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
         "inputs": {&"barley": 20, &"wheat": 20},
-        "desc": "Fenced grazing for cows. It starts empty: buy cows from a merchant and a citizen leads them here. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
-    },
-    &"sheepfold": {
-        "name": "Sheep Pasture", "size": Vector2i(5, 5), "cost": {&"wood": 8}, "work": 6.0,
-        "shape": "field", "height": 0.0, "color": Color(0.42, 0.52, 0.3),
-        "pasture": true, "animal": &"sheep", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
         "controls": [
             {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
         ],
-        "inputs": {&"barley": 12, &"wheat": 12},
-        "desc": "Fenced grazing for sheep. It starts empty: buy sheep from a merchant and a citizen leads them here. They grow wool (about a fleece a season each; farmers shear and collect it), breed slowly while there is room, and leave some manure. In the cold months they need grain.",
+        "desc": "A fenced run for one kind of animal, chosen in the inspector (chickens, sheep or cows; it can be changed while it is empty). It starts empty: buy animals from a merchant and a citizen leads them here. They give eggs, wool or milk, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain. A herd over the keep-at-most level has the surplus slaughtered for meat and leather.",
     },
     &"tailor": {
         "indoor_work": true, "wall": &"planks", "name": "Tailor's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
@@ -336,12 +316,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"forager"]],
+    ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"tailor", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -458,7 +438,7 @@ static func offer_name(key:StringName) -> String:
         return String(ANIMALS[offer_id(key)]["one"]).capitalize();
     return item_name(key);
 
-# Farm animals kept in a Coop or Pasture (the building's "animal" key). cells: ground per animal; start: how many a
+# Farm animals kept in a Pasture (its chosen kind, `Pasture.kind`). cells: ground per animal; start: how many a
 # merchant brings at most (a pasture starts empty: animals are bought); value: trade value of one; guide: how many a
 # citizen can lead to a pasture at once; breed: chance a day of one more while there is room (two or more are needed);
 # meat, leather: what one slaughtered animal gives (a pasture's "keep at most" setting culls the surplus);
@@ -469,6 +449,8 @@ const ANIMALS:Dictionary = {
     &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "meat": 3, "leather": 1, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
     &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "meat": 8, "leather": 3, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
 };
+# Old building ids that were one animal each (before the single selectable Pasture): save loading turns them into a pasture of that animal.
+const LEGACY_PASTURES:Dictionary = {&"coop": &"chicken", &"pasture": &"cow", &"sheepfold": &"sheep"};
 const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the animals graze and need no feed
 
 # solid:    blocks walking (pawns work from an adjacent cell)
@@ -540,9 +522,9 @@ const STARVING_BIRTH_MULT:float = 0.2;    # chance multiplier with no food, and 
 # which Town Hall upgrades a colony starts with. Starting goods go into the Town Hall's store room first and the
 # rest into a supply cart that disappears when empty.
 const DIFFICULTIES:Dictionary = {
-    &"hard": {"name": "Hard", "town_hall": [], "seeds": [&"wheat"]},
-    &"normal": {"name": "Normal", "town_hall": [&"storage"], "seeds": [&"wheat", &"beans", &"radish"]},
-    &"easy": {"name": "Easy", "town_hall": [&"storage", &"storage2", &"heating"], "seeds": [&"wheat", &"beans", &"radish", &"lettuce", &"barley"]},
+    &"hard": {"name": "Hard", "town_hall": [], "seeds": [&"wheat"], "trees": 0},
+    &"normal": {"name": "Normal", "town_hall": [&"storage"], "seeds": [&"wheat", &"beans", &"radish"], "trees": 1},
+    &"easy": {"name": "Easy", "town_hall": [&"storage", &"storage2", &"heating"], "seeds": [&"wheat", &"beans", &"radish", &"lettuce", &"barley"], "trees": 2},
 };
 static var difficulty:StringName = &"normal";
 

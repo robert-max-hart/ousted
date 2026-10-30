@@ -61,8 +61,9 @@ func _ready() -> void:
         _orchard.moisture[i] = 0.6;
     # a channel from the nearest water, if the map has any near the field
     # animals
-    _coop = world.place_building(&"coop", _o + Vector2i(18, 0), Vector2i(5, 5), true) as Pasture;
+    _coop = world.place_building(&"pasture", _o + Vector2i(18, 0), Vector2i(5, 5), true) as Pasture;
     _cows = world.place_building(&"pasture", _o + Vector2i(26, 0), Vector2i(7, 7), true) as Pasture;
+    _cows.set_kind(&"cow");
     for p in [_coop, _cows]:
         p.arrived = true;
         p.animals = p.capacity_animals() / 2;

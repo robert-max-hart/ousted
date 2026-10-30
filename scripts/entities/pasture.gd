@@ -18,6 +18,7 @@ const STARVE_CHANCE   :float = 0.35;   # chance a day that each unfed animal die
 const FEED_DAYS       :float = 12.0;   # the grain buffer a herd is topped up to, in days of feed
 const STOCK_UP_BELOW  :float = 12.0;   # C, daily mean: below this the buffer is kept stocked (autumn, winter, early spring)
 
+var kind        :StringName = &"chicken";   # which animal this pasture keeps (Defs.ANIMALS); changeable only while it is empty
 var animals     :int = 0;
 var arrived     :bool = false;         # (old saves: had its founding stock; unused now, animals are bought)
 var incoming_animals:int = 0;           # being led here now (not saved)
@@ -41,15 +42,36 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     var mm:MultiMesh = MultiMesh.new();
     mm.transform_format = MultiMesh.TRANSFORM_3D;
     mm.use_colors = true;
-    mm.mesh = _mesh_for(def["animal"]);
+    mm.mesh = _mesh_for(kind);
     _herd = MultiMeshInstance3D.new();
     _herd.multimesh = mm;
     _herd.material_override = CropMeshes.material();
     _herd.top_level = true;
     add_child(_herd);
 
+func display_name() -> String:
+    return "%s Pasture" % String(animal()["one"]).capitalize();
+
 func animal() -> Dictionary:
-    return Defs.ANIMALS[def["animal"]];
+    return Defs.ANIMALS[kind];
+
+# Whether the animal can be changed now: nothing in the pasture and nothing on the way.
+func can_change_kind() -> bool:
+    return animals <= 0 and incoming_animals <= 0;
+
+# Chooses the animal. Returns false (and changes nothing) when it is not allowed.
+func set_kind(k:StringName) -> bool:
+    if not Defs.ANIMALS.has(k) or not can_change_kind():
+        return false;
+    kind = k;
+    product_acc = 0.0;
+    manure_acc = 0.0;
+    feed_acc = 0.0;
+    ready_product = 0;
+    ready_manure = 0;
+    ready_extra.clear();
+    _herd.multimesh.mesh = _mesh_for(kind);
+    return true;
 
 @warning_ignore("integer_division")
 func capacity_animals() -> int:
@@ -184,6 +206,7 @@ func take_ready(item:StringName, n:int) -> int:
 
 func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();
+    d["kind"] = kind;
     d["animals"] = animals;
     d["arrived"] = arrived;
     d["product_acc"] = product_acc;
@@ -196,6 +219,8 @@ func to_dict() -> Dictionary:
 
 func restore_dict(d:Dictionary) -> void:
     super.restore_dict(d);
+    kind = d.get("kind", &"chicken");
+    _herd.multimesh.mesh = _mesh_for(kind);
     animals = d.get("animals", 0);
     arrived = d.get("arrived", false);
     product_acc = d.get("product_acc", 0.0);
@@ -252,9 +277,9 @@ func _process(delta:float) -> void:
         _herd.multimesh.set_instance_color(i, _coat(i));
 
 func _coat(i:int) -> Color:
-    if def["animal"] == &"chicken":
+    if kind == &"chicken":
         return [Color(1, 1, 1), Color(0.85, 0.65, 0.45), Color(0.95, 0.9, 0.8)][i % 3];
-    if def["animal"] == &"sheep":
+    if kind == &"sheep":
         return [Color(0.96, 0.94, 0.88), Color(0.9, 0.88, 0.82), Color(0.55, 0.5, 0.45)][i % 3];
     return [Color(0.8, 0.6, 0.4), Color(0.95, 0.95, 0.92), Color(0.55, 0.4, 0.3), Color(0.35, 0.3, 0.28)][i % 4];
 

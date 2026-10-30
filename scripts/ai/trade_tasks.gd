@@ -158,7 +158,7 @@ func _pasture_for(kind:StringName, post:TradingPost) -> Pasture:
     var best:Pasture = null;
     var best_d:float = INF;
     for b in world.buildings:
-        if b is Pasture and b.is_complete() and b.def["animal"] == kind and (b as Pasture).free_room() > 0:
+        if b is Pasture and b.is_complete() and b.kind == kind and (b as Pasture).free_room() > 0:
             var d:float = b.position.distance_squared_to(post.position);
             if d < best_d:
                 best_d = d;

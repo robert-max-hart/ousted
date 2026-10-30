@@ -28,8 +28,8 @@ func _ready() -> void:
             world.remove_node(rn);
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(30, 16)));
     _post = world.place_building(&"trading_post", o, Vector2i(4, 3), true) as TradingPost;
-    world.place_building(&"coop", o + Vector2i(8, 0), Vector2i(4, 4), true);
-    world.place_building(&"pasture", o + Vector2i(15, 0), Vector2i(6, 6), true);
+    world.place_building(&"pasture", o + Vector2i(8, 0), Vector2i(4, 4), true);
+    (world.place_building(&"pasture", o + Vector2i(15, 0), Vector2i(6, 6), true) as Pasture).set_kind(&"cow");
     world.traders.last_visit_day = -99;
     world.traders.start_visit();
     world.traders.merchant.state = Merchant.State.TRADING;

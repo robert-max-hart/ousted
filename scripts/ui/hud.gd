@@ -223,7 +223,7 @@ func _refresh_info() -> void:
     _help_btn.set_pressed_no_signal(_help_open);
     _help_label.text = help;
     _help_label.visible = _help_open and help != "";
-    _info_btn.visible = obj is Field;
+    _info_btn.visible = obj is Field or obj is Pasture;
     for b in World.instance.buildings:
         if b is Field:
             (b as Field).show_soil_numbers(_soil_toggle.button_pressed and is_same(b, obj));
@@ -237,6 +237,12 @@ func _refresh_info() -> void:
     _refresh_upgrades(obj);
     if obj is Field:
         _info_btn.text = "Change crop (%s)" % (obj as Field).crop()["name"];
+        _info_btn.disabled = false;
+        _info_btn.tooltip_text = "";
+    elif obj is Pasture:
+        _info_btn.text = "Change animal (%s)" % (obj as Pasture).animal()["name"];
+        _info_btn.disabled = not (obj as Pasture).can_change_kind();
+        _info_btn.tooltip_text = "" if not _info_btn.disabled else "Only an empty pasture can change its animal.";
     const TOP_BAR:float = 48.0;
     const PANEL_PADDING:float = 40.0;      # panel margins, title and the gap above the toolbar
     # the toolbar grows a line when the window is narrow, so measure it
@@ -481,6 +487,9 @@ func _town_hall_exists(w:World) -> bool:
 
 func _on_info_button() -> void:
     var obj:Variant = World.instance.tools.selected;
+    if obj is Pasture:
+        _animal_choices(obj as Pasture);
+        return;
     if obj is Field:
         if _crop_list.visible:
             _crop_list.visible = false;
@@ -517,6 +526,29 @@ func _on_info_button() -> void:
                 _refresh_info());
             _crop_list.add_child(btn);
         _crop_list.visible = true;
+
+# The animals a pasture can keep, listed inline like the crops of a field.
+func _animal_choices(pen:Pasture) -> void:
+    if _crop_list.visible:
+        _crop_list.visible = false;
+        return;
+    for child in _crop_list.get_children():
+        child.queue_free();
+    for id in Defs.ANIMALS:
+        var a:Dictionary = Defs.ANIMALS[id];
+        var btn:Button = Button.new();
+        btn.text = "%s: gives %s" % [a["name"], Defs.item_name(a["product"]).to_lower()];
+        btn.tooltip_text = "Needs %.1f cells each. Also gives manure, and meat%s when slaughtered." % [a["cells"], " and leather" if a.get("leather", 0) > 0 else ""];
+        btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+        btn.focus_mode = Control.FOCUS_NONE;
+        btn.pressed.connect(func() -> void:
+            var sel:Variant = World.instance.tools.selected;
+            if sel is Pasture and World.alive(sel):
+                (sel as Pasture).set_kind(id);
+            _crop_list.visible = false;
+            _refresh_info());
+        _crop_list.add_child(btn);
+    _crop_list.visible = true;
 
 # --------------------------------
 # Construction
