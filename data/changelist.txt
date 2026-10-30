@@ -2,7 +2,7 @@
 # split by vertical bars, then "- " bullets. The newest version is the build id on the title screen.
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
-
+# 0.4.3 | 30 Oct 2026 | Luxuries, clothing, merchant types and a darker palette
 # 0.4.3-dev | 30 Oct 2026 | Honey, and a darker palette
 - New Apiary (Food): beehives that make honey in warm weather, more of it the more berry bushes, hazel groves and orchard trees bloom within its radius. Farmers collect it; it never spoils and is worth a lot to merchants, who bring and ask for it.
 - Citizens eat honey now and then: a little food and a happiness boost that lasts four days. They only want another once it has worn off (and after a random pause), so a stock lasts. A new "Citizens enjoy treats" policy switches it off, to keep honey for trading.

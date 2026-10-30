@@ -6,7 +6,11 @@ The focus is realistic agriculture, and there is no combat.
 - `design_doc.md` is the user's original concept. Don't rewrite it.
 - `docs/plan.md` is the expanded plan: system designs, architecture, milestones M1 to M8, open questions and prototype findings. **Read it before starting work.**
 
-## Current status (handoff, 2026-10-28, end of day)
+## Current status (2026-10-30: build 0.4.3 pushed; newer sections below are the latest work)
+
+**Since the 2026-10-28 handoff, all pushed as 0.4.3:** a darker palette, the Apiary and honey, treats (citizens drink honey and spirits for a lasting mood boost), the Trading Post inventory, sheep, wool, slaughter and clothing (Tailor, Artisan profession), one selectable Pasture, starting orchard seeds, spirits (Distillery), pottery, water-needing buildings, silver and gold (Deep Veins), four merchant types, seasonal prices, a trade history, and the polish picks. **M6 is feature-complete; the version stays 0.4.x until the user says M6 is done (then 0.6.0).** Open for the next playtest: tuning (item 10), whether half-value selling is too easy, the frame rate and the colour palette. Pinned: a tavern building, fires, iron balancing, a steepness overlay, settings and load slots, climates, spoilage tests. The "Current status" text below is the 2026-10-28 handoff and is partly out of date.
+
+## Handoff of 2026-10-28 (older)
 
 **M1 to M4 are done; M5 is tabled; M6 (trade) steps 1 to 3 are built.** M5 ("terrain as labor") is skipped because the user may drop terraforming (see the memory note and `docs/plan.md`). M6 so far: the Trading Post and merchant visits (step 1), the barter window and trade orders (step 2, with the market-stall Trading Post and the donkey-cart merchant), and merchants selling seeds, saplings and animals, with pastures starting empty (step 3). **Build id 0.4.2, everything is committed and pushed.** Untracked and left alone on purpose: `autosave.sav` (a save from the user's playtest, handy for repro) and `playtest_2.txt` (and sometimes `playtest_notes.txt`). **Screenshots work in the user's session:** `tests/run_shots.sh` runs the windowed shot tests (needs `DISPLAY=:1`); look at the PNGs with Read. Newer shot tests: `m4_shot`, `shrub_shot`, `merchant_shot`, `trade_shot`, `guide_shot`.
 
