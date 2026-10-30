@@ -277,7 +277,7 @@ func miner_task(p:Pawn) -> Task:
 # has nowhere to go.
 func _dig_task(_p:Pawn, b:Building) -> Task:
     var item:StringName = &"";
-    for candidate in [&"iron", &"coal", &"stone"]:
+    for candidate in [&"iron", &"coal", &"silver", &"gold", &"stone"]:
         if b.item_unlocked(candidate) and b.production_allowed(candidate) and Stock.has_room_for(candidate):
             item = candidate;
             break;

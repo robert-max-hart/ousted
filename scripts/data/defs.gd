@@ -41,6 +41,8 @@ const ITEMS:Dictionary = {
     &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
     &"spirits": {"name": "Spirits", "color": Color(0.85, 0.7, 0.35), "treat": {"nutrition": 0.02, "mood": 0.2, "days": 3.0}},
     &"pottery": {"name": "Pottery", "color": Color(0.74, 0.45, 0.3)},
+    &"silver":  {"name": "Silver", "color": Color(0.78, 0.8, 0.84)},
+    &"gold":    {"name": "Gold", "color": Color(0.92, 0.76, 0.2)},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
@@ -185,21 +187,27 @@ const BUILDINGS:Dictionary = {
         "shape": "mine", "height": 1.6, "color": Color(0.5, 0.48, 0.45), "roof": Color(0.36, 0.28, 0.2),
         "worker_slots": 3, "profession": "MINER",
         "produces": [&"iron", &"stone"],
-        "mine_hours": {&"stone": 1.5, &"iron": 3.0, &"coal": 6.0},
-        "needs_tool": {&"coal": 0.25},
-        "locked_until": {&"coal": &"deep_shafts"},
+        "mine_hours": {&"stone": 1.5, &"iron": 3.0, &"coal": 6.0, &"silver": 8.0, &"gold": 16.0},
+        "needs_tool": {&"coal": 0.25, &"silver": 0.25, &"gold": 0.25},
+        "locked_until": {&"coal": &"deep_shafts", &"silver": &"deep_veins", &"gold": &"deep_veins"},
         "upgrades": {
             &"deep_shafts": {
                 "name": "Deep Shafts", "cost": {&"wood": 20, &"stone": 12, &"iron": 6}, "work": 24.0,
                 "desc": "Sinks shafts down to the coal seams. Unlocks mining coal here.",
             },
+            &"deep_veins": {
+                "name": "Deep Veins", "requires": [&"deep_shafts"], "cost": {&"wood": 30, &"stone": 20, &"iron": 12}, "work": 40.0,
+                "desc": "Follows the veins of precious metal far below. Unlocks mining silver and gold here: slow work, but merchants pay a great deal for them.",
+            },
         },
         "controls": [
             {"id": "cap_iron", "type": "cap", "label": "Iron cap", "item": &"iron", "default": 40, "step": 10},
             {"id": "cap_coal", "type": "cap", "label": "Coal cap", "item": &"coal", "default": 30, "step": 10, "requires_upgrade": &"deep_shafts"},
+            {"id": "cap_silver", "type": "cap", "label": "Silver cap", "item": &"silver", "default": 10, "step": 5, "requires_upgrade": &"deep_veins"},
+            {"id": "cap_gold", "type": "cap", "label": "Gold cap", "item": &"gold", "default": 6, "step": 2, "requires_upgrade": &"deep_veins"},
             {"id": "cap_stone", "type": "cap", "label": "Stone cap", "item": &"stone", "default": 100, "step": 20},
         ],
-        "desc": "Digs iron, coal and stone without running out, but 2.5 times slower than gathering at the surface, and coal takes twice as long as iron (miners without an iron or steel tool dig it at a quarter of the speed). Iron comes first, then coal, then stone, each until its cap is reached. Coal needs the Deep Shafts upgrade. No storage. Miners carry the ore to a storage building, and work the surface if there is no mine to work at.",
+        "desc": "Digs iron, coal and stone without running out, but 2.5 times slower than gathering at the surface, and coal takes twice as long as iron (miners without an iron or steel tool dig it at a quarter of the speed). Iron comes first, then coal, silver, gold and stone, each until its cap is reached. Coal needs the Deep Shafts upgrade; silver and gold (which take 8 and 16 hours a unit, and are only good for trading) need Deep Veins after it. No storage. Miners carry the ore to a storage building, and work the surface if there is no mine to work at.",
     },
     &"blacksmith": {
         "indoor_work": true, "wall": &"stone", "name": "Blacksmith", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 6}, "work": 16.0,
@@ -433,7 +441,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
