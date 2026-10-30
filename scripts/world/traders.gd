@@ -24,8 +24,8 @@ const OTHER_PAYS       :float = 0.5;                     # ... and for goods the
 const OWN_MARGIN       :float = 1.25;                    # what they charge for their own goods, times the value
 
 # What merchants bring, and what they ask for (trade values are in Defs.TRADE_VALUE).
-const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"eggs", &"hazelnuts", &"honey", &"spirits", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel"];
-const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"hazelnuts", &"eggs", &"honey", &"spirits", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"tool_wood", &"tool_iron", &"manure"];
+const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"eggs", &"hazelnuts", &"honey", &"spirits", &"pottery", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel"];
+const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"hazelnuts", &"eggs", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"tool_wood", &"tool_iron", &"manure"];
 
 var world     :World;
 var merchant  :Merchant = null;

@@ -23,7 +23,7 @@ func _ready() -> void:
     GameClock.set_speed(0);
     world.seeds.unlock_all();
     world.policies.set_on(&"treats", false);       # or citizens drink what the test is counting
-    var o:Vector2i = world.town_hall.origin + Vector2i(8, -10);
+    var o:Vector2i = world.town_hall.origin + Vector2i(5, -7);
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(3, 3), Vector2i(16, 12)).has_point(rn.cell):
             world.remove_node(rn);
@@ -43,6 +43,21 @@ func _ready() -> void:
     var r:Dictionary = _still.def["recipes"];
     _expect("three recipes make spirits", r.size() == 3 and r[&"spirits_barley"]["output"] == &"spirits" and r[&"spirits_apples"]["output"] == &"spirits");
     _expect("the recipes are switched on", _still.recipe_enabled(&"spirits_barley") and _still.recipe_enabled(&"spirits_apples"));
+    # water
+    _expect("the Distillery needs water in reach", _still.needs_water() and _still.def["needs_water"] == 12.0);
+    _expect("the Town Hall (a well) is near enough", _still.has_water());
+    var real:Dictionary = _still.def;
+    _still.def = real.duplicate();
+    _still.def["needs_water"] = 0.5;       # no water within half a cell of it
+    _still._water_checked = -99.0;
+    _expect("with no water in reach it cannot work or fetch", not _still.has_water() and not _still.recipe_enabled(&"spirits_barley") and _still.inputs_wanted().is_empty());
+    _expect("and says so", _still.info_text().contains("Water within") and _still.info_text().contains("NO"));
+    var well:Building = world.place_building(&"well", o + Vector2i(0, 4), Vector2i(2, 2), true);
+    _still.def["needs_water"] = 8.0;
+    _still._water_checked = -99.0;
+    _expect("a well within reach gives it water", well != null and _still.has_water() and _still.recipe_enabled(&"spirits_barley"));
+    _still.def = real;
+    _still._water_checked = -99.0;
     # the food reserve
     var food:int = Stock.food_total();
     _still.settings["keep_food"] = food + 50;

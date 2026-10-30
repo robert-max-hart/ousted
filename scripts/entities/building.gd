@@ -259,6 +259,38 @@ func take_input(item:StringName, n:int) -> void:
 func cancel_input_incoming(item:StringName, n:int) -> void:
     input_incoming[item] = maxi(0, input_incoming.get(item, 0) - n);
 
+# --------------------------------
+# Water (the "needs_water" def key: the radius, in cells, within which a well, the Town Hall or open water must be)
+
+var _water_checked:float = -99.0;
+var _water_found  :bool = true;
+
+func needs_water() -> bool:
+    return def.has("needs_water");
+
+# Whether a water source is in range (checked at most once an hour: it scans the cells around).
+func has_water() -> bool:
+    if not needs_water():
+        return true;
+    if GameClock.total_hours - _water_checked < 1.0:
+        return _water_found;
+    _water_checked = GameClock.total_hours;
+    _water_found = false;
+    var reach:float = def["needs_water"];
+    var c:Vector2 = center_cell();
+    for other in world.buildings:
+        if other.def.get("water", false) and other.is_complete() and Vector2(other.center_cell()).distance_to(c) <= reach:
+            _water_found = true;
+            return true;
+    var r:int = ceili(reach);
+    for z in range(-r, r + 1):
+        for x in range(-r, r + 1):
+            var cell:Vector2i = Vector2i(int(c.x) + x, int(c.y) + z);
+            if Vector2(x, z).length() <= reach and world.terrain.in_bounds(cell) and world.terrain.cell_height(cell) < Terrain.WATER_LEVEL:
+                _water_found = true;
+                return true;
+    return false;
+
 # A recipe is named by its id, which is also its product unless it has an "output" (several recipes can make one item).
 # "food_reserve": id of a setting; the recipe (which uses food) only runs while the colony's food stock is above it.
 func recipe_enabled(id:StringName) -> bool:
@@ -267,6 +299,8 @@ func recipe_enabled(id:StringName) -> bool:
     if recipe.get("off_at_zero", false) and production_cap(item) <= 0:
         return false;
     if recipe.has("food_reserve") and Stock.food_total() < settings.get(recipe["food_reserve"], 0):
+        return false;
+    if not has_water():
         return false;
     var toggle:String = recipe.get("toggle", "make_%s" % id);
     return settings.get(toggle, true) and production_allowed(item);
@@ -727,6 +761,8 @@ func info_text() -> String:
         s += "Stored %d / %d\n" % [used(), capacity()];
         for item in stored:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
+    if needs_water() and state == State.COMPLETE:
+        s += "Water within %d cells: %s\n" % [roundi(def["needs_water"]), "yes" if has_water() else "NO: build a well nearby, or the work stops"];
     if def.has("school_capacity") and state == State.COMPLETE:
         s += "Pupils: %d / %d\n" % [attendees, def["school_capacity"]];
         s += "Teacher: %s\n" % ("teaching now (pupils learn %.2fx)" % teaching_mult if teaching else "none present");

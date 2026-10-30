@@ -307,6 +307,16 @@ static func decorate(b:Building, kind:String) -> void:
                 _cyl(b, 0.26, 0.26, 0.5, oak, Vector3(px + 0.1, 0.25, bz + 0.45), 10);
                 _cyl(b, 0.27, 0.27, 0.04, hoop, Vector3(px + 0.1, 0.12, bz + 0.45), 10);
                 _cyl(b, 0.27, 0.27, 0.04, hoop, Vector3(px + 0.1, 0.38, bz + 0.45), 10);
+        "kiln":
+            var brick:StandardMaterial3D = _colour(Color(0.55, 0.3, 0.22));
+            var clay:StandardMaterial3D = _colour(Color(0.74, 0.45, 0.3));
+            var kx:float = body.x * 0.5 + 0.6;       # a domed kiln beside the workshop, and pots drying on a shelf
+            _cyl(b, 0.55, 0.65, 0.7, brick, Vector3(kx, 0.35, -front * 0.1), 12);
+            _ball(b, 0.55, brick, Vector3(kx, 0.7, -front * 0.1), 0.8);
+            _cyl(b, 0.12, 0.14, 0.5, _colour(IRON), Vector3(kx, 1.35, -front * 0.1), 8);
+            _box(b, Vector3(1.3, 0.08, 0.35), _colour(TIMBER), Vector3(-body.x * 0.25, 0.45, front + 0.45));
+            for k in 3:
+                _cyl(b, 0.1 + 0.02 * k, 0.07, 0.22 + 0.04 * k, clay, Vector3(-body.x * 0.25 - 0.4 + k * 0.4, 0.62 + 0.02 * k, front + 0.45), 8);
         "hives":
             var box:StandardMaterial3D = _colour(Color(0.86, 0.72, 0.38));
             var lid:StandardMaterial3D = _colour(Color(0.5, 0.36, 0.2));

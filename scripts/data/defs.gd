@@ -40,6 +40,7 @@ const ITEMS:Dictionary = {
     &"clothes_leather": {"name": "Leather Clothes", "color": Color(0.5, 0.34, 0.2), "clothing": {"warm": 0.3, "days": 80.0}},
     &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
     &"spirits": {"name": "Spirits", "color": Color(0.85, 0.7, 0.35), "treat": {"nutrition": 0.02, "mood": 0.2, "days": 3.0}},
+    &"pottery": {"name": "Pottery", "color": Color(0.74, 0.45, 0.3)},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
@@ -284,7 +285,7 @@ const BUILDINGS:Dictionary = {
         "indoor_work": true, "wall": &"stone", "name": "Distillery", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 8}, "work": 14.0,
         "shape": "house", "decor": "still", "height": 1.6, "color": Color(0.5, 0.42, 0.34), "roof": Color(0.32, 0.26, 0.22),
         "storage": true, "capacity": 40, "accepts_items": [&"spirits"],
-        "worker_slots": 1, "profession": "ARTISAN",
+        "worker_slots": 1, "profession": "ARTISAN", "needs_water": 12.0,
         "produces": [&"spirits"],
         "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"firewood": 4},
         "recipes": {
@@ -299,7 +300,22 @@ const BUILDINGS:Dictionary = {
             {"id": "make_spirits_apples", "type": "toggle", "label": "Distil apples", "default": true},
             {"id": "make_spirits_pears", "type": "toggle", "label": "Distil pears", "default": true},
         ],
-        "desc": "Artisans distil barley, apples or pears (4 with a little firewood make 2 spirits) and store the spirits. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
+        "desc": "Artisans distil barley, apples or pears (4 with a little firewood make 2 spirits) and store the spirits. It needs water: a well, the Town Hall or open water within 12 cells. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
+    },
+    &"pottery": {
+        "indoor_work": true, "wall": &"stone", "name": "Potter's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 12, &"stone": 8}, "work": 14.0,
+        "shape": "house", "decor": "kiln", "height": 1.5, "color": Color(0.62, 0.42, 0.32), "roof": Color(0.5, 0.3, 0.22),
+        "storage": true, "capacity": 40, "accepts_items": [&"pottery"],
+        "worker_slots": 1, "profession": "ARTISAN", "needs_water": 12.0,
+        "produces": [&"pottery"],
+        "inputs": {&"stone": 8},
+        "recipes": {
+            &"pottery": {"inputs": {&"stone": 4}, "hours": 2.5, "yield": 2, "off_at_zero": true},
+        },
+        "controls": [
+            {"id": "cap_pottery", "type": "cap", "label": "Pottery cap", "item": &"pottery", "default": 20, "step": 5, "zero_label": "Off"},
+        ],
+        "desc": "Artisans grind stone and mix it with water into clay, shape it and fire it in the kiln: 4 stone make 2 pieces of pottery, which merchants pay well for. It needs water: a well, the Town Hall or open water within 12 cells.",
     },
     &"apiary": {
         "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
@@ -340,11 +356,11 @@ const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager"]],
-    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -417,7 +433,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"spirits": 25, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
