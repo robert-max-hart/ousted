@@ -17,6 +17,7 @@ const SEED_OFFERS      :Vector2i = Vector2i(1, 3);       # how many seeds or sap
 const IN_SEASON_WEIGHT :float = 3.0;                     # a crop that can be sown now is this much likelier to be offered
 const ANIMAL_CHANCE    :float = 0.7;                     # a kind of animal is offered with this chance, when a pasture for it has room
 const SELL_BUDGET      :int = 90;                        # about this much trade value of each kind
+const OFF_TYPE_BUDGET  :int = 30;                        # about this much trade value of the one thing every merchant brings that is not their line
 const OTHER_PAYS       :float = 0.5;                     # ... and for goods they did not ask for
 const OWN_MARGIN       :float = 1.25;                    # what they charge for their own goods, times the value
 
@@ -120,6 +121,10 @@ func on_day() -> void:
             visit["days_left"] -= 1;
             if visit["days_left"] <= 0 or trading_post() == null:
                 depart();
+            elif visit["days_left"] == 1:
+                var post:Building = trading_post();
+                if post is TradingPost and (post as TradingPost).has_order():
+                    world.notify("The %s leaves tomorrow and the order at the Trading Post is not finished: the goods still to be carried there will not make it unless citizens hurry." % type_name());
         return;
     if trading_post() == null or GameClock.day_index() - last_visit_day < MIN_GAP_DAYS:
         return;
@@ -201,6 +206,7 @@ func _make_visit() -> Dictionary:
     for i in mini(world.rng.randi_range(sells.x, sells.y), kinds.size()):
         var item:StringName = kinds[i];
         stock[item] = maxi(1, roundi(SELL_BUDGET * world.rng.randf_range(0.5, 1.0) / float(Defs.trade_value(item))));
+    _add_off_type(stock, type);
     var wants:Dictionary = {};
     var asks:Array[StringName] = [];
     for item in type["wants"]:
@@ -218,6 +224,18 @@ func _make_visit() -> Dictionary:
         _offer_seeds(stock);
     _offer_animals(stock, type["animals"]);
     return {"stock": stock, "wants": wants, "days_left": STAY_DAYS, "arrived": false, "type": kind, "season": GameClock.season(), "deals": 0};
+
+# Every merchant also has a small amount of one thing that is not their line: a random tradeable item they do not
+# otherwise bring.
+func _add_off_type(stock:Dictionary, type:Dictionary) -> void:
+    var pool:Array[StringName] = [];
+    for item in Defs.TRADE_VALUE:
+        if not stock.has(item) and not (type["brings"] as Array).has(item):
+            pool.append(item);
+    if pool.is_empty():
+        return;
+    var item:StringName = pool[world.rng.randi_range(0, pool.size() - 1)];
+    stock[item] = maxi(1, roundi(OFF_TYPE_BUDGET * world.rng.randf_range(0.5, 1.0) / float(Defs.trade_value(item))));
 
 # A kind of merchant by weight (the same all year round).
 func _pick_type() -> StringName:
@@ -252,20 +270,29 @@ func _offer_seeds(stock:Dictionary) -> void:
         stock[Defs.seed_key(locked[pick])] = 1;
         locked.remove_at(pick);
 
-# Animals, for the kinds the colony has a pasture with room for.
+# Animals, for the kinds the colony has a pasture with room for (an empty pasture has room for any kind, but only
+# for one of them: once it is counted for an offer it is not counted for another).
 func _offer_animals(stock:Dictionary, share:float = 1.0) -> void:
     if share <= 0.0:
         return;
+    var used:Dictionary = {};
     for kind in Defs.ANIMALS:
         var room:int = 0;
+        var counted:Array[Pasture] = [];
         for b in world.buildings:
-            if b is Pasture and b.is_complete() and b.kind == kind:
-                room += (b as Pasture).free_room();
+            if b is Pasture and b.is_complete() and not used.has(b):
+                var pen:Pasture = b as Pasture;
+                var r:int = pen.room_for(kind);
+                room += r;
+                if r > 0 and pen.can_change_kind():
+                    counted.append(pen);
         var post:Building = trading_post();
         if post is TradingPost:
             room -= (post as TradingPost).animals_waiting.get(kind, 0);
         if room > 0 and world.rng.randf() < ANIMAL_CHANCE * share:
             stock[Defs.animal_key(kind)] = mini(room, world.rng.randi_range(1, Defs.ANIMALS[kind]["start"]));
+            for pen in counted:
+                used[pen] = true;
 
 func _shuffle(a:Array) -> void:
     for i in range(a.size() - 1, 0, -1):
@@ -308,6 +335,16 @@ func _route_from(cell:Vector2i, edge:Vector2i) -> Array[Vector2i]:
 
 # --------------------------------
 # Inspector, saving
+
+# A short note for the top bar: empty when no merchant is about.
+func top_text() -> String:
+    if merchant == null:
+        return "";
+    if merchant.state == Merchant.State.ARRIVING:
+        return "Merchant on the way";
+    if merchant.state == Merchant.State.LEAVING:
+        return "Merchant leaving";
+    return "Merchant here (%dd)" % visit.get("days_left", 0);
 
 func status_text() -> String:
     if merchant == null:

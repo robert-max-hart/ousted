@@ -57,12 +57,21 @@ func food_total() -> int:
             total += amount(item);
     return total;
 
-# The treat with the biggest mood boost that has units available, or &"" if none.
+# How many units of an item the Trading Post's "keep for trade" setting holds back from citizens (honey, spirits).
+func reserve(item:StringName) -> int:
+    if World.instance == null:
+        return 0;
+    for b in World.instance.buildings:
+        if b.def.get("trade_post", false) and b.is_complete():
+            return b.settings.get("keep_%s" % item, 0);
+    return 0;
+
+# The treat with the biggest mood boost that has units available above the trade reserve, or &"" if none.
 func best_treat() -> StringName:
     var best:StringName = &"";
     var best_mood:float = 0.0;
     for item in Defs.ITEMS:
-        if Defs.is_treat(item) and available(item) > 0 and Defs.ITEMS[item]["treat"]["mood"] > best_mood:
+        if Defs.is_treat(item) and available(item) > reserve(item) and Defs.ITEMS[item]["treat"]["mood"] > best_mood:
             best = item;
             best_mood = Defs.ITEMS[item]["treat"]["mood"];
     return best;

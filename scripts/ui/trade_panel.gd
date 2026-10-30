@@ -27,9 +27,9 @@ var _sig        :String = "";
 func setup() -> void:
     visible = false;
     set_anchors_and_offsets_preset(Control.PRESET_CENTER);
-    custom_minimum_size = Vector2(700, 460);
-    offset_left = -350.0;
-    offset_right = 350.0;
+    custom_minimum_size = Vector2(860, 460);
+    offset_left = -430.0;
+    offset_right = 430.0;
     offset_top = -230.0;
     offset_bottom = 230.0;
     mouse_filter = Control.MOUSE_FILTER_STOP;
@@ -173,7 +173,8 @@ func _update_rows(list:VBoxContainer, buying:bool) -> void:
         var have:int = t.visit["stock"].get(item, 0) if buying else _post.spare(item);
         var price:float = t.buy_price(item) if buying else t.sell_price(item);
         var factor:float = t.season_factor(item);
-        var mark:String = " [dear]" if factor >= 1.0 + Traders.PRICE_NOTE else " [cheap]" if factor <= 1.0 - Traders.PRICE_NOTE else "";
+        var usual:String = ", usual %s" % _fmt(snappedf(price / factor, 0.01));
+        var mark:String = " [dear%s]" % usual if factor >= 1.0 + Traders.PRICE_NOTE else " [cheap%s]" % usual if factor <= 1.0 - Traders.PRICE_NOTE else "";
         (row.get_node("Name") as Label).text = "%s  (%s each, %d)%s" % [Defs.offer_name(item) if buying else Defs.item_name(item), _fmt(price), have, mark];
         (row.get_node("Qty") as Label).text = str(qtys.get(item, 0));
         if not buying:

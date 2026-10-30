@@ -44,11 +44,14 @@ func _ready() -> void:
         var v:Dictionary = t._make_visit();
         var type:Dictionary = Traders.TYPES[v["type"]];
         counts[v["type"]] = counts.get(v["type"], 0) + 1;
+        var off:int = 0;
         for item in v["stock"]:
             if Defs.is_seed_key(item) or Defs.is_animal_key(item):
                 continue;
-            inside = inside and (type["brings"] as Array).has(item);
+            if not (type["brings"] as Array).has(item):
+                off += 1;       # the one small off-type item every merchant brings
             clash = clash or v["wants"].has(item);
+        inside = inside and off == 1;
         for item in v["wants"]:
             inside = inside and (type["wants"] as Array).has(item);
             if Traders.LUXURIES.has(item):
@@ -66,7 +69,7 @@ func _ready() -> void:
             metal_with_animals += 1;
     _expect("all kinds turn up (%s)" % [counts], counts.size() == 4);
     _expect("grain merchants are commonest, fine goods rarest (%s)" % [counts], counts[&"grain"] > counts[&"luxury"]);
-    _expect("each deals only in its own goods", inside);
+    _expect("each deals in its own goods and one small other thing", inside);
     _expect("nobody asks for what they sell", not clash);
     _expect("luxuries are asked for at %s or more, other goods within the type's range (%d luxuries seen)" % [Traders.LUXURY_MULT, luxury_seen], lux_ok and luxury_seen > 0);
     _expect("herders offer animals often, metal traders never (%d of %d, %d)" % [herders_with_animals, herders, metal_with_animals], herders_with_animals > herders / 3 and metal_with_animals == 0);

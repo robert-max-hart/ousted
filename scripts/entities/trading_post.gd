@@ -27,6 +27,29 @@ var animals_waiting:Dictionary = {};    # animal kind -> bought animals waiting 
 func has_order() -> bool:
     return not order.is_empty();
 
+# Bought animals with nowhere to go: say so now and then.
+const WARN_EVERY_DAYS:int = 4;
+var _warned_day:int = -99;
+
+func on_day() -> void:
+    super.on_day();
+    if not is_complete() or animals_waiting.is_empty() or GameClock.day_index() - _warned_day < WARN_EVERY_DAYS:
+        return;
+    var stuck:PackedStringArray = [];
+    for kind in animals_waiting:
+        if not has_pasture_room(kind):
+            stuck.append("%d %s" % [animals_waiting[kind], Defs.ANIMALS[kind]["name"].to_lower()]);
+    if not stuck.is_empty():
+        _warned_day = GameClock.day_index();
+        world.notify("%s waiting at the Trading Post: no pasture has room for them. Build or expand a pasture." % ", ".join(stuck));
+
+# Whether some finished pasture has room (an empty one counts: it takes any animal) for this kind.
+func has_pasture_room(kind:StringName) -> bool:
+    for b in world.buildings:
+        if b is Pasture and b.is_complete() and (b as Pasture).room_for(kind) > 0:
+            return true;
+    return false;
+
 # --------------------------------
 # The inventory
 
@@ -249,7 +272,7 @@ func info_text() -> String:
                 kept.append("%s %d (going back)" % [Defs.item_name(item), inputs[item]]);
         s += "Held for trade (%d of %d): %s\n" % [held_total(), HOLD_CAP, ", ".join(kept)];
     for kind in animals_waiting:
-        s += "Waiting to be led to a pasture: %d %s\n" % [animals_waiting[kind], Defs.ANIMALS[kind]["name"].to_lower()];
+        s += "Waiting to be led to a pasture: %d %s%s\n" % [animals_waiting[kind], Defs.ANIMALS[kind]["name"].to_lower(), "" if has_pasture_room(kind) else " (no pasture has room)"];
     if not pickup.is_empty():
         var parts:PackedStringArray = [];
         for item in pickup:

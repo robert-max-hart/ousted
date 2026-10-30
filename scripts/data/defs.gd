@@ -335,7 +335,11 @@ const BUILDINGS:Dictionary = {
         "name": "Trading Post", "size": Vector2i(4, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
         "shape": "market", "height": 2.6, "color": Color(0.62, 0.5, 0.32), "wall": &"planks",
         "trade_post": true, "unique": true,
-        "desc": "Merchants walk in from the edge of the map a few times a season, stay a few days and leave again. They bring goods to sell and name what they want to buy.",
+        "controls": [
+            {"id": "keep_honey", "type": "cap", "label": "Keep honey for trade", "default": 0, "step": 2, "zero_label": "None"},
+            {"id": "keep_spirits", "type": "cap", "label": "Keep spirits for trade", "default": 0, "step": 2, "zero_label": "None"},
+        ],
+        "desc": "Merchants walk in from the edge of the map a few times a season, stay a few days and leave again. They bring goods to sell and name what they want to buy. Goods can be kept at the post for trading (the Goods held for trade window), and honey and spirits can be kept in storage for it: citizens only drink what is over that number.",
     },
     &"graveyard": {
         "wall": &"plaster", "name": "Graveyard", "size": Vector2i(4, 3), "cost": {}, "work": 6.0,

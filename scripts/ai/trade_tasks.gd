@@ -114,6 +114,8 @@ func _guide_animals(p:Pawn, post:TradingPost) -> Task:
         var pasture:Pasture = _pasture_for(kind, post);
         if pasture == null:
             continue;
+        if pasture.kind != kind and not pasture.set_kind(kind):        # an empty pasture takes up the animal it is given
+            continue;
         var n:int = mini(post.animals_waiting[kind], mini(pasture.free_room(), Defs.ANIMALS[kind]["guide"]));
         if n <= 0:
             continue;
@@ -153,14 +155,21 @@ func _guide_animals(p:Pawn, post:TradingPost) -> Task:
         return t;
     return null;
 
-# The nearest finished pasture for this kind of animal with room for at least one more.
+# The nearest finished pasture for this kind of animal with room for at least one more; failing that, the nearest
+# empty pasture (it then takes up this animal).
 func _pasture_for(kind:StringName, post:TradingPost) -> Pasture:
     var best:Pasture = null;
     var best_d:float = INF;
+    var empty:Pasture = null;
+    var empty_d:float = INF;
     for b in world.buildings:
-        if b is Pasture and b.is_complete() and b.kind == kind and (b as Pasture).free_room() > 0:
-            var d:float = b.position.distance_squared_to(post.position);
-            if d < best_d:
-                best_d = d;
-                best = b as Pasture;
-    return best;
+        if not (b is Pasture) or not b.is_complete():
+            continue;
+        var d:float = b.position.distance_squared_to(post.position);
+        if b.kind == kind and (b as Pasture).free_room() > 0 and d < best_d:
+            best_d = d;
+            best = b as Pasture;
+        elif b.kind != kind and (b as Pasture).can_change_kind() and d < empty_d:
+            empty_d = d;
+            empty = b as Pasture;
+    return best if best != null else empty;

@@ -75,7 +75,21 @@ func set_kind(k:StringName) -> bool:
 
 @warning_ignore("integer_division")
 func capacity_animals() -> int:
-    return maxi(1, floori(size.x * size.y / animal()["cells"]));
+    return capacity_for(kind);
+
+# How many of an animal this pasture would hold.
+func capacity_for(k:StringName) -> int:
+    return maxi(1, floori(size.x * size.y / Defs.ANIMALS[k]["cells"]));
+
+# Whether animals of this kind could be put in it: it keeps them already, or it is empty and could change to them.
+func can_host(k:StringName) -> bool:
+    return kind == k or can_change_kind();
+
+# Room for this kind, counting what is on the way: an empty pasture has room for any kind.
+func room_for(k:StringName) -> int:
+    if kind == k:
+        return free_room();
+    return capacity_for(k) if can_change_kind() else 0;
 
 func grazing() -> bool:
     return Weather.mean_temperature() >= Defs.GRAZING_ABOVE;

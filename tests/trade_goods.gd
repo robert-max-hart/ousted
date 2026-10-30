@@ -54,13 +54,15 @@ func _ready() -> void:
     Weather._update_temperature();
     # a pasture with room gets animals offered
     _pen = world.place_building(&"pasture", o + Vector2i(8, 0), Vector2i(4, 4), true) as Pasture;
+    _pen.add_animals(1);       # an empty pasture would take any animal, one with a chicken in it only chickens
     offered.clear();
     for i in 200:
         var stock2:Dictionary = world.traders._make_visit()["stock"];
         for key in stock2:
             offered[key] = offered.get(key, 0) + 1;
     _expect("with a chicken run, chickens are offered (%d of 200)" % offered.get(Defs.animal_key(&"chicken"), 0), offered.get(Defs.animal_key(&"chicken"), 0) > 25);       # only herders (always) and grain merchants (sometimes) bring animals
-    _expect("but still no cows", not offered.has(Defs.animal_key(&"cow")));
+    _expect("but not cows, with a chicken in it", not offered.has(Defs.animal_key(&"cow")));
+    _pen.animals = 0;
     # a visit with a seed and some chickens on offer
     world.traders.last_visit_day = -99;
     world.traders.start_visit();

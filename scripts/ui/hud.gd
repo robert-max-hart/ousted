@@ -46,6 +46,7 @@ var _extras     :InspectorExtras;    # mark-for-harvest button and the worker li
 var _site_box   :VBoxContainer;      # cancel and build priority for a site
 var _cancel_btn :Button;
 var _priority_btns:Array[Button] = [];
+var _merchant_label:Label;           # a note under the top bar while a merchant is on the way, here or leaving
 var _size_label :Label;              # follows the cursor while sizing a field, graveyard or stockpile
 var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the inspector's button
 var _ledger_btn :Button;
@@ -91,6 +92,16 @@ func _ready() -> void:
     _build_info_panel(root);
     _build_log(root);
     _build_menu(root);
+    _merchant_label = Label.new();
+    _merchant_label.visible = false;
+    _merchant_label.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _merchant_label.set_anchors_preset(Control.PRESET_CENTER_TOP);
+    _merchant_label.grow_horizontal = Control.GROW_DIRECTION_BOTH;
+    _merchant_label.offset_top = 52.0;
+    _merchant_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.5));
+    _merchant_label.add_theme_color_override("font_outline_color", Color.BLACK);
+    _merchant_label.add_theme_constant_override("outline_size", 5);
+    root.add_child(_merchant_label);
     _size_label = Label.new();
     _size_label.visible = false;
     _size_label.mouse_filter = Control.MOUSE_FILTER_IGNORE;
@@ -175,6 +186,9 @@ func _refresh_all() -> void:
     var homeless:int = w.families.homeless_count();
     if homeless > 0:
         parts.append("Homeless %d" % homeless);
+    var merchant_note:String = w.traders.top_text();
+    _merchant_label.visible = merchant_note != "";
+    _merchant_label.text = merchant_note;
     _stock.text = "  ".join(parts);
     var food_tip:PackedStringArray = ["Storage: %d / %d" % [Stock.used(), Stock.capacity()]];
     for item in Defs.ITEMS:

@@ -19,6 +19,10 @@
 - Luxuries (honey, spirits, pottery, fine clothes, silver, gold) fetch 1.4 to 2.2 times their value from any merchant who asks for them.
 - Seasonal prices: grain and fruit are dear in spring and cheap at harvest, firewood, coal, clothes and spirits dear in winter, and so on. What is on offer does not change; only the price, fixed for the length of a visit. The barter window marks goods [dear] or [cheap].
 - The Ledger has a Trade graph and a Trade tab: totals, every deal (who, what, the value each way) and every visit.
+- An empty pasture now has room for any animal a merchant offers, and takes up the animal led to it. Animals waiting at the Trading Post with no pasture room are warned of in the log and the inspector.
+- The Trading Post can keep honey and spirits back for trade: citizens only drink what is over the level you set.
+- Every merchant also brings a small amount of one off-line item (firewood, manure, anything tradeable).
+- A note under the top bar shows a merchant on the way, here (with the days left) or leaving; a warning in the log when a merchant is about to leave with an order unfinished; the barter window shows the usual price beside a dear or cheap one and is wider.
 - Greener, deeper grass and calmer sand and spring oak leaves, and slightly softer daytime light, so the terrain looks less washed out.
 
 # 0.4.2 | 28 Oct 2026 | Trade: merchants, barter, seeds and animals (M6 steps 1 to 3)
