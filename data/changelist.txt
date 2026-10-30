@@ -15,6 +15,10 @@
 - A Potter's Workshop (Industry): an Artisan turns 4 stone into 2 pieces of pottery, a good trade good.
 - Buildings can now need water nearby: the Distillery and the Potter's Workshop only work with a well, the Town Hall or open water within 12 cells. The inspector says whether they have it.
 - Silver and gold: a new Mine upgrade, Deep Veins (after Deep Shafts), lets miners dig silver (8 hours a unit) and gold (16), each up to a cap you set (defaults 10 and 6) after the other ores and before stone. They are only trade goods, worth a great deal (gold 80, silver 30), and merchants bring and ask for them.
+- Four kinds of merchant, each with its own goods and cart colours: grain merchants (food, seeds and saplings, sometimes animals), metal traders (iron, coal, tools, silver and gold), herders (wool, leather, meat, eggs, and animals) and fine goods caravans (honey, spirits, pottery, fine clothes, precious metals). They call equally often in every season, and nobody asks for what they are selling.
+- Luxuries (honey, spirits, pottery, fine clothes, silver, gold) fetch 1.4 to 2.2 times their value from any merchant who asks for them.
+- Seasonal prices: grain and fruit are dear in spring and cheap at harvest, firewood, coal, clothes and spirits dear in winter, and so on. What is on offer does not change; only the price, fixed for the length of a visit. The barter window marks goods [dear] or [cheap].
+- The Ledger has a Trade graph and a Trade tab: totals, every deal (who, what, the value each way) and every visit.
 - Greener, deeper grass and calmer sand and spring oak leaves, and slightly softer daytime light, so the terrain looks less washed out.
 
 # 0.4.2 | 28 Oct 2026 | Trade: merchants, barter, seeds and animals (M6 steps 1 to 3)

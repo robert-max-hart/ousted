@@ -114,16 +114,17 @@ static func hall(b:Building) -> void:
 # Trading Post: an open market pavilion, not a house. A plank deck under a striped canvas tent on four posts, a
 # counter with a balance, crates, barrels and sacks, a banner on the ridge and a hanging sign by the deck.
 
-static var _stripes_tex:ImageTexture = null;
+static var _stripes_tex:Dictionary = {};       # colour pair -> stripe texture
 
 static func _awning(red:Color, cream:Color) -> StandardMaterial3D:
-    if _stripes_tex == null:
+    var key:String = "%s%s" % [red, cream];
+    if not _stripes_tex.has(key):
         var img:Image = Image.create(8, 1, false, Image.FORMAT_RGBA8);
         for x in 8:
             img.set_pixel(x, 0, red if x < 4 else cream);
-        _stripes_tex = ImageTexture.create_from_image(img);
+        _stripes_tex[key] = ImageTexture.create_from_image(img);
     var m:StandardMaterial3D = StandardMaterial3D.new();
-    m.albedo_texture = _stripes_tex;
+    m.albedo_texture = _stripes_tex[key];
     m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST;
     m.uv1_triplanar = true;
     m.uv1_scale = Vector3(0.45, 1.0, 1.0);

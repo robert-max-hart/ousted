@@ -38,8 +38,9 @@ func _ready() -> void:
     var started:bool = world.traders.start_visit();
     _expect("a visit starts", started and world.traders.merchant != null and world.traders.merchant.state == Merchant.State.ARRIVING);
     var v:Dictionary = world.traders.visit;
-    _expect("they bring goods (%s)" % [v["stock"]], v["stock"].size() >= Traders.SELL_KINDS.x and v["stock"].values().all(func(n:int) -> bool: return n >= 1));
-    _expect("and name goods they want, at 0.8 to 1.5 times the value (%s)" % [v["wants"]], v["wants"].size() >= Traders.WANT_KINDS.x and v["wants"].values().all(func(m:float) -> bool: return m >= 0.79 and m <= 1.51));
+    _expect("they bring goods (%s)" % [v["stock"]], v["stock"].size() >= 2 and v["stock"].values().all(func(n:int) -> bool: return n >= 1));
+    _expect("and name goods they want, at 0.8 to 2.2 times the value (%s)" % [v["wants"]], v["wants"].size() >= 3 and v["wants"].values().all(func(m:float) -> bool: return m >= 0.79 and m <= 2.21));
+    _expect("the visit has a kind of merchant and a season for its prices", Traders.TYPES.has(v["type"]) and v["season"] == GameClock.season());
     _expect("they start at the map edge", world.traders.merchant.cell().x <= 2 or world.traders.merchant.cell().y <= 2 or world.traders.merchant.cell().x >= Terrain.SIZE - 3 or world.traders.merchant.cell().y >= Terrain.SIZE - 3);
     _expect("the inspector knows", _post.info_text().contains("on the road"));
     # save mid-walk and restore

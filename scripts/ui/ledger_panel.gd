@@ -13,6 +13,7 @@ const GRAPHS:Array[Dictionary] = [
     {"name": "Population", "lines": [["pop", "Total", Color(0.95, 0.95, 0.9)], ["adults", "Adults", Color(0.45, 0.75, 0.95)], ["children", "Children", Color(0.95, 0.8, 0.35)], ["babies", "Babies", Color(0.95, 0.5, 0.65)]]},
     {"name": "Food", "lines": [["food", "Food", Color(0.9, 0.78, 0.35)], ["firewood", "Firewood", Color(0.75, 0.5, 0.28)]]},
     {"name": "Happiness", "lines": [["mood", "Average happiness (%)", Color(0.55, 0.85, 0.5)]]},
+    {"name": "Trade", "lines": [["trade_in", "Sold (value, per 8 days)", Color(0.55, 0.85, 0.5), true], ["trade_out", "Bought (value, per 8 days)", Color(0.95, 0.65, 0.3), true]]},
     {"name": "Births and deaths", "lines": [["births", "Births (per 8 days)", Color(0.55, 0.85, 0.5), true], ["deaths", "Deaths (per 8 days)", Color(0.9, 0.4, 0.4), true]]},
 ];
 
@@ -22,6 +23,9 @@ var _legend:HBoxContainer;
 var _graph_btns:Array[Button] = [];
 var _history:VBoxContainer;
 var _shown_events:int = -1;
+var _trade_list:VBoxContainer;
+var _trade_summary:Label;
+var _shown_trades:int = -1;
 var _timer:float = 0.0;
 
 func setup(ledger:Ledger) -> void:
@@ -60,6 +64,8 @@ func setup(ledger:Ledger) -> void:
     tabs.set_tab_title(0, "Graphs");
     tabs.add_child(_build_history());
     tabs.set_tab_title(1, "History");
+    tabs.add_child(_build_trade());
+    tabs.set_tab_title(2, "Trade");
 
 func _build_graphs() -> Control:
     var box:VBoxContainer = VBoxContainer.new();
@@ -91,6 +97,21 @@ func _build_history() -> Control:
     scroll.add_child(_history);
     return scroll;
 
+func _build_trade() -> Control:
+    var box:VBoxContainer = VBoxContainer.new();
+    _trade_summary = Label.new();
+    _trade_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _trade_summary.custom_minimum_size.x = 460;
+    box.add_child(_trade_summary);
+    var scroll:ScrollContainer = ScrollContainer.new();
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL;
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    box.add_child(scroll);
+    _trade_list = VBoxContainer.new();
+    _trade_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    scroll.add_child(_trade_list);
+    return box;
+
 func _show_graph(i:int) -> void:
     for j in _graph_btns.size():
         _graph_btns[j].set_pressed_no_signal(j == i);
@@ -108,7 +129,9 @@ func _show_graph(i:int) -> void:
 func open() -> void:
     visible = true;
     _shown_events = -1;
+    _shown_trades = -1;
     _refresh_history();
+    _refresh_trade();
     _chart.queue_redraw();
 
 func _process(delta:float) -> void:
@@ -118,7 +141,46 @@ func _process(delta:float) -> void:
     if _timer <= 0.0:
         _timer = 1.0;
         _refresh_history();
+        _refresh_trade();
         _chart.queue_redraw();
+
+# The trade record, newest first: a summary on top, then each deal and each visit that ended. Rebuilt when one is added.
+func _refresh_trade() -> void:
+    var count:int = _ledger.trades.size() * 1000 + _ledger.deal_count;
+    if count == _shown_trades:
+        return;
+    _shown_trades = count;
+    _trade_summary.text = "%d deal%s over %d visit%s. Sold %s in value, bought %s (balance %s%s)." % [
+        _ledger.deal_count, "" if _ledger.deal_count == 1 else "s", _ledger.visit_count, "" if _ledger.visit_count == 1 else "s",
+        _fmt(_ledger.trade_in_total), _fmt(_ledger.trade_out_total), "+" if _ledger.trade_in_total >= _ledger.trade_out_total else "-", _fmt(absf(_ledger.trade_in_total - _ledger.trade_out_total))];
+    for c in _trade_list.get_children():
+        _trade_list.remove_child(c);
+        c.queue_free();
+    if _ledger.trades.is_empty():
+        var none:Label = Label.new();
+        none.text = "No merchant has called yet.";
+        _trade_list.add_child(none);
+        return;
+    for i in range(_ledger.trades.size() - 1, -1, -1):
+        var e:Dictionary = _ledger.trades[i];
+        var l:Label = Label.new();
+        if e["kind"] == "deal":
+            l.text = "%s: the %s took %s and gave %s (%s in, %s out)." % [e["when"], e["merchant"], _items(e["sold"]), _items(e["bought"]), _fmt(e["in"]), _fmt(e["out"])];
+        else:
+            l.text = "%s: the %s left after %d deal%s." % [e["when"], e["merchant"], e["deals"], "" if e["deals"] == 1 else "s"];
+            l.add_theme_color_override("font_color", Color(0.75, 0.75, 0.72));
+        l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+        l.custom_minimum_size.x = 460;
+        _trade_list.add_child(l);
+
+func _items(goods:Dictionary) -> String:
+    var parts:PackedStringArray = [];
+    for item in goods:
+        parts.append(Defs.offer_name(item) if Defs.is_seed_key(item) else "%d %s" % [goods[item], Defs.offer_name(item).to_lower()]);
+    return ", ".join(parts) if not parts.is_empty() else "nothing";
+
+func _fmt(v:float) -> String:
+    return "%.1f" % v if absf(v - roundf(v)) > 0.05 else "%d" % roundi(v);
 
 # Newest first. Rebuilt only when an event has been added.
 func _refresh_history() -> void:
@@ -194,13 +256,13 @@ class LedgerChart extends Control:
         var out:Array[float] = [];
         var running:float = 0.0;
         for j in samples.size():
-            running += float(samples[j][line[0]]);
+            running += float(samples[j].get(line[0], 0));
             if line.size() > 3 and line[3]:
                 if j >= SUM_DAYS:
-                    running -= float(samples[j - SUM_DAYS][line[0]]);
+                    running -= float(samples[j - SUM_DAYS].get(line[0], 0));
                 out.append(running);
             else:
-                out.append(float(samples[j][line[0]]));
+                out.append(float(samples[j].get(line[0], 0)));
                 running = 0.0;
         return out;
 

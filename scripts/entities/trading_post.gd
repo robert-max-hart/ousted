@@ -164,6 +164,11 @@ func settle() -> void:
     var tail:String = "";
     if not animals_waiting.is_empty():
         tail = " The animals wait at the Trading Post for someone to lead them to a pasture.";
+    var cost:float = 0.0;
+    for item in order["buy"]:
+        cost += order["buy"][item] * world.traders.buy_price(item);
+    world.ledger.record_deal(world.traders.type_name(), order["sell"], order["buy"], order.get("sold_value", 0.0), cost);
+    world.traders.visit["deals"] = world.traders.visit.get("deals", 0) + 1;
     world.notify("Trade done: %s.%s" % [_summary(order["sell"], order["buy"]), tail]);
     order = {};
 

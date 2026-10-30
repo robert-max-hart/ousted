@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/merchant_types.gd" id="1_soak"]
+
+[node name="MerchantTypes" type="Node"]
+script = ExtResource("1_soak")

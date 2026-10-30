@@ -17,6 +17,7 @@ var path        :Array[Vector2i] = [];
 var _path_i     :int = 0;
 var arrived     :Callable;           # called once, when the cart reaches the post
 var gone        :Callable;           # called once, when it has walked off
+var palette     :Array = [];         # the cart's two stripe colours and the trader's coat (see Traders.TYPES); empty: the old red and cream
 
 func setup(w:World, from:Vector2i, route:Array[Vector2i], st:int) -> void:
     world = w;
@@ -105,8 +106,11 @@ func _build_visual() -> void:
     var wood:StandardMaterial3D = _tinted(Color(0.5, 0.36, 0.22));
     var dark_wood:StandardMaterial3D = _tinted(Color(0.34, 0.24, 0.15));
     var iron:StandardMaterial3D = _tinted(Color(0.2, 0.19, 0.19));
-    var red:StandardMaterial3D = _tinted(Color(0.72, 0.2, 0.16));
-    var cream:StandardMaterial3D = _tinted(Color(0.93, 0.87, 0.7));
+    var stripe_a:Color = palette[0] if palette.size() >= 3 else Color(0.72, 0.2, 0.16);
+    var stripe_b:Color = palette[1] if palette.size() >= 3 else Color(0.93, 0.87, 0.7);
+    var coat_color:Color = palette[2] if palette.size() >= 3 else Color(0.55, 0.2, 0.2);
+    var red:StandardMaterial3D = _tinted(stripe_a);
+    var cream:StandardMaterial3D = _tinted(stripe_b);
     var bed_y:float = 0.5;
     var cz:float = -1.0;                                    # the cart's middle
     # the bed, low side boards, a tailgate and the axle
@@ -135,7 +139,7 @@ func _build_visual() -> void:
     # the canvas hood over the load, open at both ends, in the stall's stripes
     var hood:PrismMesh = PrismMesh.new();
     hood.size = Vector3(1.06, 0.62, 1.35);
-    _part(hood, BuildingShapes._awning(Color(0.72, 0.2, 0.16), Color(0.93, 0.87, 0.7)), Vector3(0, bed_y + 0.38, cz + 0.12));
+    _part(hood, BuildingShapes._awning(stripe_a, stripe_b), Vector3(0, bed_y + 0.38, cz + 0.12));
     # cargo behind the hood: a sack and a small crate, and a barrel strapped on the side
     _part(_ball(0.22, _tinted(Color(0.78, 0.7, 0.5)), 0.8), _tinted(Color(0.78, 0.7, 0.5)), Vector3(-0.15, bed_y + 0.2, cz - 0.62));
     _part(_box(0.34, 0.3, 0.3), _tinted(Color(0.78, 0.62, 0.38)), Vector3(0.22, bed_y + 0.22, cz - 0.62));
@@ -181,7 +185,7 @@ func _build_visual() -> void:
     _trader = Node3D.new();
     _trader.position = Vector3(0.62, 0, 2.15);
     add_child(_trader);
-    var coat_red:StandardMaterial3D = _tinted(Color(0.55, 0.2, 0.2));
+    var coat_red:StandardMaterial3D = _tinted(coat_color);
     var body:CapsuleMesh = CapsuleMesh.new();
     body.radius = 0.2;
     body.height = 1.1;

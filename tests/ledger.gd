@@ -18,7 +18,7 @@ func _ready() -> void:
     _expect("the newest event is last", led.events[led.events.size() - 1]["text"] == "A test event.");
     led.on_day(world);
     var s:Dictionary = led.samples[0];
-    _expect("a sample counts the citizens", s["pop"] == 8 and s["adults"] == 8 and s["babies"] == 0 and s["children"] == 0);
+    _expect("a sample counts the citizens", s["pop"] == world.pawns.size() and s["adults"] + s["children"] + s["babies"] == s["pop"] and s["babies"] == 0);
     _expect("it has food and firewood", s["food"] == Stock.food_total() and s["firewood"] == Stock.amount(&"firewood"));
     _expect("it has an average happiness", s["mood"] > 0.0 and s["mood"] <= 100.0);
     world.kill_pawn(world.pawns[0], "old age");

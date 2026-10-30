@@ -114,7 +114,7 @@ func _refresh() -> void:
         return;
     var t:Traders = _traders();
     var left:int = t.visit["days_left"];
-    _title.text = "Trading with the merchant: they stay %d more day%s" % [left, "" if left == 1 else "s"];
+    _title.text = "Trading with the %s: they stay %d more day%s. Prices are for %s." % [t.type_name(), left, "" if left == 1 else "s", GameClock.SEASON_NAMES[t.visit.get("season", GameClock.season())].to_lower()];
     # rows only change when the lists do; quantities are updated in place
     var items:Array[StringName] = [];
     for item in t.visit["stock"]:
@@ -172,7 +172,9 @@ func _update_rows(list:VBoxContainer, buying:bool) -> void:
         var item:StringName = row.get_meta("item");
         var have:int = t.visit["stock"].get(item, 0) if buying else _post.spare(item);
         var price:float = t.buy_price(item) if buying else t.sell_price(item);
-        (row.get_node("Name") as Label).text = "%s  (%s each, %d)" % [Defs.offer_name(item) if buying else Defs.item_name(item), _fmt(price), have];
+        var factor:float = t.season_factor(item);
+        var mark:String = " [dear]" if factor >= 1.0 + Traders.PRICE_NOTE else " [cheap]" if factor <= 1.0 - Traders.PRICE_NOTE else "";
+        (row.get_node("Name") as Label).text = "%s  (%s each, %d)%s" % [Defs.offer_name(item) if buying else Defs.item_name(item), _fmt(price), have, mark];
         (row.get_node("Qty") as Label).text = str(qtys.get(item, 0));
         if not buying:
             var good:bool = t.visit["wants"].has(item);

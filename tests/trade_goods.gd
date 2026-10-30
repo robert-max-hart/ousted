@@ -59,7 +59,7 @@ func _ready() -> void:
         var stock2:Dictionary = world.traders._make_visit()["stock"];
         for key in stock2:
             offered[key] = offered.get(key, 0) + 1;
-    _expect("with a chicken run, chickens are offered (%d of 200)" % offered.get(Defs.animal_key(&"chicken"), 0), offered.get(Defs.animal_key(&"chicken"), 0) > 60);
+    _expect("with a chicken run, chickens are offered (%d of 200)" % offered.get(Defs.animal_key(&"chicken"), 0), offered.get(Defs.animal_key(&"chicken"), 0) > 25);       # only herders (always) and grain merchants (sometimes) bring animals
     _expect("but still no cows", not offered.has(Defs.animal_key(&"cow")));
     # a visit with a seed and some chickens on offer
     world.traders.last_visit_day = -99;
