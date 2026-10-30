@@ -188,9 +188,16 @@ func supply_inputs_task(p:Pawn) -> Task:
     return null;
 
 func blacksmith_task(p:Pawn) -> Task:
+    return craft_task(p, "BLACKSMITH");
+
+# Weavers and the other artisans (a craft building with recipes and an input buffer, like the Blacksmith).
+func artisan_task(p:Pawn) -> Task:
+    return craft_task(p, "ARTISAN");
+
+func craft_task(p:Pawn, profession:String) -> Task:
     var sites:Array[Building] = [];
     for b in world.buildings:
-        if b.is_complete() and b.def.get("profession", "") == "BLACKSMITH":
+        if b.is_complete() and b.def.get("profession", "") == profession:
             sites.append(b);
     sites.sort_custom(func(a:Building, c:Building) -> bool:
         return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));

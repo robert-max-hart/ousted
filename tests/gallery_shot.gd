@@ -10,7 +10,7 @@ extends Node;
 const ROWS:Array = [
     [&"house", &"town_hall", &"granary", &"school", &"stockpile"],     # the second stockpile is empty, for contrast
     [&"woodcutter", &"forager", &"blacksmith", &"mine", &"well", &"shack"],
-    [&"graveyard", &"field", &"stockpile", &"apiary"],
+    [&"graveyard", &"field", &"stockpile", &"apiary", &"weaver"],
 ];
 
 var world:World;

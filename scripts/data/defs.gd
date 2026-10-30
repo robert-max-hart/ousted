@@ -33,6 +33,8 @@ const ITEMS:Dictionary = {
     &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
     &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
+    &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
+    &"cloth":   {"name": "Cloth", "color": Color(0.55, 0.62, 0.8)},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
     &"manure":  {"name": "Manure", "color": Color(0.38, 0.28, 0.16)},
     &"coal":    {"name": "Coal",    "color": Color(0.16, 0.16, 0.18), "heat": 2},
@@ -257,6 +259,28 @@ const BUILDINGS:Dictionary = {
         "inputs": {&"barley": 20, &"wheat": 20},
         "desc": "Fenced grazing for cows. It starts empty: buy cows from a merchant and a citizen leads them here. They give milk (which spoils fast), breed slowly while there is room, and leave a lot of manure. In the cold months they eat a good deal of grain.",
     },
+    &"sheepfold": {
+        "name": "Sheep Pasture", "size": Vector2i(5, 5), "cost": {&"wood": 8}, "work": 6.0,
+        "shape": "field", "height": 0.0, "color": Color(0.42, 0.52, 0.3),
+        "pasture": true, "animal": &"sheep", "drag_size": true, "min_side": 3, "walkable": true, "relocatable": false,
+        "inputs": {&"barley": 12, &"wheat": 12},
+        "desc": "Fenced grazing for sheep. It starts empty: buy sheep from a merchant and a citizen leads them here. They grow wool (about a fleece a season each; farmers shear and collect it), breed slowly while there is room, and leave some manure. In the cold months they need grain.",
+    },
+    &"weaver": {
+        "indoor_work": true, "wall": &"planks", "name": "Weaver's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
+        "shape": "house", "decor": "loom", "height": 1.7, "color": Color(0.58, 0.46, 0.34), "roof": Color(0.4, 0.3, 0.42),
+        "storage": true, "capacity": 40, "accepts_items": [&"cloth"],
+        "worker_slots": 2, "profession": "ARTISAN",
+        "produces": [&"cloth"],
+        "inputs": {&"wool": 6},
+        "recipes": {
+            &"cloth": {"inputs": {&"wool": 3}, "hours": 2.0},
+        },
+        "controls": [
+            {"id": "cap_cloth", "type": "cap", "label": "Cloth cap", "item": &"cloth", "default": 20, "step": 5, "zero_label": "Off"},
+        ],
+        "desc": "Artisans weave wool fetched from storage into cloth (3 wool make 1 cloth) and store it. Cloth is a luxury merchants pay well for.",
+    },
     &"apiary": {
         "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
         "shape": "house", "decor": "hives", "roof_pitch": 0.25, "height": 0.7, "color": Color(0.8, 0.62, 0.22), "roof": Color(0.55, 0.38, 0.16),
@@ -295,12 +319,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"apiary", &"forager"]],
-    ["Industry", [&"woodcutter", &"mine", &"blacksmith"]],
+    ["Food", [&"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"forager"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"weaver"]],
     ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"apiary", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"coop", &"pasture", &"sheepfold", &"apiary", &"weaver", &"graveyard"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -373,7 +397,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"wool": 4, &"cloth": 14, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods
@@ -424,6 +448,7 @@ static func offer_name(key:StringName) -> String:
 # when nothing grows to graze (the cold months).
 const ANIMALS:Dictionary = {
     &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
+    &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
     &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
 };
 const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the animals graze and need no feed

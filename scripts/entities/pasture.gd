@@ -219,6 +219,8 @@ func _process(delta:float) -> void:
 func _coat(i:int) -> Color:
     if def["animal"] == &"chicken":
         return [Color(1, 1, 1), Color(0.85, 0.65, 0.45), Color(0.95, 0.9, 0.8)][i % 3];
+    if def["animal"] == &"sheep":
+        return [Color(0.96, 0.94, 0.88), Color(0.9, 0.88, 0.82), Color(0.55, 0.5, 0.45)][i % 3];
     return [Color(0.8, 0.6, 0.4), Color(0.95, 0.95, 0.92), Color(0.55, 0.4, 0.3), Color(0.35, 0.3, 0.28)][i % 4];
 
 static func _mesh_for(kind:StringName) -> ArrayMesh:
@@ -245,6 +247,21 @@ static func _mesh_for(kind:StringName) -> ArrayMesh:
         var tail:BoxMesh = BoxMesh.new();
         tail.size = Vector3(0.14, 0.14, 0.03);
         ResourceRenderer.add_part(mesh, tail, Transform3D(Basis(Vector3.BACK, 0.7), Vector3(-0.16, 0.3, 0)), mat);
+    elif kind == &"sheep":
+        var fleece:SphereMesh = SphereMesh.new();
+        fleece.radius = 0.3;
+        fleece.height = 0.5;
+        fleece.radial_segments = 7;
+        fleece.rings = 4;
+        ResourceRenderer.add_part(mesh, fleece, Transform3D(Basis(), Vector3(0, 0.42, 0)), mat);
+        var face:BoxMesh = BoxMesh.new();
+        face.size = Vector3(0.2, 0.2, 0.18);
+        ResourceRenderer.add_part(mesh, face, Transform3D(Basis(), Vector3(0.34, 0.5, 0)), mat, Color(0.35, 0.3, 0.28));
+        for sx in [-0.14, 0.14]:
+            for sz in [-0.1, 0.1]:
+                var leg:BoxMesh = BoxMesh.new();
+                leg.size = Vector3(0.06, 0.24, 0.06);
+                ResourceRenderer.add_part(mesh, leg, Transform3D(Basis(), Vector3(sx, 0.12, sz)), mat, Color(0.3, 0.27, 0.25));
     else:
         var body:BoxMesh = BoxMesh.new();
         body.size = Vector3(0.95, 0.5, 0.45);

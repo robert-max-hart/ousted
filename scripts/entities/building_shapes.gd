@@ -285,6 +285,15 @@ static func decorate(b:Building, kind:String) -> void:
             _cyl(b, 0.3, 0.32, 0.45, bark, Vector3(-body.x * 0.3, 0.22, front + 0.6), 10);
             _box(b, Vector3(0.06, 0.55, 0.06), _colour(TIMBER), Vector3(-body.x * 0.3 + 0.1, 0.72, front + 0.6), Vector3(0, 0, 0.5));
             _box(b, Vector3(0.22, 0.14, 0.05), _colour(IRON), Vector3(-body.x * 0.3 + 0.2, 0.95, front + 0.6), Vector3(0, 0, 0.5));
+        "loom":
+            var wood:StandardMaterial3D = _colour(Color(0.45, 0.32, 0.2));
+            var dye:Array[Color] = [Color(0.3, 0.4, 0.75), Color(0.75, 0.3, 0.25), Color(0.85, 0.8, 0.65)];
+            for sx in [-0.5, 0.5]:       # a loom standing outside: two posts, a beam and the cloth on it
+                _box(b, Vector3(0.1, 1.3, 0.1), wood, Vector3(body.x * 0.5 + 0.7 + sx * 0.5, 0.65, front * 0.3));
+            _box(b, Vector3(1.2, 0.1, 0.12), wood, Vector3(body.x * 0.5 + 0.7, 1.25, front * 0.3));
+            _box(b, Vector3(0.85, 0.9, 0.04), _colour(dye[0]), Vector3(body.x * 0.5 + 0.7, 0.75, front * 0.3));
+            for k in 3:       # bolts of finished cloth by the door
+                _cyl(b, 0.14, 0.14, 0.5, _colour(dye[k]), Vector3(-body.x * 0.3 + k * 0.3, 0.14, front + 0.55), 8, Vector3(0, 0, PI * 0.5));
         "hives":
             var box:StandardMaterial3D = _colour(Color(0.86, 0.72, 0.38));
             var lid:StandardMaterial3D = _colour(Color(0.5, 0.36, 0.2));
