@@ -332,6 +332,16 @@ static func decorate(b:Building, kind:String) -> void:
                 _box(b, Vector3(0.14, 1.0, 0.03), plank, Vector3(-body.x * 0.5 - 0.22 - k * 0.05, 0.5, -body.y * 0.1 + k * 0.17), Vector3(0, 0, 0.32 + k * 0.05));
             _cyl(b, 0.2, 0.22, 0.45, _colour(Color(0.4, 0.3, 0.2)), Vector3(body.x * 0.5 + 0.28, 0.22, front * 0.4), 8);
             _cyl(b, 0.2, 0.2, 0.03, _colour(IRON), Vector3(body.x * 0.5 + 0.28, 0.45, front * 0.4), 8);
+        "fishing":
+            var pile:StandardMaterial3D = _colour(TIMBER);
+            for sx in [-1.0, 1.0]:      # stilts down into the water, a plank landing in front, and a net hung to dry
+                for sz in [-1.0, 1.0]:
+                    _box(b, Vector3(0.16, 1.9, 0.16), pile, Vector3(sx * body.x * 0.5, -0.45, sz * body.y * 0.5));
+            _box(b, Vector3(body.x + 0.4, 0.12, body.y + 0.4), pile, Vector3(0, 0.03, 0));
+            _box(b, Vector3(1.4, 0.1, 1.1), pile, Vector3(0, 0.05, front + 0.7));
+            for sx in [-0.6, 0.6]:
+                _box(b, Vector3(0.06, 1.0, 0.06), pile, Vector3(body.x * 0.3 + sx, 0.55, front + 0.8));
+            _box(b, Vector3(1.2, 0.8, 0.03), _colour(Color(0.62, 0.6, 0.5)), Vector3(body.x * 0.3, 0.65, front + 0.8));
         "hut":
             var rack:StandardMaterial3D = _colour(TIMBER);
             var rz:float = front + 0.75;

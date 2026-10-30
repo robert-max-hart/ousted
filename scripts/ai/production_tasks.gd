@@ -51,6 +51,38 @@ func forager_task(p:Pawn) -> Task:
             return t;
     return null;
 
+# A Fishing Hut: a fisherman works from the hut's shore and catches fish at the hut's rate (water share and overlap, see
+# FishingHut), up to a load, while the food stock is under the hut's cap. The progress towards the next fish stays on the
+# hut, so a catch started before sleep or a meal is not lost.
+func fisherman_task(p:Pawn) -> Task:
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b is FishingHut and b.is_complete() and b.production_allowed(&"food") and Stock.has_room_for(&"fish") and (b as FishingHut).catch_rate() > 0.0:
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    for b in sites:
+        if workers_at(b) >= b.def.get("worker_slots", 1) or p.has_failed(b):
+            continue;
+        var hut:FishingHut = b as FishingHut;
+        var t:Task = Task.new(&"fish", "Fishing");
+        t.job = JobManager.Profession.FISHERMAN;
+        t.target = hut;
+        t.workplace = hut;
+        t.move_rect(hut.rect(), false, "Walking to %s" % hut.display_name().to_lower());
+        var cast:Callable = func(pw:Pawn, dh:float) -> bool:
+            if not World.alive(hut):
+                return true;
+            var progress:float = hut.dig_progress.get(&"fish", 0.0) + dh * hut.catch_rate();
+            while progress >= 1.0 and pw.carry_amount < Pawn.CARRY_CAP:
+                progress -= 1.0;
+                pw.add_carry(&"fish", 1);
+            hut.dig_progress[&"fish"] = progress;
+            return pw.carry_amount >= Pawn.CARRY_CAP;
+        t.work(cast, "Fishing");
+        return t;
+    return null;
+
 const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel"];
 
 # The wild foods a hut's foragers try in turn: each is "pick only this kind", and &"" at the end means anything
@@ -326,6 +358,10 @@ func _chop_task(p:Pawn, b:Building) -> Task:
     return harvest_node_task(p, func(rn:ResourceNode) -> bool:
         return rn.is_tree() and in_radius(b, rn.cell) and (mode == 2 or rn.is_mature()));
 
+# A woodcutter replants thickly, like a managed woodlot: trees may touch, and up to this many saplings grow in the radius at once.
+const PLANT_SPACING    :int = 0;
+const PLANT_SAPLING_CAP:int = 60;
+
 func _plant_task(_p:Pawn, b:Building) -> Task:
     if not b.settings.get("plant", false):
         return null;
@@ -333,14 +369,14 @@ func _plant_task(_p:Pawn, b:Building) -> Task:
     for rn in world.saplings:
         if in_radius(b, rn.cell):
             growing += 1;
-    if growing + world.planting.size() >= 25:
+    if growing + world.planting.size() >= PLANT_SAPLING_CAP:
         return null;
     var center:Vector2i = Vector2i(b.center_cell());
     var r:int = ceili(b.radius());
     var spot:Vector2i = Vector2i(-1, -1);
     for i in 30:
         var c:Vector2i = center + Vector2i(world.rng.randi_range(-r, r), world.rng.randi_range(-r, r));
-        if in_radius(b, c) and world.can_plant_tree(c):
+        if in_radius(b, c) and world.can_plant_tree(c, PLANT_SPACING):
             spot = c;
             break;
     if spot.x < 0:

@@ -30,6 +30,7 @@ func _process(_delta:float) -> void:
         var keeper:Node = Node.new();
         get_tree().root.add_child(keeper);
         get_tree().current_scene = keeper;
+        _title._choose_start.button_pressed = false;          # (the choose-your-start flow has its own test, start_choice)
         _title._on_start();
         _started = true;
     elif _started and _frame == 12:

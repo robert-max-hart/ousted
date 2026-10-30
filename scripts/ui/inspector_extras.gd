@@ -17,6 +17,8 @@ var _grow_btn   :Button;       # expand a field, stockpile or graveyard, or canc
 var _grow_for   :Building;
 var _workers_box:VBoxContainer;
 var _workers_sig:String = "";
+var _pupils_box :VBoxContainer;
+var _pupils_sig :String = "";
 var _node       :ResourceNode;
 
 func _init() -> void:
@@ -38,12 +40,16 @@ func _init() -> void:
     _workers_box = VBoxContainer.new();
     _workers_box.visible = false;
     add_child(_workers_box);
+    _pupils_box = VBoxContainer.new();
+    _pupils_box.visible = false;
+    add_child(_pupils_box);
 
 func refresh(obj:Variant) -> void:
     _refresh_mark(obj);
     _refresh_grow(obj);
     _refresh_early(obj);
     _refresh_workers(obj);
+    _refresh_pupils(obj);
 
 func _refresh_mark(obj:Variant) -> void:
     _node = obj as ResourceNode if obj is ResourceNode else null;
@@ -116,7 +122,8 @@ func _refresh_workers(obj:Variant) -> void:
         for c in _workers_box.get_children():
             c.queue_free();
         var head:Label = Label.new();
-        head.text = "%ss (%d), click to find:" % [JobManager.PROFESSION_NAMES[prof], crew.size()] if not crew.is_empty() else "No %ss yet: raise the number with + in the Professions panel." % JobManager.PROFESSION_NAMES[prof].to_lower();
+        var plural:String = _plural(JobManager.PROFESSION_NAMES[prof]);
+        head.text = "%s (%d), click to find:" % [plural, crew.size()] if not crew.is_empty() else "No %s yet: raise the number with + in the Professions panel." % plural.to_lower();
         head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
         head.custom_minimum_size.x = 280;
         _workers_box.add_child(head);
@@ -132,6 +139,40 @@ func _refresh_workers(obj:Variant) -> void:
             var p:Pawn = btn.get_meta("pawn");
             if World.alive(p):
                 btn.text = "%s: %s" % [p.first_name, p.status];
+
+# A school lists the children studying there right now, each a button that finds them.
+func _refresh_pupils(obj:Variant) -> void:
+    var b:Building = obj as Building if obj is Building else null;
+    if b == null or not b.is_complete() or not b.def.has("school_capacity"):
+        _pupils_box.visible = false;
+        _pupils_sig = "";
+        return;
+    var pupils:Array[Pawn] = [];
+    for p in World.instance.pawns:
+        if p.task != null and p.task.kind == &"school" and is_same(p.task.target, b):
+            pupils.append(p);
+    var sig:String = ",".join(pupils.map(func(p:Pawn) -> String: return p.first_name));
+    _pupils_box.visible = true;
+    if sig == _pupils_sig and _pupils_box.get_child_count() > 0:
+        return;
+    _pupils_sig = sig;
+    for c in _pupils_box.get_children():
+        c.queue_free();
+    var head:Label = Label.new();
+    head.text = "Students (%d / %d), click to find:" % [pupils.size(), b.def["school_capacity"]] if not pupils.is_empty() else "No students at the school right now (classes are 8:00 to 16:00).";
+    head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    head.custom_minimum_size.x = 280;
+    _pupils_box.add_child(head);
+    for p in pupils:
+        var btn:Button = Button.new();
+        btn.focus_mode = Control.FOCUS_NONE;
+        btn.alignment = HORIZONTAL_ALIGNMENT_LEFT;
+        btn.text = "%s (age %d)" % [p.first_name, int(p.age)];
+        btn.pressed.connect(_locate.bind(p));
+        _pupils_box.add_child(btn);
+
+func _plural(name:String) -> String:
+    return name.trim_suffix("man") + "men" if name.ends_with("man") else name + "s";
 
 func _locate(p:Pawn) -> void:
     if not World.alive(p):

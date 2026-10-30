@@ -9,6 +9,7 @@ class_name World extends Node3D;
 static var instance:World = null;
 static var pending_load:Dictionary = {};     # set by SaveGame before a World is created from a save
 static var new_game_seed:int = 0;           # set by the title screen for the next new game (0 = random)
+static var choose_start:bool = false;       # set by the title screen: the next new game waits for the player to place the Town Hall
 static var backdrop:bool = false;           # the title screen builds a frozen mock town with no citizens, HUD or tools
 
 # How fast particle effects (rain, snow, smoke) play: with the game's clock, except behind the title screen where the
@@ -23,6 +24,11 @@ const START_PROFESSIONS :Array[int] = [
     JobManager.Profession.BUILDER, JobManager.Profession.BUILDER,
     JobManager.Profession.FARMER,
 ];
+const RIVER_SOIL_BONUS :float = 0.2;                 # extra fertility right at the river, fading to nothing RIVER_NEAR cells out
+const START_RIVER_AT    :float = 12.0;              # the start site is picked this far from the river (near enough to use it, far enough to build)
+const START_ORE_MIN     :int = 2;                   # iron outcrops guaranteed in the ring START_ORE_NEAR..START_ORE_FAR cells from the start
+const START_ORE_NEAR    :float = 14.0;
+const START_ORE_FAR     :float = 30.0;
 const START_ROCKS_MIN   :int = 5;                   # loose rocks guaranteed near the start (8 stone each), whatever the seed
 const START_ROCKS_NEAR  :float = 10.0;              # ... in the ring this far from the start, no further than START_ROCKS_FAR
 const START_ROCKS_FAR   :float = 22.0;
@@ -57,6 +63,8 @@ var piles       :Array[GroundPile] = [];
 var occupant    :Array = [];        # Building per cell, or null
 var node_at     :Array = [];        # ResourceNode per cell, or null
 var soil_fertility:PackedFloat32Array;
+var awaiting_start:bool = false;            # a new game before the Town Hall is placed: no colony yet, the clock stopped
+var suggested_start:Vector2i = Vector2i.ZERO;   # where the game would have started the colony (the camera begins there)
 var town_hall   :Building;
 
 var _entities   :Node3D;
@@ -132,23 +140,28 @@ func _ready() -> void:
     else:
         _spawn_nature();
         var start:Vector2i = _find_start_cell();
-        _clear_nodes(start, 10);
+        _clear_nodes(start, 13);
         if backdrop:
             TitleBackdrop.build(self, start);
             return;
-        _ensure_start_rocks(start);
-        town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
-        _start_colony_goods(start);
-        seeds.grant_trees(rng);
-        Defs.ageing_days_per_year = 4.0;
-        _spawn_settlers(start);
-        jobs.sync_targets();
+        if choose_start:
+            choose_start = false;
+            awaiting_start = true;
+            suggested_start = start;
+            GameClock.locked = true;       # time stands still until the Town Hall is placed
+            GameClock.set_speed(0);
+        else:
+            _found_colony(start);
 
     camera_rig = RTSCamera.new();
     camera_rig.name = "CameraRig";
     add_child(camera_rig);
     if loading:
         camera_rig.restore_state(save["camera"]);
+    elif awaiting_start:
+        camera_rig.focus_on(Vector3(suggested_start.x, 0.0, suggested_start.y));
+        camera_rig._distance = 75.0;
+        camera_rig._target_distance = 75.0;
     else:
         camera_rig.focus_on(town_hall.position);
     visuals.setup_weather_fx();
@@ -165,7 +178,11 @@ func _ready() -> void:
     GameClock.season_changed.connect(_on_season);
     Weather.drought_changed.connect(_on_drought);
     _apply_season(GameClock.season());
-    notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
+    if awaiting_start:
+        tools.begin_start_mode();
+        notify("Choose where to settle: click to place your Town Hall.");
+    else:
+        notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
 
 func idx(c:Vector2i) -> int:
     return c.y * Terrain.SIZE + c.x;
@@ -187,7 +204,8 @@ func _init_soil() -> void:
     soil_fertility.resize(Terrain.SIZE * Terrain.SIZE);
     for z in Terrain.SIZE:
         for x in Terrain.SIZE:
-            soil_fertility[z * Terrain.SIZE + x] = clampf(0.7 + noise.get_noise_2d(x, z) * 0.5, 0.2, 1.0);
+            var valley:float = 1.0 - clampf(terrain.river_distance(Vector2i(x, z)) / Terrain.RIVER_NEAR, 0.0, 1.0);       # the river's valley is richer soil
+            soil_fertility[z * Terrain.SIZE + x] = clampf(0.7 + noise.get_noise_2d(x, z) * 0.5 + valley * RIVER_SOIL_BONUS, 0.2, 1.0);
 
 func _spawn_nature() -> void:
     var forest:FastNoiseLite = FastNoiseLite.new();
@@ -232,7 +250,13 @@ func _find_start_cell() -> Vector2i:
             var hr:Vector2 = terrain.rect_height_range(r);
             if hr.x < Terrain.WATER_LEVEL + 0.5:
                 continue;
-            var score:float = (hr.y - hr.x) * 4.0 + Vector2(c - center).length() * 0.1;
+            # level ground matters most close in (the first buildings), and a wider level apron leaves room to grow
+            var near:Vector2 = terrain.rect_height_range(Rect2i(c - Vector2i(8, 8), Vector2i(16, 16)));
+            var wide:Vector2 = terrain.rect_height_range(Rect2i(c - Vector2i(14, 14), Vector2i(28, 28)).intersection(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE)));
+            var score:float = (hr.y - hr.x) * 4.0 + (near.y - near.x) * 3.0 + (wide.y - wide.x) * 1.5 + Vector2(c - center).length() * 0.1;
+            if not terrain.river_path.is_empty():       # settle by the river: close, but not on its bank
+                var rd:float = minf(terrain.river_distance(c), 40.0);
+                score += absf(rd - START_RIVER_AT) * 0.7 + maxf(0.0, 9.0 - rd);
             if score < best_score:
                 best_score = score;
                 best = c;
@@ -261,6 +285,63 @@ func _ensure_start_rocks(start:Vector2i) -> void:
     while have < START_ROCKS_MIN and not free.is_empty():
         var pick:int = rng.randi_range(0, free.size() - 1);
         add_node(&"rock", free[pick]);
+        free.remove_at(pick);
+        have += 1;
+
+# Founds the colony around a start cell: the Town Hall (already built), its goods and the first settlers.
+func _found_colony(start:Vector2i) -> void:
+    _ensure_start_rocks(start);
+    _ensure_start_ore(start);
+    town_hall = place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
+    _start_colony_goods(start);
+    seeds.grant_trees(rng);
+    Defs.ageing_days_per_year = 4.0;
+    _spawn_settlers(start);
+    jobs.sync_targets();
+
+# The player's choice of start (see awaiting_start): returns "" once the colony is founded with the Town Hall at origin,
+# else why that spot will not do.
+func begin_colony(origin:Vector2i) -> String:
+    if not awaiting_start:
+        return "The colony is already founded";
+    var start:Vector2i = origin + Vector2i(2, 2);
+    var why:String = can_place(&"town_hall", origin, Vector2i(4, 4));
+    if why != "":
+        return why;
+    _clear_nodes(start, 13);        # the hall's ground and the settlers' first yard are cleared of trees and rocks
+    awaiting_start = false;
+    _found_colony(start);
+    GameClock.locked = false;
+    GameClock.set_speed(1);
+    camera_rig._distance = 40.0;
+    camera_rig._target_distance = 40.0;
+    camera_rig.focus_on(town_hall.position);
+    notify("Your settlers have arrived. Spring has begun.");
+    return "";
+
+# Iron is a little scarce on the bigger map, so the ring START_ORE_NEAR to START_ORE_FAR cells from the start always
+# holds at least START_ORE_MIN outcrops (placed on the gentler ground; the hills keep their own).
+func _ensure_start_ore(start:Vector2i) -> void:
+    var have:int = 0;
+    for rn in nodes:
+        var d:float = Vector2(rn.cell - start).length();
+        if rn.kind == &"ore" and d >= START_ORE_NEAR and d <= START_ORE_FAR:
+            have += 1;
+    var free:Array[Vector2i] = [];
+    var reach:int = ceili(START_ORE_FAR);
+    for z in range(start.y - reach, start.y + reach + 1):
+        for x in range(start.x - reach, start.x + reach + 1):
+            var c:Vector2i = Vector2i(x, z);
+            var d:float = Vector2(c - start).length();
+            if d < START_ORE_NEAR or d > START_ORE_FAR or not terrain.in_bounds(c):
+                continue;
+            if terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4 or terrain.cell_slope(c) > 1.4:
+                continue;
+            if node_at[idx(c)] == null and occupant[idx(c)] == null:
+                free.append(c);
+    while have < START_ORE_MIN and not free.is_empty():
+        var pick:int = rng.randi_range(0, free.size() - 1);
+        add_node(&"ore", free[pick]);
         free.remove_at(pick);
         have += 1;
 
@@ -491,15 +572,16 @@ func plant_tree(c:Vector2i) -> ResourceNode:
     return rn;
 
 # Free, dry, gentle ground that is not road or field, and not touching another tree.
-func can_plant_tree(c:Vector2i) -> bool:
+# spacing: how many cells of clear ground a new tree needs on every side (0 lets trees stand shoulder to shoulder).
+func can_plant_tree(c:Vector2i, spacing:int = 1) -> bool:
     if not terrain.in_bounds(c) or terrain.is_water(c) or terrain.cell_height(c) < Terrain.WATER_LEVEL + 0.4:
         return false;
     if occupant[idx(c)] != null or node_at[idx(c)] != null or terrain.get_overlay(c) != Terrain.Overlay.NONE:
         return false;
     if terrain.cell_slope(c) > 1.2 or planting.has(c):
         return false;
-    for dz in range(-1, 2):
-        for dx in range(-1, 2):
+    for dz in range(-spacing, spacing + 1):
+        for dx in range(-spacing, spacing + 1):
             var n:Vector2i = c + Vector2i(dx, dz);
             if terrain.in_bounds(n) and node_at[idx(n)] != null and (node_at[idx(n)] as ResourceNode).is_tree():
                 return false;
@@ -585,17 +667,33 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
         return "No saplings yet: foragers may find some";
     if not Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE).encloses(r):
         return "Out of bounds";
+    var bridge:bool = Defs.BUILDINGS[def_id].get("bridge", false);
+    var fishing:bool = Defs.BUILDINGS[def_id].get("fishing", false);       # goes partly over the water, like a bridge
+    var wet:int = 0;
+    var dry:int = 0;
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
             if terrain.is_water(c):
-                return "Can't build on water";
+                if not bridge and not fishing:
+                    return "Can't build on water";
+                wet += 1;
+            else:
+                dry += 1;
+                if fishing and terrain.cell_slope(c) > 1.0:
+                    return "The shore is too steep here";
             if occupant[idx(c)] != null:
                 return "Something is already built here";
             if terrain.get_overlay(c) == Terrain.Overlay.ROAD:
                 return "A road is in the way";
             if terrain.get_overlay(c) == Terrain.Overlay.CHANNEL or terrain.get_overlay(c) == Terrain.Overlay.CHANNEL_WET:
                 return "A channel is in the way";
+    if bridge:
+        return "" if wet > 0 else "A bridge has to cross water";
+    if fishing:
+        if wet == 0:
+            return "A fishing hut has to stand partly over the water";
+        return "" if dry > 0 else "A fishing hut needs some of its ground on the shore";
     var hr:Vector2 = terrain.rect_height_range(r);
     var limit:float = MAX_BUILD_SLOPE * (2.0 if Defs.BUILDINGS[def_id].get("drag_size", false) else 1.0);
     if hr.y - hr.x > limit:
@@ -608,9 +706,9 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
     var r:Rect2i = Rect2i(origin, size);
     var is_field:bool = def.get("field", false);
     var is_ground:bool = is_field or def.get("graveyard", false) or def.get("pasture", false);       # drawn as a terrain overlay: bare while it goes up
-    if (not def.get("drag_size", false) or def.get("flatten", false)) and not restoring:
+    if (not def.get("drag_size", false) or def.get("flatten", false)) and not def.get("no_flatten", false) and not restoring:
         terrain.flatten_rect(r);
-    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else TradingPost.new() if def.get("trade_post", false) else Apiary.new() if def.get("apiary", false) else Building.new();
+    var b:Building = Field.new() if is_field else Graveyard.new() if def.get("graveyard", false) else Pasture.new() if def.get("pasture", false) else TradingPost.new() if def.get("trade_post", false) else Apiary.new() if def.get("apiary", false) else FishingHut.new() if def.get("fishing", false) else Building.new();
     for z in range(r.position.y, r.end.y):
         for x in range(r.position.x, r.end.x):
             var c:Vector2i = Vector2i(x, z);
@@ -698,6 +796,18 @@ func has_governance() -> bool:
     return alive(town_hall) and town_hall.is_complete() and town_hall.has_upgrade(&"governance");
 
 # Why this building can't be moved right now, or "" when it can.
+# A bridge deck stands on this cell (walkers cross the water on it).
+func is_bridge(c:Vector2i) -> bool:
+    var b:Building = occupant[idx(c)] if terrain.in_bounds(c) else null;
+    return b != null and b.def.get("bridge", false);
+
+# The height citizens stand at on this spot: the ground, or the deck of a bridge over water.
+func stand_y(x:float, z:float) -> float:
+    var y:float = terrain.height_at(x, z);
+    if y < Terrain.WATER_LEVEL + Building.DECK_HEIGHT and is_bridge(Vector2i(int(x), int(z))):
+        return Terrain.WATER_LEVEL + Building.DECK_HEIGHT;
+    return y;
+
 func relocation_block_reason(b:Building) -> String:
     if not b.def.get("relocatable", true):
         return "Can't be moved";
@@ -1027,11 +1137,14 @@ func _refresh_nav_rect(r:Rect2i) -> void:
 
 func _refresh_nav(c:Vector2i) -> void:
     var i:int = idx(c);
-    var solid:bool = terrain.is_water(c) or terrain.cell_slope(c) > MAX_WALK_SLOPE;
-    var weight:float = 1.0;
+    var solid:bool = (terrain.is_water(c) and not terrain.is_shallow(c)) or terrain.cell_slope(c) > MAX_WALK_SLOPE;
+    var weight:float = 3.0 if terrain.is_water(c) else 1.0;       # wading is slow: a detour is cheaper than a short ford
     var b:Building = occupant[i];
     if b != null and not b.is_walkable():
         solid = true;
+    elif b != null and b.def.get("bridge", false):
+        solid = false;          # a deck (or the stakes of one) carries walkers over the water
+        weight = 0.8;
     var rn:ResourceNode = node_at[i];
     if rn != null:
         if rn.solid:

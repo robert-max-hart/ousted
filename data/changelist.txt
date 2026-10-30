@@ -3,6 +3,19 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.4.5 | 30 Oct 2026 | Rivers, bridges and playtest fixes
+- Every map has a winding river from one edge to the other, wider downstream. Citizens can wade through its shallow fords (at half speed); deep water still blocks them. The land beside it is richer soil, and you start a short walk from it.
+- New Bridge (Civic): drag a wooden deck at least 2 cells wide across the water, with its ends on land. Citizens walk over it at full speed.
+- Idle laborers now chop mature trees when the colony has under 30 wood, and unmarked gathering stays within 45 cells of the citizen (marked trees and rocks are still worked anywhere).
+- Iron: the ring 14 to 30 cells from the start always has at least 2 outcrops. The start site is chosen for a wider area of level ground.
+- Trade window redone: a table of price and stock for each side, +1 +5 -1 -5 zero and Max buttons, prices coloured green or red by how they favour you, goods the merchant asked for sorted to the top in bold on gold, and a bar comparing what they pay with what you owe.
+- New: a Build another button, a student list at the School, a button to send a merchant away early, a click on the merchant banner to look at them, a front arrow on the build ghost, and a Game saved message.
+- Woodcutters plant trees closer together and keep up to 60 saplings growing.
+- Citizens freeze in their pose when the game is paused; scarecrows stand between plots; grass tufts are smaller and denser; road colour varies less; day and night blend more slowly; the Road tool is under Civic and the terrain brushes are gone from the toolbar.
+- New Fishing Hut (Food) and Fisherman profession: build it on the shore with part of it over the water. Fishermen catch fish from the water in its circle: the more of the circle is water, the better the catch, and two huts whose circles overlap both catch less. Fish are a new food that spoils in 4 days.
+- New games let you choose where to settle: look over the map, then click to place the Town Hall, and the settlers arrive there. A note beside the cursor rates the spot: level ground, water, soil, trees, wild food, stone and iron. Untick "Choose where to settle" on the New Game screen to have the game pick a spot.
+- Saves from before this build keep their old map (no river).
+
 # 0.4.4 | 30 Oct 2026 | A bigger, smoother map
 - The map is 160 by 160 cells (it was 128), about 56% more land.
 - Much more level ground: about two thirds of the land is flat (it was under a third), the lowlands roll gently, and the hills are fewer and stand in a few regions, still tall. Every map still has hills for ore.

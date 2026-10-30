@@ -13,9 +13,9 @@
 class_name GrassDetail extends Node3D;
 
 const BLOCK         :int = 16;
-const DENSITY       :float = 0.9;       # tufts per grassy cell (the knob if it costs too much frame rate)
+const DENSITY       :float = 2.4;       # tufts per grassy cell (the knob if it costs too much frame rate)
 const WINTER_SHARE  :float = 0.3;       # share of the tufts that still stick out of the snow
-const DRAW_DISTANCE :float = 62.0;      # metres from the camera to a block's middle
+const DRAW_DISTANCE :float = 52.0;      # metres from the camera to a block's middle
 const REBUILDS_PER_FRAME:int = 4;
 const BY_SEASON     :Array[Color] = [
     Color(0.36, 0.58, 0.22), Color(0.4, 0.57, 0.2), Color(0.64, 0.52, 0.22), Color(0.66, 0.6, 0.42),
@@ -73,16 +73,16 @@ func _process(_delta:float) -> void:
 # Three crossed blades that lean a little.
 func _make_tuft() -> ArrayMesh:
     var mesh:ArrayMesh = ArrayMesh.new();
-    for i in 3:
+    for i in 4:
         var blade:CylinderMesh = CylinderMesh.new();
         blade.top_radius = 0.0;
-        blade.bottom_radius = 0.036;
-        blade.height = 0.3;
+        blade.bottom_radius = 0.022;
+        blade.height = 0.2;
         blade.radial_segments = 3;
         blade.rings = 1;
         blade.cap_bottom = false;
-        var lean:Basis = Basis(Vector3.UP, i * 2.1) * Basis(Vector3.RIGHT, 0.22);
-        ResourceRenderer.add_part(mesh, blade, Transform3D(lean, lean * Vector3(0, 0.15, 0)), _mat);
+        var lean:Basis = Basis(Vector3.UP, i * 1.6) * Basis(Vector3.RIGHT, 0.2 + 0.05 * i);
+        ResourceRenderer.add_part(mesh, blade, Transform3D(lean, lean * Vector3(0, 0.1, 0)), _mat);
     return mesh;
 
 func _rebuild(b:Vector2i) -> void:

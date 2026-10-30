@@ -20,6 +20,10 @@ var _speed_btns :Array[Button] = [];
 var _tool_btns  :Dictionary = {};       # key -> Button
 var _cat_btns   :Array[Button] = [];     # build categories (Housing, Storage, ...)
 var _build_row  :HFlowContainer;         # the buildings of the open category
+var _toast      :Label;
+var _toast_tween:Tween;
+var _tool_row   :HFlowContainer;
+var _road_cat   :int = -1;               # the category the Road tool button lives in
 var _open_cat   :int = -1;               # index into Defs.BUILD_CATEGORIES, or -1 when none is open
 var _jobs_rows  :Array[Label] = [];
 var _jobs_flags :Array[Label] = [];     # a red ! on professions whose buildings have empty positions
@@ -36,6 +40,8 @@ var _help_label :Label;
 var _help_open  :bool = false;
 var _info_btn   :Button;
 var _move_btn   :Button;
+var _copy_btn   :Button;               # start placing another building of the selected one's kind
+var _dismiss_btn:Button;               # send the merchant on their way early
 var _jobs_panel :PanelContainer;
 var _jobs_toggle:Button;
 var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
@@ -47,6 +53,9 @@ var _site_box   :VBoxContainer;      # cancel and build priority for a site
 var _cancel_btn :Button;
 var _priority_btns:Array[Button] = [];
 var _merchant_label:Label;           # a note under the top bar while a merchant is on the way, here or leaving
+var _site_panel :PanelContainer;     # the rating of the spot under the cursor while the Town Hall is being placed
+var _site_text  :RichTextLabel;
+var _site_for   :Vector2i = Vector2i(-9999, -9999);
 var _size_label :Label;              # follows the cursor while sizing a field, graveyard or stockpile
 var _crop_list  :VBoxContainer;      # the crop choices, shown inline under the inspector's button
 var _ledger_btn :Button;
@@ -94,7 +103,10 @@ func _ready() -> void:
     _build_menu(root);
     _merchant_label = Label.new();
     _merchant_label.visible = false;
-    _merchant_label.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _merchant_label.mouse_filter = Control.MOUSE_FILTER_STOP;
+    _merchant_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND;
+    _merchant_label.tooltip_text = "Click to look at the merchant";
+    _merchant_label.gui_input.connect(_on_merchant_label_input);
     _merchant_label.set_anchors_preset(Control.PRESET_CENTER_TOP);
     _merchant_label.grow_horizontal = Control.GROW_DIRECTION_BOTH;
     _merchant_label.offset_top = 52.0;
@@ -109,6 +121,34 @@ func _ready() -> void:
     _size_label.add_theme_color_override("font_outline_color", Color.BLACK);
     _size_label.add_theme_constant_override("outline_size", 5);
     root.add_child(_size_label);
+    _site_panel = PanelContainer.new();
+    _site_panel.visible = false;
+    _site_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    var site_style:StyleBoxFlat = StyleBoxFlat.new();
+    site_style.bg_color = Color(0.06, 0.06, 0.05, 0.88);
+    site_style.set_corner_radius_all(5);
+    site_style.set_content_margin_all(8);
+    _site_panel.add_theme_stylebox_override("panel", site_style);
+    _site_text = RichTextLabel.new();
+    _site_text.bbcode_enabled = true;
+    _site_text.fit_content = true;
+    _site_text.scroll_active = false;
+    _site_text.custom_minimum_size = Vector2(290, 0);
+    _site_text.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _site_panel.add_child(_site_text);
+    root.add_child(_site_panel);
+    _toast = Label.new();
+    _toast.visible = false;
+    _toast.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    _toast.set_anchors_preset(Control.PRESET_CENTER_TOP);
+    _toast.grow_horizontal = Control.GROW_DIRECTION_BOTH;
+    _toast.offset_top = 90.0;
+    _toast.z_index = 100;
+    _toast.add_theme_font_size_override("font_size", 20);
+    _toast.add_theme_color_override("font_color", Color(0.75, 1.0, 0.7));
+    _toast.add_theme_color_override("font_outline_color", Color.BLACK);
+    _toast.add_theme_constant_override("outline_size", 6);
+    root.add_child(_toast);
     _ledger_panel = LedgerPanel.new();
     root.add_child(_ledger_panel);
     _ledger_panel.setup(World.instance.ledger);
@@ -143,10 +183,37 @@ func _process(delta:float) -> void:
     if size_text != "":
         _size_label.text = size_text;
         _size_label.position = get_viewport().get_mouse_position() + Vector2(18, 20);
+    _update_site_panel();
     _refresh -= delta;
     if _refresh <= 0.0:
         _refresh = REFRESH_RATE;
         _refresh_all();
+
+# While the Town Hall is being placed: what the spot under the cursor is like (redone when the cursor moves to a new cell).
+func _update_site_panel() -> void:
+    var w:World = World.instance;
+    _site_panel.visible = w.awaiting_start and w.tools.hover_valid();
+    if not _site_panel.visible:
+        return;
+    var c:Vector2i = w.tools.hover_origin() + Vector2i(2, 2);
+    if c != _site_for:
+        _site_for = c;
+        _site_text.text = SiteRating.bbcode(SiteRating.rate(w, c));
+    var mouse:Vector2 = get_viewport().get_mouse_position();
+    var room:Vector2 = get_viewport().get_visible_rect().size - _site_panel.size - Vector2(8, 8);
+    _site_panel.position = Vector2(minf(mouse.x + 28.0, room.x), minf(mouse.y + 24.0, room.y));
+
+# A short message in the middle of the screen that fades out (it also shows over the Esc menu).
+func toast(msg:String) -> void:
+    _toast.text = msg;
+    _toast.visible = true;
+    _toast.modulate = Color.WHITE;
+    if _toast_tween != null:
+        _toast_tween.kill();
+    _toast_tween = create_tween();
+    _toast_tween.tween_interval(1.2);
+    _toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.8);
+    _toast_tween.tween_callback(func() -> void: _toast.visible = false);
 
 func notify(msg:String) -> void:
     var l:Label = Label.new();
@@ -179,6 +246,9 @@ func _refresh_all() -> void:
     if not governed and _policies_btn.button_pressed:
         _policies_btn.button_pressed = false;
     _apply_category();
+    _tool_row.visible = not w.awaiting_start;          # before the Town Hall is down there is only one thing to do
+    if w.awaiting_start:
+        _build_row.visible = false;
     parts.append("Pop %d" % w.pawns.size());
     var idle:int = w.pawns.filter(func(p:Pawn) -> bool: return p.is_idle()).size();
     if idle > 0:
@@ -294,6 +364,7 @@ func _refresh_trade_button(obj:Variant) -> void:
     _trade_btn.visible = post != null and post.is_complete();
     _trade_btn.disabled = not here;
     _trade_btn.text = "Trade with the merchant" if here else "No merchant here";
+    _dismiss_btn.visible = here;
     _hold_btn.visible = post != null and post.is_complete();
     if post == null and _hold_panel.visible:
         _hold_panel.visible = false;
@@ -314,6 +385,7 @@ func _refresh_relocate(obj:Variant) -> void:
     var b:Building = obj as Building if obj is Building else null;
     var show:bool = b != null and b.def.get("relocatable", true) and b.is_complete();
     _move_btn.visible = show;
+    _copy_btn.visible = b != null and b.is_complete() and Defs.BUILD_MENU.has(b.def_id) and not b.def.get("unique", false);
     if not show:
         return;
     var why:String = World.instance.relocation_block_reason(b);
@@ -484,6 +556,9 @@ func _on_mode_changed(mode:int) -> void:
             if (Defs.BUILD_CATEGORIES[ci][1] as Array).has(StringName(key)):
                 _open_cat = ci;
         _apply_category();
+    elif mode == PlayerTools.Mode.ROAD and _road_cat >= 0:
+        _open_cat = _road_cat;
+        _apply_category();
 
 func _on_selection_changed(_obj:Variant) -> void:
     _crop_list.visible = false;
@@ -631,14 +706,14 @@ func _build_toolbar(root:Control) -> void:
     _hint.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7));
     col.add_child(_hint);
     var row:HFlowContainer = HFlowContainer.new();     # wraps to a second line when the window is narrow
+    _tool_row = row;
     col.add_child(row);
     var tools:PlayerTools = World.instance.tools;
     var group:ButtonGroup = ButtonGroup.new();
     group.allow_unpress = false;
     var modes:Array = [
         [PlayerTools.Mode.SELECT, "Select"], [PlayerTools.Mode.HARVEST, "Harvest"], [PlayerTools.Mode.FORAGE, "Forage"],
-        [PlayerTools.Mode.ROAD, "Road"], [PlayerTools.Mode.CHANNEL, "Channel"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
-        [PlayerTools.Mode.RAISE, "Raise"], [PlayerTools.Mode.LOWER, "Lower"], [PlayerTools.Mode.FLATTEN, "Flatten"],
+        [PlayerTools.Mode.CHANNEL, "Channel"], [PlayerTools.Mode.DEMOLISH, "Demolish"], [PlayerTools.Mode.CANCEL, "Cancel"],
     ];
     for m in modes:
         var b:Button = _tool_button(row, group, m[1], PlayerTools.MODE_HINTS[m[0]]);
@@ -659,8 +734,19 @@ func _build_toolbar(root:Control) -> void:
             var b:Button = _tool_button(_build_row, group, def["name"], "Cost: %s" % Defs.cost_string(def["cost"]));
             b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
             _tool_btns[String(id)] = b;
+        if Defs.BUILD_CATEGORIES[ci][0] == "Civic":
+            var rb:Button = _tool_button(_build_row, group, "Road", PlayerTools.MODE_HINTS[PlayerTools.Mode.ROAD]);
+            rb.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.ROAD, &""));
+            _tool_btns[str(PlayerTools.Mode.ROAD)] = rb;
+            _road_cat = ci;
     (_tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
     _apply_category();
+
+func _on_merchant_label_input(ev:InputEvent) -> void:
+    if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+        var m:Merchant = World.instance.traders.merchant;
+        if World.alive(m):
+            World.instance.camera_rig.focus_on(Vector3(m.position.x, 0.0, m.position.z));
 
 func _on_category_pressed(index:int) -> void:
     _open_cat = -1 if _open_cat == index else index;
@@ -677,6 +763,8 @@ func _apply_category() -> void:
             if id == &"town_hall":
                 shown = shown and not _town_hall_exists(World.instance);
             (_tool_btns[String(id)] as Button).visible = shown;
+    if _tool_btns.has(str(PlayerTools.Mode.ROAD)):
+        (_tool_btns[str(PlayerTools.Mode.ROAD)] as Button).visible = _open_cat == _road_cat;
 
 func _build_jobs_panel(root:Control) -> void:
     var panel:PanelContainer = _panel(root, &"jobs");
@@ -866,6 +954,16 @@ func _build_info_panel(root:Control) -> void:
         if sel is Building and World.alive(sel):
             World.instance.tools.start_relocate(sel));
     col.add_child(_move_btn);
+    _copy_btn = Button.new();
+    _copy_btn.text = "Build another";
+    _copy_btn.tooltip_text = "Place another building of this kind (same size and facing)";
+    _copy_btn.focus_mode = Control.FOCUS_NONE;
+    _copy_btn.visible = false;
+    _copy_btn.pressed.connect(func() -> void:
+        var sel:Variant = World.instance.tools.selected;
+        if sel is Building and World.alive(sel):
+            World.instance.tools.start_copy(sel));
+    col.add_child(_copy_btn);
     _extras = InspectorExtras.new();
     col.add_child(_extras);
     _site_box = VBoxContainer.new();
@@ -905,6 +1003,16 @@ func _build_info_panel(root:Control) -> void:
         if sel is TradingPost:
             _trade_panel.open(sel));
     col.add_child(_trade_btn);
+    _dismiss_btn = Button.new();
+    _dismiss_btn.text = "Send the merchant away";
+    _dismiss_btn.tooltip_text = "The merchant leaves now. An unfinished order lapses and its goods come back.";
+    _dismiss_btn.focus_mode = Control.FOCUS_NONE;
+    _dismiss_btn.visible = false;
+    _dismiss_btn.pressed.connect(func() -> void:
+        if World.instance.traders.present():
+            _trade_panel.visible = false;
+            World.instance.traders.depart());
+    col.add_child(_dismiss_btn);
     _hold_btn = Button.new();
     _hold_btn.text = "Goods held for trade";
     _hold_btn.focus_mode = Control.FOCUS_NONE;

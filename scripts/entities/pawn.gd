@@ -6,6 +6,7 @@
 class_name Pawn extends Node3D;
 
 const WALK_SPEED        :float = 3.0;      # metres per real second at 1x
+const WADE_SPEED_MULT   :float = 0.5;       # in shallow water
 const ROAD_SPEED_MULT   :float = 1.5;
 const COLD_DAMAGE_BELOW:float = 0.2;      # warmth under this starts hurting health, more the lower it gets
 const CARRY_CAP         :int = 6;
@@ -176,7 +177,7 @@ func _process(delta:float) -> void:
             status = "Idle";
             return;
     _run_task(delta * GameClock.speed(), dh);
-    position.y = world.terrain.height_at(position.x, position.z);
+    position.y = world.stand_y(position.x, position.z);
 
 # --------------------------------
 # Tools
@@ -585,7 +586,7 @@ func _follow_path(move_dt:float) -> bool:
     var base:float = WALK_SPEED * (0.75 if energy < 0.15 else 1.0);
     while time > 0.0 and _path_i < _path.size():
         var c:Vector2i = _path[_path_i];
-        var spd:float = base * (ROAD_SPEED_MULT if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD else 1.0);
+        var spd:float = base * (ROAD_SPEED_MULT if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD else WADE_SPEED_MULT if world.terrain.is_water(c) and not world.is_bridge(c) else 1.0);
         var to:Vector2 = Vector2(c.x + 0.5 - position.x, c.y + 0.5 - position.z);
         var d:float = to.length();
         if d > 0.001:
@@ -667,6 +668,8 @@ func is_idle() -> bool:
 # Working: lean into it and swing a tool. Walking: a small bob. Runs at the game speed (up to 3x, faster looks frantic).
 func _animate(delta:float) -> void:
     var speed:float = minf(GameClock.speed(), 3.0);
+    if speed <= 0.0:         # paused: freeze the pose where it is
+        return;
     _anim_t += delta * speed;
     var work:bool = _work_now and speed > 0.0;
     var move:bool = _move_now and speed > 0.0;

@@ -8,12 +8,13 @@ class_name JobManager extends TaskBase;
 
 # GATHERER is retired (laborers harvest what is marked, food included); the slot stays so old saves and the
 # experience of the "gathering" job keep their numbers, and reconcile() turns any left into laborers.
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN, FISHERMAN };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan", "Fisherman"];
 const MAX_BUILDERS_PER_SITE :int = 4;
 const PRIORITY_WEIGHT       :float = 1.0e6;     # one build priority step outweighs any distance on the map
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
+const WOOD_LOW              :int = 30;     # idle laborers chop mature trees when the colony has less wood than this
 
 var needs:NeedsTasks;
 var school:SchoolTasks;
@@ -129,11 +130,13 @@ func _job_order(prof:int) -> Array[Callable]:
             return [school.teach_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.BLACKSMITH:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.FISHERMAN:
+            return [production.fisherman_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.ARTISAN:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -550,6 +553,13 @@ func _forage_if_hungry_task(p:Pawn) -> Task:
     if Stock.food_total() >= world.pawns.size() * FOOD_PER_PAWN_LOW:
         return null;
     return _forage_task(p);
+
+# Idle laborers keep the colony in wood: with the stock low they chop the nearest mature tree (within WORK_RANGE).
+func _wood_if_short_task(p:Pawn) -> Task:
+    if Stock.amount(&"wood") >= WOOD_LOW:
+        return null;
+    return harvest_node_task(p, func(rn:ResourceNode) -> bool:
+        return rn.is_tree() and rn.is_mature());
 
 # Keep filling our hands with the same item before walking back.
 func _gather_more_task(p:Pawn, item:StringName) -> Task:

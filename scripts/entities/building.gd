@@ -9,6 +9,8 @@ enum State { CONSTRUCTION, COMPLETE };
 
 # Build priority of a site (or an upgrade being built): paused sites get no hauling or building, and the rest are
 # served highest first (ties go to the nearest).
+# The top of a bridge deck above the water surface (citizens on it stand at this height).
+const DECK_HEIGHT:float = 0.5;
 const PRIORITY_NAMES:Array[String] = ["Paused", "Low", "Medium", "High", "Critical"];
 const PRIORITY_PAUSED:int = 0;
 const PRIORITY_MEDIUM:int = 2;
@@ -85,7 +87,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     for c in def.get("controls", []):
         settings[c["id"]] = c["default"];
     var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
-    position = Vector3(center.x, w.terrain.height_at(center.x, center.y), center.y);
+    position = Vector3(center.x, _ground_y(center), center.y);
     _build_visual();
     _update_visual();
 
@@ -100,11 +102,16 @@ func footprint() -> Rect2i:
 func on_resized(_old:Rect2i) -> void:
     name = "%s_%d_%d" % [def_id, origin.x, origin.y];
     var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
-    position = Vector3(center.x, world.terrain.height_at(center.x, center.y), center.y);
+    position = Vector3(center.x, _ground_y(center), center.y);
     if def.get("shape", "") == "pile" and _body != null:
         (_body.mesh as BoxMesh).size = Vector3(size.x - 0.3, def.get("height", 0.1), size.y - 0.3);
     if _fence != null:
         _fence.rebuild();
+
+# Where the building's origin stands: the ground, or the water surface for a bridge.
+func _ground_y(center:Vector2) -> float:
+    var y:float = world.terrain.height_at(center.x, center.y);
+    return maxf(y, Terrain.WATER_LEVEL) if def.get("bridge", false) or def.get("fishing", false) else y;
 
 func display_name() -> String:
     return def["name"];
@@ -876,6 +883,8 @@ func _build_visual() -> void:
             for sx in [-0.55, 0.55]:
                 var w:MeshInstance3D = _add_mesh(wheel, _flat_mat(Color(0.25, 0.18, 0.12)), Vector3(sx, 0.28, vsize.y * 0.42));
                 w.rotation.z = PI * 0.5;
+        "bridge":
+            _build_bridge(h);
         "pile":
             var pad:BoxMesh = BoxMesh.new();
             pad.size = Vector3(vsize.x - 0.3, h, vsize.y - 0.3);
@@ -887,6 +896,29 @@ func _build_visual() -> void:
             pass;
     if def.has("decor"):
         BuildingShapes.decorate(self, def["decor"]);
+
+# A plank deck with a low rail along each long side, standing on posts down to the water.
+func _build_bridge(h:float) -> void:
+    var deck:BoxMesh = BoxMesh.new();
+    deck.size = Vector3(vsize.x, h, vsize.y);
+    var top:float = DECK_HEIGHT;
+    _body = _add_mesh(deck, _body_mat, Vector3(0, top - h * 0.5, 0));
+    _body_y0 = top - h;
+    _body_h = h;
+    var along_x:bool = vsize.x >= vsize.y;
+    var rail_mat:StandardMaterial3D = _flat_mat(Color(0.36, 0.26, 0.16));
+    var post:BoxMesh = BoxMesh.new();
+    post.size = Vector3(0.14, 0.5, 0.14);
+    var rail:BoxMesh = BoxMesh.new();
+    rail.size = Vector3(vsize.x if along_x else 0.08, 0.07, 0.08 if along_x else vsize.y);
+    for side in [-1.0, 1.0]:
+        var off:float = (vsize.y if along_x else vsize.x) * 0.5 - 0.08;
+        add_decor(rail, rail_mat, Vector3(0.0 if along_x else side * off, top + 0.42, side * off if along_x else 0.0));
+        var length:float = vsize.x if along_x else vsize.y;
+        var n:int = maxi(2, int(length / 2.0) + 1);
+        for k in n:
+            var along:float = lerpf(-length * 0.5 + 0.1, length * 0.5 - 0.1, float(k) / float(n - 1));
+            add_decor(post, rail_mat, Vector3(along if along_x else side * off, top + 0.25, side * off if along_x else along));
 
 # BuildingShapes: the body (which rises while a site) and roof of a custom shape, and loose extras.
 func set_body(mesh:MeshInstance3D, y0:float, height:float) -> void:

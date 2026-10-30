@@ -141,9 +141,13 @@ func _ready() -> void:
     t.merchant.state = Merchant.State.TRADING;
     panel.open(post);
     var text:String = "";
+    var color:Color = Color.WHITE;
     for row in panel._buy_list.get_children():
-        text += (row.get_node("Name") as Label).text;
-    _expect("a dear item shows its usual price (%s)" % text, text.contains("[dear, usual 2.50]"));
+        var ui:Dictionary = row.get_meta("ui");
+        text += (ui["price"] as Label).tooltip_text;
+        color = (ui["price"] as Label).get_theme_color("font_color");
+    _expect("an item's tooltip shows its usual price (%s)" % text, text.contains("Usual price 2.50"));
+    _expect("a dear item the colony buys is red, not green", color.r > color.g);
     print("TRADE POLISH %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

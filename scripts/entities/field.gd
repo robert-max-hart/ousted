@@ -69,8 +69,8 @@ func _build_scarecrows() -> void:
     hat.albedo_color = Color(0.3, 0.22, 0.14);
     for bz in range(0, size.y, 6):
         for bx in range(0, size.x, 6):
-            var c:Vector2i = origin + Vector2i(mini(bx + 3, size.x - 1), mini(bz + 3, size.y - 1));
-            var base:Vector3 = world.terrain.cell_center(c);
+            var c:Vector2i = origin + Vector2i(clampi(bx + 3, 1, size.x - 1), clampi(bz + 3, 1, size.y - 1));      # a grid corner: between the plots, not on one
+            var base:Vector3 = Vector3(c.x, world.terrain.height_at(c.x, c.y), c.y);
             var pole:BoxMesh = BoxMesh.new();
             pole.size = Vector3(0.07, 1.5, 0.07);
             _scarecrow_part(pole, wood, base + Vector3(0, 0.75, 0));

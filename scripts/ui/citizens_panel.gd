@@ -68,7 +68,7 @@ func _refresh() -> void:
         if not World.alive(p):
             continue;
         (row[2] as Label).text = "%d" % int(p.age);
-        (row[3] as Label).text = p.profession_name() if p.is_adult() else p.stage_name();
+        (row[3] as Label).text = p.profession_name() if p.is_adult() else p.stage_name().capitalize();
         (row[4] as Label).text = p.status;
         (row[5] as Label).text = "-" if p.is_baby() else "%d%%" % roundi(p.happiness() * 100.0);
         (row[4] as Label).add_theme_color_override("font_color", Color(1.0, 0.85, 0.4) if p.is_idle() else Color.WHITE);
@@ -86,7 +86,7 @@ func _key(p:Pawn) -> Variant:
         1:
             return p.age;
         2:
-            return p.profession_name() if p.is_adult() else p.stage_name();
+            return p.profession_name() if p.is_adult() else p.stage_name().capitalize();
         3:
             return p.status;
         4:

@@ -46,6 +46,7 @@ func _emit_hour(abs_hour:int) -> void:
 
 # A new game starts from the first morning again, at normal speed.
 func reset() -> void:
+    locked = false;
     total_hours = START_HOUR;
     _last_hour = int(START_HOUR);
     set_speed(1);
@@ -57,6 +58,7 @@ func save_state() -> Dictionary:
     return {"total_hours": total_hours, "speed_index": speed_index, "resume_speed": _resume_speed};
 
 func restore_state(d:Dictionary) -> void:
+    locked = false;
     total_hours = d["total_hours"];
     _last_hour = int(total_hours);          # no hour signals for the time that "passed" while loading
     _resume_speed = d["resume_speed"];
@@ -72,7 +74,11 @@ func game_hours(real_delta:float) -> float:
 func speed() -> float:
     return SPEEDS[speed_index];
 
+var locked:bool = false;           # the speed can't be changed (a new game waiting for the Town Hall to be placed)
+
 func set_speed(index:int) -> void:
+    if locked and index != 0:
+        return;
     speed_index = clampi(index, 0, SPEEDS.size() - 1);
     if speed_index > 0:
         _resume_speed = speed_index;

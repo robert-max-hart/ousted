@@ -6,6 +6,8 @@
 # ----------------------------------------------------------------
 class_name TaskBase extends RefCounted;
 
+const WORK_RANGE:float = 45.0;      # cells: how far from where they stand citizens go for unmarked gathering
+
 var world:World;
 
 func _init(w:World) -> void:
@@ -36,9 +38,10 @@ func workers_at(b:Building) -> int:
 func in_radius(b:Building, c:Vector2i) -> bool:
     return b.center_cell().distance_to(Vector2(c) + Vector2(0.5, 0.5)) <= b.radius();
 
-func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
+func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = WORK_RANGE) -> Task:
     var best:ResourceNode = null;
-    var best_d:float = max_dist * max_dist;
+    var best_d:float = INF;
+    var limit:float = max_dist * max_dist;
     var pc:Vector2 = Vector2(p.position.x, p.position.z);
     var room:Dictionary = {};     # item -> whether any storage has space (checked once per item)
     for rn in world.nodes:
@@ -51,7 +54,7 @@ func harvest_node_task(p:Pawn, pred:Callable, max_dist:float = INF) -> Task:
         if rn.amount > 0 and not rn.clearing and not room[rn.item]:
             continue;
         var d:float = pc.distance_squared_to(Vector2(rn.cell) + Vector2(0.5, 0.5));
-        if d < best_d:
+        if d < best_d and (d <= limit or rn.designated):       # marked trees and rocks are worked wherever they are
             best = rn;
             best_d = d;
     if best == null:

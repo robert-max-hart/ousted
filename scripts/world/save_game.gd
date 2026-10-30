@@ -61,8 +61,13 @@ static func loadable(slot:String) -> bool:
     return not read(slot, error).is_empty();
 
 static func save(world:World, slot:String = QUICKSAVE) -> void:
+    if world.awaiting_start:
+        world.hud.toast("Place the Town Hall first.");
+        return;
     var err:String = write(world, slot);
     world.notify("Game saved." if err == "" else err);
+    if world.hud != null:
+        world.hud.toast("Game saved." if err == "" else err);
 
 static func autosave(world:World) -> void:
     if autosave_enabled and not world.pawns.is_empty():

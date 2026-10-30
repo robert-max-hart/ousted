@@ -15,6 +15,7 @@ const SERIF_FONTS   :Array[String] = ["URW Bookman", "Bookman Old Style", "Palat
 var _menu       :VBoxContainer;
 var _new_panel  :PanelContainer;
 var _difficulty :StringName = &"normal";
+var _choose_start:CheckBox;
 var _diff_btns  :Dictionary = {};        # difficulty id -> Button
 var _diff_text  :Label;
 var _seed_edit  :LineEdit;
@@ -229,6 +230,11 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     _seed_edit.max_length = 9;
     _seed_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
     seed_row.add_child(_seed_edit);
+    _choose_start = CheckBox.new();
+    _choose_start.text = "Choose where to settle";
+    _choose_start.button_pressed = true;
+    _choose_start.tooltip_text = "Look over the map first and place the Town Hall yourself. Off: the game picks a level spot near the river.";
+    col.add_child(_choose_start);
     var buttons:HBoxContainer = HBoxContainer.new();
     buttons.add_theme_constant_override("separation", 8);
     col.add_child(buttons);
@@ -271,8 +277,10 @@ func _on_start() -> void:
     Defs.difficulty = _difficulty;
     var text:String = _seed_edit.text.strip_edges();
     World.new_game_seed = text.to_int() if text.is_valid_int() and text.to_int() > 0 else (hash(text) % 1000000 if text != "" else 0);
+    World.choose_start = _choose_start.button_pressed;
     GameClock.reset();
     Weather.reset();
+    GameClock.locked = false;
     get_tree().change_scene_to_file(SaveGame.MAIN_SCENE);
 
 func _on_continue() -> void:

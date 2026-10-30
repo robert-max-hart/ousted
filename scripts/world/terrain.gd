@@ -15,6 +15,7 @@ const SIZE              :int = 160;
 const CHUNK             :int = 32;
 const CHUNKS            :int = 5;       # SIZE / CHUNK
 const WATER_LEVEL       :float = 0.0;
+const SHALLOW_FROM      :float = -0.45;       # water no deeper than this (below the surface) can be waded through
 const MAX_HEIGHT        :float = 40.0;
 const MIN_HEIGHT        :float = -6.0;
 
@@ -76,6 +77,108 @@ const HILLS_FREQ     :float = 0.008;    # how big the hill regions are
 const HILLS_FROM     :float = 0.19;     # hill mask noise above this raises hills (higher: fewer hill regions)
 const HILLS_AMP      :float = 15.0;     # how high the ridges stand
 
+# A winding river from one edge of the map to the opposite one: it follows low ground where it can, widens downstream, and has
+# a few shallow fords where citizens can wade across. tests/river_probe prints what it makes for a set of seeds.
+const RIVER_HALF_UP   :float = 1.7;       # half the width (cells) at the source end
+const RIVER_HALF_DOWN :float = 4.2;       # ... and at the mouth
+const RIVER_BED       :float = -1.1;      # height of the bed in the middle of a deep stretch
+const RIVER_BANK      :float = 5.0;       # cells over which the banks blend into the land
+const RIVER_STEP      :float = 1.6;       # cells between points of the centre line
+const FORDS           :int = 3;
+const FORD_BED        :float = -0.2;
+const FORD_HALF       :int = 2;           # points on each side of a ford's middle that stay shallow
+const FORD_RAMP       :int = 3;           # points over which the bed deepens again
+const RIVER_FAR       :float = 45.0;      # how far from the centre line the distance field reaches
+const RIVER_NEAR      :float = 10.0;      # cells from the river that still count as its valley (richer soil)
+
+var river_path :PackedVector2Array;       # the centre line, in cells (empty when the map has no river)
+var river_fords:PackedVector2Array;       # the middle of each ford, in cells
+var river_dist :PackedFloat32Array;       # per corner: distance to the centre line, 999 beyond the valley
+
+func _carve_river(world_seed:int) -> void:
+    var n:int = SIZE + 1;
+    river_dist = PackedFloat32Array();
+    river_dist.resize(n * n);
+    river_dist.fill(999.0);
+    river_path = PackedVector2Array();
+    river_fords = PackedVector2Array();
+    var rng:RandomNumberGenerator = RandomNumberGenerator.new();
+    rng.seed = world_seed + 91;
+    var meander:FastNoiseLite = FastNoiseLite.new();
+    meander.seed = world_seed + 92;
+    meander.frequency = 0.03;
+    var side:int = rng.randi_range(0, 3);
+    var a:float = rng.randf_range(0.25, 0.75) * SIZE;
+    var b:float = rng.randf_range(0.25, 0.75) * SIZE;
+    var from:Vector2 = [Vector2(a, 0.0), Vector2(SIZE, a), Vector2(a, SIZE), Vector2(0.0, a)][side];
+    var goal:Vector2 = [Vector2(b, SIZE), Vector2(0.0, b), Vector2(b, 0.0), Vector2(SIZE, b)][side];
+    var pos:Vector2 = from;
+    var heading:float = (goal - from).angle();
+    var points:PackedVector2Array = PackedVector2Array([pos]);
+    for i in 600:
+        var best:float = INF;
+        var best_h:float = heading;
+        var bias:float = meander.get_noise_1d(i) * 1.5;      # the heading the river wants, around the straight line to its goal
+        for off in [-0.5, -0.25, 0.0, 0.25, 0.5]:
+            var h:float = heading + off;
+            var q:Vector2 = pos + Vector2.from_angle(h) * RIVER_STEP;
+            var turn_to_goal:float = absf(angle_difference(h, (goal - pos).angle() + bias));
+            var score:float = height_at(q.x, q.y) * 0.5 + absf(off) * 1.0 + turn_to_goal * 3.0;
+            if pos.distance_to(goal) > 25.0 and (q.x < 8.0 or q.y < 8.0 or q.x > SIZE - 8.0 or q.y > SIZE - 8.0):
+                score += 12.0;          # stay on the map until the last stretch
+            if score < best:
+                best = score;
+                best_h = h;
+        heading = best_h;
+        pos += Vector2.from_angle(heading) * RIVER_STEP;
+        points.append(pos);
+        if pos.x < -1.0 or pos.y < -1.0 or pos.x > SIZE + 1.0 or pos.y > SIZE + 1.0:
+            break;
+    var count:int = points.size();
+    if count < 20:
+        return;
+    river_path = points;
+    var ford_at:Array[int] = [];
+    for k in FORDS:
+        ford_at.append(clampi(roundi(count * (0.2 + 0.65 * (k + rng.randf_range(0.2, 0.8)) / FORDS)), 0, count - 1));
+        river_fords.append(points[ford_at[k]]);
+    # each corner follows its nearest point of the centre line: first find it (out to RIVER_FAR cells), then carve
+    var nearest:PackedInt32Array = PackedInt32Array();
+    nearest.resize(n * n);
+    nearest.fill(-1);
+    for i in count:
+        var p:Vector2 = points[i];
+        for z in range(maxi(0, floori(p.y - RIVER_FAR)), mini(n, ceili(p.y + RIVER_FAR) + 1)):
+            for x in range(maxi(0, floori(p.x - RIVER_FAR)), mini(n, ceili(p.x + RIVER_FAR) + 1)):
+                var d:float = Vector2(x, z).distance_to(p);
+                var k:int = z * n + x;
+                if d < river_dist[k]:
+                    river_dist[k] = d;
+                    nearest[k] = i;
+    var original:PackedFloat32Array = heights.duplicate();
+    for k in n * n:
+        var i:int = nearest[k];
+        if i < 0:
+            continue;
+        var t:float = float(i) / float(count - 1);
+        var half:float = lerpf(RIVER_HALF_UP, RIVER_HALF_DOWN, t);
+        var d:float = river_dist[k];
+        if d > half + RIVER_BANK:
+            continue;
+        var gap:int = 999;
+        for f in ford_at:
+            gap = mini(gap, absi(i - f));
+        var shallow:float = 1.0 - smoothstep(float(FORD_HALF), float(FORD_HALF + FORD_RAMP), float(gap));
+        var bed:float = lerpf(RIVER_BED, FORD_BED, shallow);
+        var level:float = bed * (1.0 - 0.5 * minf(d / half, 1.0) ** 2) if shallow < 0.5 else bed;
+        heights[k] = minf(heights[k], lerpf(original[k], level, 1.0 - smoothstep(half, half + RIVER_BANK, d)));
+
+# How far (cells) a cell is from the river's centre line; 999 when it is far from it or the map has none.
+func river_distance(c:Vector2i) -> float:
+    if river_dist.is_empty():
+        return 999.0;
+    return river_dist[clampi(c.y, 0, SIZE) * (SIZE + 1) + clampi(c.x, 0, SIZE)];
+
 func generate(world_seed:int) -> void:
     _tint_noise = FastNoiseLite.new();
     _tint_noise.seed = world_seed + 3;
@@ -109,6 +212,7 @@ func generate(world_seed:int) -> void:
             var mask:float = clampf((hills_mask.get_noise_2d(x, z) - HILLS_FROM) * 3.0, 0.0, 1.0);
             h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * HILLS_AMP;
             heights[z * n + x] = h;
+    _carve_river(world_seed);
     overlay = PackedByteArray();
     overlay.resize(SIZE * SIZE);
     mark_all_dirty();
@@ -160,6 +264,10 @@ func cell_slope(c:Vector2i) -> float:
 
 func is_water(c:Vector2i) -> bool:
     return cell_height(c) < WATER_LEVEL + 0.1;
+
+# Shallow water can be waded through (slowly); anything deeper blocks walking.
+func is_shallow(c:Vector2i) -> bool:
+    return is_water(c) and cell_height(c) >= WATER_LEVEL + SHALLOW_FROM;
 
 func get_overlay(c:Vector2i) -> int:
     return overlay[index(c)];
@@ -382,7 +490,7 @@ func _build_chunk(ci:int) -> void:
             if overlay[index(cell)] == Overlay.ROAD:
                 for j in 4:       # packed earth is mottled: each corner a little lighter or darker
                     var speck:float = float((((x * 2 + (j & 1)) * 73856093) ^ ((z * 2 + (j >> 1)) * 19349663)) & 1023) / 1023.0;
-                    colors[v + j] = Color(own.r * (0.88 + speck * 0.24), own.g * (0.88 + speck * 0.24), own.b * (0.9 + speck * 0.2));
+                    colors[v + j] = Color(own.r * (0.95 + speck * 0.1), own.g * (0.95 + speck * 0.1), own.b * (0.96 + speck * 0.08));
             elif overlay[index(cell)] == Overlay.TILLED or overlay[index(cell)] == Overlay.SITE:
                 for j in 4:       # ploughed ground: a ridge along each row's top edge and a furrow along its bottom, with some mottling
                     var crumb:float = float((((x * 2 + (j & 1)) * 83492791) ^ ((z * 2 + (j >> 1)) * 2654435761)) & 1023) / 1023.0;

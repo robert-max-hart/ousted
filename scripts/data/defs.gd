@@ -35,6 +35,7 @@ const ITEMS:Dictionary = {
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
     &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
     &"leather": {"name": "Leather", "color": Color(0.55, 0.36, 0.2)},
+    &"fish":    {"name": "Fish", "color": Color(0.55, 0.68, 0.78), "food": true, "nutrition": 0.45, "spoil_days": 4.0},
     &"meat":    {"name": "Meat", "color": Color(0.72, 0.28, 0.25), "food": true, "nutrition": 0.5, "spoil_days": 8.0},
     &"clothes_wool":    {"name": "Wool Clothes", "color": Color(0.82, 0.78, 0.66), "clothing": {"warm": 0.3, "days": 80.0}},
     &"clothes_leather": {"name": "Leather Clothes", "color": Color(0.5, 0.34, 0.2), "clothing": {"warm": 0.3, "days": 80.0}},
@@ -81,6 +82,7 @@ const ITEMS:Dictionary = {
 # water:    citizens can drink here
 # beds:     shelter capacity
 # walkable: pawns can walk through the footprint
+# bridge:   a deck over water (placeable on water, never levelled; citizens on it stand at Building.DECK_HEIGHT)
 const BUILDINGS:Dictionary = {
     &"town_hall": {
         "wall": &"stone", "name": "Town Hall", "size": Vector2i(4, 4), "cost": {&"wood": 30, &"stone": 10}, "work": 20.0,
@@ -135,6 +137,12 @@ const BUILDINGS:Dictionary = {
         "storage": true, "capacity": 150, "walkable": true, "drag_size": true, "flatten": true, "scalable": true,
         "desc": "An open area where citizens drop off goods. Drag to size it: a 4x4 holds 150 units, and cost and capacity grow with the area. Item filters can be set in the inspector.",
     },
+    &"bridge": {
+        "name": "Bridge", "size": Vector2i(2, 4), "cost": {&"wood": 8}, "work": 6.0,
+        "shape": "bridge", "height": 0.18, "color": Color(0.45, 0.33, 0.2), "wall": &"planks",
+        "walkable": true, "drag_size": true, "scalable": true, "bridge": true, "min_side": 2, "relocatable": false,
+        "desc": "A wooden deck over water, so citizens can cross a river without wading. Drag along the crossing: at least 2 wide, with the ends on land. Cost grows with the length.",
+    },
     &"granary": {
         "name": "Granary", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 14.0,
         "shape": "silo", "height": 1.8, "color": Color(0.66, 0.55, 0.36), "roof": Color(0.45, 0.32, 0.2),
@@ -181,6 +189,15 @@ const BUILDINGS:Dictionary = {
             },
         },
         "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
+    },
+    &"fishing_hut": {
+        "name": "Fishing Hut", "size": Vector2i(3, 3), "cost": {&"wood": 14}, "work": 10.0,
+        "shape": "house", "decor": "fishing", "roof_pitch": 0.7, "height": 1.5, "color": Color(0.5, 0.4, 0.3), "roof": Color(0.4, 0.45, 0.5),
+        "radius": 9.0, "worker_slots": 2, "profession": "FISHERMAN", "fishing": true, "no_flatten": true, "relocatable": false,
+        "controls": [
+            {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 150, "step": 20},
+        ],
+        "desc": "Fishermen catch fish from the water around the hut and carry them to storage. Build it on the shore with some of it over the water. The more of the circle is water, the better the catch; two huts whose circles overlap share the water and both catch less. Fish spoil quickly.",
     },
     &"mine": {
         "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
@@ -367,12 +384,12 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house"]],
     ["Storage", [&"stockpile", &"granary"]],
-    ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager"]],
+    ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
-    ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard"]],
+    ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard", &"bridge"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"graveyard"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"graveyard", &"bridge", &"fishing_hut"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -445,7 +462,7 @@ const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods

@@ -148,6 +148,19 @@ func start_relocate(b:Building) -> void:
     build_facing = b.facing;
     hint = "Moving the %s (costs %s). Click the new spot. R rotates. Right-click to cancel." % [b.display_name(), Defs.cost_string(_relocation_cost(b))];
 
+# A new game waiting for the player to choose the start: the Town Hall ghost follows the cursor, and cancelling the tool
+# brings it back (there is nothing else to do yet).
+func begin_start_mode() -> void:
+    set_mode(Mode.BUILD, &"town_hall");
+    hint = "Choose where to settle: click to place your Town Hall (R turns it). Level ground near water and some forest does best. Drag the right mouse button to look around.";
+
+# Starts placing another building like b: the same kind, size and facing.
+func start_copy(b:Building) -> void:
+    set_mode(Mode.BUILD, b.def_id);
+    if not _is_field_mode():          # fields, stockpiles and graveyards are sized by dragging
+        build_size = b.size;
+        build_facing = b.facing;
+
 func _relocation_cost(b:Building) -> Dictionary:
     var c:Dictionary = {};
     for item in b.def["cost"]:
@@ -209,6 +222,8 @@ func _unhandled_input(event:InputEvent) -> void:
             _on_release();
 
 func _cancel() -> void:
+    if World.instance.awaiting_start:
+        return;          # the only thing to do yet is to place the Town Hall
     if mode != Mode.SELECT:
         set_mode(Mode.SELECT);
     else:
@@ -226,6 +241,12 @@ func _on_press() -> void:
                 _drag_start = _hover_cell;
                 return;
             var origin:Vector2i = _build_origin();
+            if World.instance.awaiting_start:          # the very first building: found the colony here
+                error = World.instance.begin_colony(origin);
+                if error == "":
+                    set_mode(Mode.SELECT);
+                    select(World.instance.town_hall);
+                return;
             error = World.instance.can_place(build_id, origin, build_size, relocating != null);
             if error == "" and relocating != null:
                 var moved:Building = relocating;
@@ -339,6 +360,13 @@ func _update_hover() -> void:
 func _build_origin() -> Vector2i:
     # center the footprint on the cursor
     return Vector2i(roundi(_hover_pt.x - build_size.x * 0.5), roundi(_hover_pt.z - build_size.y * 0.5));
+
+# The footprint origin under the cursor (for the start site rating) and whether the cursor is over the map.
+func hover_origin() -> Vector2i:
+    return _build_origin();
+
+func hover_valid() -> bool:
+    return _hover_ok;
 
 func _is_field_mode() -> bool:
     return mode == Mode.BUILD and Defs.BUILDINGS[build_id].get("drag_size", false);
@@ -572,6 +600,8 @@ func _update_frame(r:Rect2i) -> void:
 
 # Whether the colony's stores hold the materials for the building being placed right now.
 func _can_afford() -> bool:
+    if World.instance.awaiting_start:
+        return true;          # the founding Town Hall is free
     var cost:Dictionary = _relocation_cost(relocating) if relocating != null else Defs.BUILDINGS[build_id]["cost"];
     for item in cost:
         if Stock.available(item) < cost[item]:
