@@ -47,7 +47,7 @@ func _ready() -> void:
     var before:int = world.renderer.berry_count();
     world.renderer._rebuild();
     _expect("a picked bush loses them", world.renderer.berry_count() == before - 1);
-    _expect("each crop has a plant shape", CropMeshes.shape_of(&"wheat") == &"grain" and CropMeshes.shape_of(&"pumpkin") == &"vine" and CropMeshes.mesh_for(&"leafy").get_surface_count() > 3);
+    _expect("each crop has a plant shape", CropMeshes.shape_of(&"wheat") == &"grain" and CropMeshes.shape_of(&"pumpkin") == &"vine" and CropMeshes.crop_model("lettuce_ripe").get_surface_count() > 0);
 
     # --- spreading
     var seed_cell:Vector2i = _free_cell();

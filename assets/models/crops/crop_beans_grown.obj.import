@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dnspwb7i4hw0t"
+path="res://.godot/imported/crop_beans_grown.obj-e88a0daf1ea9cb98a3a97dd9a1094386.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crop_beans_grown.obj-e88a0daf1ea9cb98a3a97dd9a1094386.mesh"]
+
+source_file="res://assets/models/crops/crop_beans_grown.obj"
+dest_files=["res://.godot/imported/crop_beans_grown.obj-e88a0daf1ea9cb98a3a97dd9a1094386.mesh", "res://.godot/imported/crop_beans_grown.obj-e88a0daf1ea9cb98a3a97dd9a1094386.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

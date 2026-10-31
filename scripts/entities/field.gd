@@ -49,7 +49,7 @@ var pests       :PackedFloat32Array;        # 0..1 infestation per plot
 var irrigated   :PackedByteArray;          # 1 where a flowing channel is within reach (derived, not saved)
 var _irrigation_seen:int = -1;
 var reserved    :Array = [];                # Pawn or null per plot
-var _layers     :Dictionary = {};           # plant shape -> MultiMeshInstance3D drawing those plots
+var _crop_layers:Dictionary = {};           # model key (see CropMeshes.crop_key) -> MultiMeshInstance3D drawing those plots
 var _tree_layers:Dictionary = {};           # orchard crop -> {part -> MultiMeshInstance3D}, made when a plot of that tree first shows
 var _visual_dirty:bool = true;
 var _scarecrows :Node3D;
@@ -124,15 +124,6 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
         near_water[i] = 1 if _is_near_water(plot_cell(i)) else 0;
     _fence = Fence.new(self, &"field", 1);
     add_child(_fence);
-    for shape in CropMeshes.SHAPES:
-        var mm:MultiMesh = MultiMesh.new();
-        mm.transform_format = MultiMesh.TRANSFORM_3D;
-        mm.use_colors = true;
-        mm.mesh = CropMeshes.mesh_for(shape);
-        var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
-        mmi.multimesh = mm;
-        add_child(mmi);
-        _layers[shape] = mmi;
 
 func _process(_delta:float) -> void:
     if has_upgrade(&"scarecrow") and _scarecrows_for != rect():
@@ -675,51 +666,51 @@ func _tree_layer(crop:StringName) -> Dictionary:
     return _tree_layers[crop];
 
 func _rebuild_crops() -> void:
-    var by_shape:Dictionary = {};
-    var trees:Dictionary = {};         # orchard crop -> plots drawn as that tree
-    for shape in CropMeshes.SHAPES:
-        by_shape[shape] = [];
+    var by_key:Dictionary = {};          # model key -> [plot index, ...]
+    var trees:Dictionary = {};           # orchard crop -> plots drawn as that tree
     for i in plot_count():
-        if plot_state[i] != Plot.FALLOW:
-            var shape:StringName = CropMeshes.shape_of(plot_crop[i]);
-            if shape == &"tree":
-                if not trees.has(plot_crop[i]):
-                    trees[plot_crop[i]] = [];
-                trees[plot_crop[i]].append(i);
-            else:
-                by_shape[shape].append(i);
+        if plot_state[i] == Plot.FALLOW:
+            continue;
+        if CropMeshes.shape_of(plot_crop[i]) == &"tree":
+            if not trees.has(plot_crop[i]):
+                trees[plot_crop[i]] = [];
+            trees[plot_crop[i]].append(i);
+            continue;
+        var key:String = CropMeshes.crop_key(plot_crop[i], plot_state[i], growth[i]);
+        if not by_key.has(key):
+            by_key[key] = [];
+        by_key[key].append(i);
     _rebuild_orchard(trees);
-    for shape in CropMeshes.SHAPES:
-        var list:Array = by_shape[shape];
-        var mm:MultiMesh = (_layers[shape] as MultiMeshInstance3D).multimesh;
+    for key in _crop_layers:
+        if not by_key.has(key):
+            by_key[key] = [];            # a model no plot uses now: empty its layer
+    for key in by_key:
+        var list:Array = by_key[key];
+        var mm:MultiMesh = _crop_layer(key).multimesh;
         mm.instance_count = list.size();
         for j in list.size():
             var i:int = list[j];
-            var c:Dictionary = Defs.CROPS[plot_crop[i]];
-            var h:float;           # height and width of the plant as a share of its full size
-            var wide:float;
-            var col:Color;
-            match plot_state[i]:
-                Plot.PLANTED:
-                    h = 0.2 + growth[i] * 0.8;
-                    wide = 0.45 + growth[i] * 0.55;
-                    col = Color(0.3, 0.6, 0.2).lerp(c["color"], growth[i] * growth[i]);
-                Plot.RIPE:
-                    h = 1.0;
-                    wide = 1.0;
-                    col = c["color"];
-                Plot.FROZEN:
-                    h = 0.2 + growth[i] * 0.8;
-                    wide = 0.45 + growth[i] * 0.55;
-                    col = Color(0.72, 0.84, 0.9);       # white with frost
-                _:
-                    h = 0.3;
-                    wide = 0.8;
-                    col = Color(0.4, 0.32, 0.22);
-            var cell:Vector2i = plot_cell(i);
-            var yaw:float = float(((cell.x * 73856093) ^ (cell.y * 19349663)) & 1023) / 1023.0 * TAU;       # no two plots look alike
-            var p:Vector3 = world.terrain.cell_center(cell);
-            mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(wide, h, wide)), p));
+            var size:float = lerpf(0.85, 1.0, CropMeshes.stage_progress(plot_state[i], growth[i]));
+            var col:Color = Color.WHITE;
+            if plot_state[i] == Plot.FROZEN:
+                col = Color(0.72, 0.84, 0.9);          # white with frost
             if pests[i] > 0.0 and (plot_state[i] == Plot.PLANTED or plot_state[i] == Plot.RIPE):
                 col = col.lerp(Color(0.5, 0.33, 0.16), pests[i] * 0.8);       # nibbled and browning
+            var cell:Vector2i = plot_cell(i);
+            var yaw:float = float(((cell.x * 73856093) ^ (cell.y * 19349663)) & 1023) / 1023.0 * TAU;       # no two plots look alike
+            mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(size, size, size)), world.terrain.cell_center(cell)));
             mm.set_instance_color(j, col);
+
+# The layer for a crop model, made the first time a plot needs it.
+func _crop_layer(key:String) -> MultiMeshInstance3D:
+    if not _crop_layers.has(key):
+        var mm:MultiMesh = MultiMesh.new();
+        mm.transform_format = MultiMesh.TRANSFORM_3D;
+        mm.use_colors = true;
+        mm.mesh = CropMeshes.crop_model(key);
+        var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
+        mmi.multimesh = mm;
+        mmi.material_override = CropMeshes.crop_material();
+        add_child(mmi);
+        _crop_layers[key] = mmi;
+    return _crop_layers[key];
