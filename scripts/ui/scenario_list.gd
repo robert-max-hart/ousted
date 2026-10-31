@@ -32,7 +32,7 @@ func _init() -> void:
     add_child(center);
     var panel:PanelContainer = PanelContainer.new();
     var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.94);
+    style.bg_color = Color(0.08, 0.07, 0.06, 1.0);
     style.set_corner_radius_all(6);
     style.set_content_margin_all(14);
     panel.add_theme_stylebox_override("panel", style);

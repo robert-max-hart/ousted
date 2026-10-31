@@ -15,6 +15,7 @@ var _list   :VBoxContainer;
 var _name   :LineEdit;
 var _status :Label;
 var _selected:String = "";
+var _confirming:String = "";        # the name a first Save press asked to overwrite (a second press does it)
 var _action :Button;
 var _delete :Button;
 
@@ -34,7 +35,7 @@ func _init(save_mode:bool = false) -> void:
     add_child(center);
     var panel:PanelContainer = PanelContainer.new();
     var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.92);
+    style.bg_color = Color(0.08, 0.07, 0.06, 1.0);
     style.set_corner_radius_all(6);
     style.set_content_margin_all(12);
     panel.add_theme_stylebox_override("panel", style);
@@ -59,7 +60,7 @@ func _init(save_mode:bool = false) -> void:
         _name.placeholder_text = "Name of the save";
         _name.text = "Day %d" % (GameClock.day_index() + 1);
         _name.max_length = 32;
-        _name.text_changed.connect(func(_t:String) -> void: _refresh_buttons());
+        _name.text_changed.connect(func(_t:String) -> void: _cancel_confirm(); _refresh_buttons());
         _name.text_submitted.connect(func(_t:String) -> void: _on_action());
         col.add_child(_name);
     _status = Label.new();
@@ -110,6 +111,7 @@ func _rebuild() -> void:
 
 func _select(slot:String) -> void:
     _selected = slot;
+    _cancel_confirm();
     if _name != null:
         _name.text = slot;
     for b in _list.get_children():
@@ -135,15 +137,28 @@ func _on_action() -> void:
         var slot:String = SaveGame.clean_name(_name.text);
         if slot == "":
             return;
+        if SaveGame.exists(slot) and _confirming != slot:       # saving over a save: ask first
+            _confirming = slot;
+            _action.text = "Overwrite";
+            _status.text = "A save called '%s' already exists. Press Overwrite to replace it, or pick another name." % slot;
+            return;
+        _cancel_confirm();
         save_chosen.emit(slot);
     elif _selected != "" and _slot_ok(_selected):
         load_chosen.emit(_selected);
+
+func _cancel_confirm() -> void:
+    _confirming = "";
+    if saving and _action != null:
+        _action.text = "Save";
+        _status.text = "";
 
 func _on_delete() -> void:
     if _selected == "":
         return;
     SaveGame.delete(_selected);
     _selected = "";
+    _cancel_confirm();
     _status.text = "";
     _rebuild();
 

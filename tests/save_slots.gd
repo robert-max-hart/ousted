@@ -28,7 +28,19 @@ func _ready() -> void:
     panel.save_chosen.connect(func(s:String) -> void: got.append(s));
     panel._name.text = "slot test b";
     panel._on_action();
-    _expect("the panel reports the typed name", got == ["slot test b"]);
+    _expect("saving over an existing name asks first, and saves nothing yet", got.is_empty() and panel._action.text == "Overwrite" and panel._status.text.contains("already exists"));
+    panel._name.text = "slot test b";       # (a changed name would cancel the question; the same one keeps it)
+    panel._on_action();
+    _expect("a second press overwrites: the panel reports the name", got == ["slot test b"] and panel._action.text == "Save");
+    got.clear();
+    panel._name.text = "slot test fresh";
+    panel._on_action();
+    _expect("a new name saves at once", got == ["slot test fresh"]);
+    panel._name.text = "slot test b";
+    panel._on_action();
+    panel._name.text = "something else";
+    panel._name.text_changed.emit("something else");
+    _expect("changing the name cancels the question", panel._confirming == "" and panel._action.text == "Save");
     panel._select("slot test a");
     panel._on_delete();
     _expect("delete removes the slot", not SaveGame.exists("slot test a"));
