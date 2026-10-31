@@ -3,7 +3,7 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.6.9-dev | 31 Oct 2026 | Animals that move: pecking chickens, grazing sheep and cows, and the merchant's donkey
+# 0.6.9 | 31 Oct 2026 | Animals that move: pecking chickens, grazing sheep and cows, and the merchant's donkey
 - The farm animals have real bodies: chickens with a comb, wattle, beak and tail feathers; sheep with a cloud of fleece, a dark face and ears; cows with patches, an udder, horns and a tail with a tuft. Each herd member has its own coat.
 - They move properly: their legs swing as they walk (a chicken's alternate, a sheep's and cow's in diagonal pairs), they walk for a while and then stand with their heads down grazing or pecking, and they face the way they are heading (they used to walk backwards). They stop when the game is paused.
 - The merchant's donkey is a proper donkey with long ears, a tail, a saddle cloth and a pack on each side, with four walking legs. Animals being led to a pasture are the same models.
