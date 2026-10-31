@@ -39,7 +39,8 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     hud._log_toggle = hud._panel_toggle(row, "Log");
     hud._policies_btn = hud._panel_toggle(row, "Policies");
     hud._soil_toggle = hud._panel_toggle(row, "Soil");
-    hud._soil_toggle.tooltip_text = "Show soil fertility on the ground (brown poor, green rich)";
+    hud._soil_toggle.text = "";          # the three ground overlays are icon-only: the top bar has no room for words
+    hud._soil_toggle.tooltip_text = "Soil: show soil fertility on the ground (brown poor, green rich)";
     hud._soil_toggle.toggled.connect(func(on:bool) -> void:
         if on:
             hud._water_toggle.button_pressed = false;
@@ -47,14 +48,16 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
         World.instance.terrain.set_soil_view(on);
         hud._refresh_info());
     hud._water_toggle = hud._panel_toggle(row, "Water");
-    hud._water_toggle.tooltip_text = "Show how close the ground is to water. Blue-green ground is within reach of a water source (open water, a well or the Town Hall), so a Distillery or Potter's Workshop built there works; brown ground is too far.";
+    hud._water_toggle.text = "";
+    hud._water_toggle.tooltip_text = "Water: show how close the ground is to water. Blue-green ground is within reach of a water source (open water, a well or the Town Hall), so a Distillery or Potter's Workshop built there works; brown ground is too far.";
     hud._water_toggle.toggled.connect(func(on:bool) -> void:
         if on:
             hud._soil_toggle.button_pressed = false;
             hud._slope_toggle.button_pressed = false;
         World.instance.terrain.set_water_view(on));
     hud._slope_toggle = hud._panel_toggle(row, "Slope");
-    hud._slope_toggle.tooltip_text = "Show how steep the ground is for building. Green is level, yellow and orange need levelling (the colony does it for you), red is too steep for a building.";
+    hud._slope_toggle.text = "";
+    hud._slope_toggle.tooltip_text = "Slope: show how steep the ground is for building. Green is level, yellow and orange need levelling (the colony does it for you), red is too steep for a building.";
     hud._slope_toggle.toggled.connect(func(on:bool) -> void:
         if on:
             hud._soil_toggle.button_pressed = false;
@@ -71,15 +74,15 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
         row.add_child(b);
         hud._speed_btns.append(b);
 
-# One figure in the top bar: its icon (StockIcons) and a number, with a tooltip.
+# One figure in the top bar: its icon (UIIcons) and a number, with a tooltip.
 static func _stock_entry(hud:HUD, id:StringName, tip:String) -> void:
     var box:HBoxContainer = HBoxContainer.new();
     box.add_theme_constant_override("separation", 4);
     box.mouse_filter = Control.MOUSE_FILTER_PASS;
     box.tooltip_text = tip;
     var icon:TextureRect = TextureRect.new();
-    icon.texture = StockIcons.texture(id);
-    icon.custom_minimum_size = Vector2(StockIcons.SIZE, StockIcons.SIZE);
+    icon.texture = UIIcons.texture(id);
+    icon.custom_minimum_size = Vector2(22, 22);
     icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED;
     icon.mouse_filter = Control.MOUSE_FILTER_PASS;
     box.add_child(icon);
@@ -177,6 +180,14 @@ static func _build_jobs_panel(hud:HUD, root:Control) -> void:
     for prof in JobManager.PROFESSION_NAMES.size():
         var row:HBoxContainer = HBoxContainer.new();
         body.add_child(row);
+        var glyph:StringName = UIIcons.for_label(JobManager.PROFESSION_NAMES[prof]);
+        if glyph != &"":
+            var mark:TextureRect = TextureRect.new();
+            mark.texture = UIIcons.texture(glyph);
+            mark.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED;
+            mark.custom_minimum_size = Vector2(UIIcons.SIZE + 4, 0);
+            mark.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+            row.add_child(mark);
         var l:Label = Label.new();
         l.custom_minimum_size.x = 150;
         row.add_child(l);

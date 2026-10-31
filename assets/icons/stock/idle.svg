@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 100 100">
+<polygon points="8.00,16.00 92.00,16.00 92.00,66.00 8.00,66.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="8.00" cy="41.00" rx="7.00" ry="25.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="92.00" cy="41.00" rx="7.00" ry="25.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="24.00,62.00 40.00,62.00 20.00,88.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="30.00" cy="41.00" rx="6.00" ry="8.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="50.00" cy="41.00" rx="6.00" ry="8.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="70.00" cy="41.00" rx="6.00" ry="8.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="8.00,16.00 92.00,16.00 92.00,66.00 8.00,66.00" fill="#ffe680"/>
+<ellipse cx="8.00" cy="41.00" rx="7.00" ry="25.00" fill="#ffe680"/>
+<ellipse cx="92.00" cy="41.00" rx="7.00" ry="25.00" fill="#ffe680"/>
+<polygon points="24.00,62.00 40.00,62.00 20.00,88.00" fill="#ffe680"/>
+<ellipse cx="30.00" cy="41.00" rx="6.00" ry="8.00" fill="#73521a"/>
+<ellipse cx="50.00" cy="41.00" rx="6.00" ry="8.00" fill="#73521a"/>
+<ellipse cx="70.00" cy="41.00" rx="6.00" ry="8.00" fill="#73521a"/>
+</svg>

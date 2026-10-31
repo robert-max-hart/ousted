@@ -660,6 +660,7 @@ func _panel_toggle(row:Container, text:String) -> Button:
     b.text = text;
     b.toggle_mode = true;
     b.focus_mode = Control.FOCUS_NONE;
+    UIIcons.decorate(b, text);
     row.add_child(b);
     return b;
 
@@ -726,6 +727,7 @@ func _tool_button(row:Container, group:ButtonGroup, text:String, tip:String) -> 
     b.toggle_mode = true;
     b.button_group = group;
     b.focus_mode = Control.FOCUS_NONE;
+    UIIcons.decorate(b, text);
     row.add_child(b);
     return b;
 

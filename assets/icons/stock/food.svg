@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 100 100">
+<ellipse cx="50.00" cy="58.00" rx="42.00" ry="28.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="50.00" cy="50.00" rx="38.00" ry="20.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="26.00,58.00 30.00,40.00 36.00,44.00 32.00,60.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="46.00,58.00 50.00,40.00 56.00,44.00 52.00,60.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="66.00,58.00 70.00,40.00 76.00,44.00 72.00,60.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="50.00" cy="58.00" rx="42.00" ry="28.00" fill="#d19442"/>
+<ellipse cx="50.00" cy="50.00" rx="38.00" ry="20.00" fill="#ebb25c"/>
+<polygon points="26.00,58.00 30.00,40.00 36.00,44.00 32.00,60.00" fill="#b2702e"/>
+<polygon points="46.00,58.00 50.00,40.00 56.00,44.00 52.00,60.00" fill="#b2702e"/>
+<polygon points="66.00,58.00 70.00,40.00 76.00,44.00 72.00,60.00" fill="#b2702e"/>
+</svg>

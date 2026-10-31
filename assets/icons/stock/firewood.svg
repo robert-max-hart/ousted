@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 100 100">
+<polygon points="10.00,62.00 42.00,62.00 42.00,88.00 10.00,88.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="10.00,62.00 42.00,62.00 42.00,69.00 10.00,69.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="42.00" cy="75.00" rx="5.00" ry="13.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="42.00,62.00 74.00,62.00 74.00,88.00 42.00,88.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="42.00,62.00 74.00,62.00 74.00,69.00 42.00,69.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="74.00" cy="75.00" rx="5.00" ry="13.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="26.00,34.00 58.00,34.00 58.00,60.00 26.00,60.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="26.00,34.00 58.00,34.00 58.00,41.00 26.00,41.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<ellipse cx="58.00" cy="47.00" rx="5.00" ry="13.00" fill="#14120f" stroke="#14120f" stroke-width="7.00" stroke-linejoin="round"/>
+<polygon points="10.00,62.00 42.00,62.00 42.00,88.00 10.00,88.00" fill="#bd8042"/>
+<polygon points="10.00,62.00 42.00,62.00 42.00,69.00 10.00,69.00" fill="#e0a861"/>
+<ellipse cx="42.00" cy="75.00" rx="5.00" ry="13.00" fill="#e6bd80"/>
+<polygon points="42.00,62.00 74.00,62.00 74.00,88.00 42.00,88.00" fill="#bd8042"/>
+<polygon points="42.00,62.00 74.00,62.00 74.00,69.00 42.00,69.00" fill="#e0a861"/>
+<ellipse cx="74.00" cy="75.00" rx="5.00" ry="13.00" fill="#e6bd80"/>
+<polygon points="26.00,34.00 58.00,34.00 58.00,60.00 26.00,60.00" fill="#bd8042"/>
+<polygon points="26.00,34.00 58.00,34.00 58.00,41.00 26.00,41.00" fill="#e0a861"/>
+<ellipse cx="58.00" cy="47.00" rx="5.00" ry="13.00" fill="#e6bd80"/>
+</svg>
