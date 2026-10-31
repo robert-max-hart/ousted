@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://sseu5lf6l0hh"
+path="res://.godot/imported/oak_2_crown.obj-9ea68cce6d3ceebb01990abdea78bb59.mesh"
+
+[deps]
+
+files=["res://.godot/imported/oak_2_crown.obj-9ea68cce6d3ceebb01990abdea78bb59.mesh"]
+
+source_file="res://assets/models/trees/oak_2_crown.obj"
+dest_files=["res://.godot/imported/oak_2_crown.obj-9ea68cce6d3ceebb01990abdea78bb59.mesh", "res://.godot/imported/oak_2_crown.obj-9ea68cce6d3ceebb01990abdea78bb59.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

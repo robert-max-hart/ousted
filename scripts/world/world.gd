@@ -251,13 +251,13 @@ func _spawn_nature() -> void:
             if slope > 1.0 and r < 0.09:
                 add_node(&"ore" if rng.randf() < 0.12 else &"rock", c);       # (the ore share dropped as the rocks grew: iron is unchanged)
             elif slope < 1.4 and f > 0.15 and r < 0.45 * trees:
-                var oak:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of oak among the pines
-                add_node(&"oak" if oak > 0.05 else &"tree", c);
+                var patch:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of one kind among the others
+                add_node(Climate.pick_tree(patch, c), c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
             elif slope < 1.4 and f > -0.35 and f <= 0.15 and r > SPARSE_FROM and r < SPARSE_FROM + (SPARSE_TREES if f > -0.1 else SPARSE_TREES * 0.55) * trees:
                 var kind:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);        # a lone tree here and there, thicker towards the groves
-                add_node(&"oak" if kind > 0.05 else &"tree", c);
+                add_node(Climate.pick_tree(kind, c), c);
             elif slope < 1.0 and r < 0.008:
                 add_node(&"rock", c);             # loose surface stone on open ground (twice what it was originally)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
@@ -307,7 +307,7 @@ func sow_wild(kind:StringName, c:Vector2i) -> ResourceNode:
 func plant_tree(c:Vector2i) -> ResourceNode:
     if not can_plant_tree(c):
         return null;
-    var rn:ResourceNode = add_node(&"oak" if rng.randf() < 0.35 else &"tree", c);
+    var rn:ResourceNode = add_node(Climate.plant_kind(rng.randf()), c);
     rn.make_sapling();
     saplings.append(rn);
     return rn;

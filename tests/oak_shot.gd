@@ -38,7 +38,7 @@ func _process(_delta:float) -> void:
     if _frame % 10 == 8 and step < POINTS.size():
         get_viewport().get_texture().get_image().save_png(_out.path_join("oak_%d.png" % step));
         if step == 3:
-            _expect("leaves are gone in winter", not world.renderer._oak_leaves.visible);
+            _expect("leaves are gone in winter", not world.renderer.leaves_visible());
     if step >= POINTS.size():
         get_tree().quit();
 

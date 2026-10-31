@@ -23,11 +23,15 @@ static func make(color:Color, sway:float, height_ref:float, double_sided:bool = 
     _materials.append(m);
     return m;
 
+# Snow settles on this material's surfaces that face up (pine boughs, bushes) when the ground is snowy.
+static func hold_snow(m:ShaderMaterial) -> void:
+    m.set_shader_parameter("snow_hold", 1.0);
+
 static func set_color(m:ShaderMaterial, color:Color) -> void:
     m.set_shader_parameter("albedo", color);
 
-# The clock (seconds of game-speed time) and the wind strength, for every material still in use.
-static func update(clock:float, wind:float) -> void:
+# The clock (seconds of game-speed time), the wind strength and the snow cover, for every material still in use.
+static func update(clock:float, wind:float, snow:float = 0.0) -> void:
     var i:int = _materials.size() - 1;
     while i >= 0:
         var m:ShaderMaterial = _materials[i];
@@ -36,6 +40,7 @@ static func update(clock:float, wind:float) -> void:
         else:
             m.set_shader_parameter("clock", clock);
             m.set_shader_parameter("wind", wind);
+            m.set_shader_parameter("snow", snow);
             m.set_shader_parameter("sway_on", 1.0 if (grass_enabled if m.get_meta(&"grass", false) else enabled) else 0.0);
         i -= 1;
 

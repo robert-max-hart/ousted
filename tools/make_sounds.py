@@ -157,6 +157,21 @@ def anvil(i):
     click = env_exp(highpass(noise(0.03), 2500), 0.008)
     return normalise(mix(ring, gain(click, 0.7)), 0.7)
 
+def treefall(i):
+    """A tree going over: wood fibres creaking and splitting, then the thump of the crown and a rush of leaves. About 1.7 s,
+    the thump lands as the tree in the game reaches the ground (FallingTree.FALL_SECONDS)."""
+    n = n_samples(1.8)
+    creak = bandpass(noise(1.8), 250, 900)
+    shaped = []
+    for k, x in enumerate(creak):
+        t = k / RATE
+        env = min(1.0, t / 0.15) * (1.0 if t < 1.0 else math.exp(-(t - 1.0) * 14.0))
+        shaped.append(x * env * (0.5 + 0.5 * math.sin(t * 38.0 + math.sin(t * 7.0) * 3.0)) * 2.2)
+    crack = delay(env_exp(highpass(noise(0.12), 1200), 0.05), 0.15)
+    thump = delay(mix(env_exp(sine(55, 0.7), 0.4, 0.01), gain(env_exp(sine(110, 0.5), 0.25, 0.01), 0.7), gain(env_exp(lowpass(noise(0.5), 700), 0.3, 0.01), 0.9)), 1.2)
+    leaves = delay(env_exp(bandpass(noise(0.6), 2500, 7000), 0.3, 0.05), 1.05)
+    return normalise(mix(shaped, gain(crack, 0.8), thump, gain(leaves, 0.5)), 0.8)
+
 for name, fn, count in (("chop", chop, 3), ("hammer", hammer, 3), ("pick", pick, 3), ("dig", dig, 2), ("rustle", rustle, 2), ("anvil", anvil, 2)):
     for i in range(1, count + 1):
         write("sfx/%s_%d.wav" % (name, i), fade_edges(fn(i)))
@@ -277,5 +292,7 @@ write("ambient/water.wav", water())
 write("ambient/birds.wav", birds())
 write("ambient/crickets.wav", crickets())
 
-total = sum(len(f) for _, _, f in os.walk(ROOT))
+write("sfx/treefall.wav", fade_edges(treefall(0)))        # (last, so adding or changing it never shifts the random numbers the others use)
+
+total = sum(1 for _, _, fs in os.walk(ROOT) for f in fs if f.endswith(".wav"))
 print("wrote", total, "sound files to", os.path.normpath(ROOT))

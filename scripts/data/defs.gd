@@ -569,6 +569,9 @@ const GRAZING_ABOVE:float = 6.0;        # C, daily mean: warmer than this the an
 const RESOURCE_NODES:Dictionary = {
     &"tree": {"name": "Pine Tree",    "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0, "tree": true},
     &"oak":  {"name": "Oak Tree",     "item": &"wood",    "amount": 4,  "work": 0.8,  "solid": false, "verb": "Chopping", "grow_hours": 1150.0, "tree": true},
+    &"birch": {"name": "Birch Tree",  "item": &"wood",    "amount": 3,  "work": 0.7,  "solid": false, "verb": "Chopping", "grow_hours": 950.0, "tree": true},
+    &"palm": {"name": "Palm Tree",    "item": &"wood",    "amount": 3,  "work": 0.7,  "solid": false, "verb": "Chopping", "grow_hours": 1000.0, "tree": true},
+    &"dead": {"name": "Dead Tree",    "item": &"wood",    "amount": 2,  "work": 0.5,  "solid": false, "verb": "Chopping", "tree": true, "dead": true},
     &"rock": {"name": "Rock",         "item": &"stone",   "amount": 8,  "work": 0.6,  "solid": true,  "verb": "Quarrying"},
     &"ore":  {"name": "Iron Deposit", "item": &"iron",    "amount": 6,  "work": 1.2,  "solid": true,  "verb": "Mining"},
     &"bush": {"name": "Berry Bush",   "item": &"berries", "amount": 5,  "work": 0.3,  "solid": false, "verb": "Foraging", "auto": true, "regrows": true,

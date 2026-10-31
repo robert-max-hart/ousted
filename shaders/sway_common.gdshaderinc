@@ -3,6 +3,9 @@
 // blade tips move most), and its phase comes from where the instance stands, so neighbours do not move in step.
 uniform vec4 albedo : source_color = vec4(1.0);
 uniform float clock = 0.0;            // advanced by the script with the game's speed: the sway pauses with the game
+uniform float snow = 0.0;             // how much of the ground is under snow (set by WindSway.update)
+uniform float snow_hold = 0.0;        // 1 for things snow lies on: pine boughs, bushes
+uniform vec3 snow_color : source_color = vec3(0.92, 0.95, 1.0);
 uniform float sway_on = 1.0;          // 0 when the player turned wind sway off (Settings)
 uniform float wind = 1.0;             // how hard it blows now: 1 in calm weather, more in rain
 uniform vec2 wind_dir = vec2(0.8, 0.6);

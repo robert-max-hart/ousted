@@ -72,6 +72,47 @@ class Mesh:
             if bottom:
                 self.tri(p(a1, r0, y0), (cx, y0, cz), p(a0, r0, y0), cap_col)
 
+    def limb(self, p0, p1, r0, r1, col, segs=6, cap_col=None):
+        """A tapered round limb between two points (radius r0 at p0, r1 at p1), for branches, bent trunks and fronds' stems."""
+        cap_col = cap_col or col
+        ux, uy, uz = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
+        n = math.sqrt(ux * ux + uy * uy + uz * uz)
+        if n < 1e-9:
+            return
+        ux, uy, uz = ux / n, uy / n, uz / n
+        # any direction across the limb, then the one across both (b = a x u, the order tcyl's rings run in)
+        ref = (0.0, 1.0, 0.0) if abs(uy) < 0.9 else (1.0, 0.0, 0.0)
+        ax, ay, az = ref[1] * uz - ref[2] * uy, ref[2] * ux - ref[0] * uz, ref[0] * uy - ref[1] * ux
+        al = math.sqrt(ax * ax + ay * ay + az * az)
+        ax, ay, az = ax / al, ay / al, az / al
+        bx, by, bz = ay * uz - az * uy, az * ux - ax * uz, ax * uy - ay * ux
+        def ring(p, r, k):
+            t = 2 * math.pi * k / segs
+            c, sn = math.cos(t) * r, math.sin(t) * r
+            return (p[0] + ax * c + bx * sn, p[1] + ay * c + by * sn, p[2] + az * c + bz * sn)
+        for i in range(segs):
+            self.quad(ring(p0, r0, i), ring(p1, r1, i), ring(p1, r1, i + 1), ring(p0, r0, i + 1), col)
+            self.tri(ring(p1, r1, i), p1, ring(p1, r1, i + 1), cap_col)
+
+    def ribbon(self, path, widths, col, cols=None, up=(0.0, 1.0, 0.0)):
+        """A flat strip along a path of 3D points, `widths` wide at each point, visible from both sides (a leaf, a frond, a blade)."""
+        pts = []
+        for i, p in enumerate(path):
+            a = path[max(0, i - 1)]
+            b = path[min(len(path) - 1, i + 1)]
+            tx, ty, tz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+            lx, ly, lz = ty * up[2] - tz * up[1], tz * up[0] - tx * up[2], tx * up[1] - ty * up[0]
+            ll = math.sqrt(lx * lx + ly * ly + lz * lz) or 1.0
+            lx, ly, lz = lx / ll, ly / ll, lz / ll
+            w = widths[i] / 2
+            pts.append(((p[0] + lx * w, p[1] + ly * w, p[2] + lz * w), (p[0] - lx * w, p[1] - ly * w, p[2] - lz * w)))
+        for i in range(len(pts) - 1):
+            c = cols[i] if cols else col
+            l0, r0 = pts[i]
+            l1, r1 = pts[i + 1]
+            self.quad(l0, l1, r1, r0, c)
+            self.quad(r0, r1, l1, l0, c)
+
     def ball(self, cx, cy, cz, rx, ry, rz, col, segs=8, rings=5, yaw=0.0, wobble=0.0):
         def p(i, j):
             a = 2 * math.pi * i / segs

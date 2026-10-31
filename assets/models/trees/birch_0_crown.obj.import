@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dmdy83wp37p0n"
+path="res://.godot/imported/birch_0_crown.obj-5c772ff5bbe247ed99af4dd801e89858.mesh"
+
+[deps]
+
+files=["res://.godot/imported/birch_0_crown.obj-5c772ff5bbe247ed99af4dd801e89858.mesh"]
+
+source_file="res://assets/models/trees/birch_0_crown.obj"
+dest_files=["res://.godot/imported/birch_0_crown.obj-5c772ff5bbe247ed99af4dd801e89858.mesh", "res://.godot/imported/birch_0_crown.obj-5c772ff5bbe247ed99af4dd801e89858.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

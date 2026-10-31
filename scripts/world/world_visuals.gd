@@ -121,7 +121,7 @@ func _update_water(delta:float) -> void:
     var rough:float = 1.0 + 0.8 * Weather.intensity;
     _water_mat.set_shader_parameter("swell", WATER_SWELL * rough);
     _water_mat.set_shader_parameter("ripple", WATER_RIPPLE * rough);
-    WindSway.update(_fx_clock, rough);        # trees, bushes and grass share the clock; the wind is stronger in rain
+    WindSway.update(_fx_clock, rough, snow_cover);        # trees, bushes and grass share the clock; the wind is stronger in rain
 
 # The water surface is a grid matching the terrain corners. Vertex color fades from shallow to deep
 # and from transparent to opaque with depth, so shorelines blend instead of cutting a hard line.

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://b546jglg5ttvn"
+path="res://.godot/imported/sapling_broad_trunk.obj-511ab0fb0e7a51fa6b424d45e023aa29.mesh"
+
+[deps]
+
+files=["res://.godot/imported/sapling_broad_trunk.obj-511ab0fb0e7a51fa6b424d45e023aa29.mesh"]
+
+source_file="res://assets/models/trees/sapling_broad_trunk.obj"
+dest_files=["res://.godot/imported/sapling_broad_trunk.obj-511ab0fb0e7a51fa6b424d45e023aa29.mesh", "res://.godot/imported/sapling_broad_trunk.obj-511ab0fb0e7a51fa6b424d45e023aa29.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

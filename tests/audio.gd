@@ -14,7 +14,7 @@ func _ready() -> void:
     Weather.drought_enabled = false;
     Settings.ensure_loaded();
     var keep:Array = [Settings.volume_master, Settings.volume_sfx, Settings.volume_ambient];
-    for id in [&"chop", &"hammer", &"pick", &"dig", &"rustle", &"anvil", &"click", &"place", &"error", &"demolish", &"done", &"birth", &"death", &"merchant", &"season"]:
+    for id in [&"chop", &"hammer", &"pick", &"dig", &"rustle", &"anvil", &"click", &"place", &"error", &"demolish", &"done", &"birth", &"death", &"merchant", &"season", &"treefall"]:
         _expect("a sound file for %s" % id, Sfx.has(id));
     for id in [&"wind", &"rain", &"water", &"birds", &"crickets"]:
         _expect("an ambient loop for %s" % id, ResourceLoader.exists("res://assets/audio/ambient/%s.wav" % id));

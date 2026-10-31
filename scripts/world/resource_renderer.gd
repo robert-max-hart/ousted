@@ -39,6 +39,35 @@ const BUSH_SWAY :float = 0.04;
 const BUSH_HEIGHT:float = 0.7;
 const HAZEL_SWAY:float = 0.07;
 const HAZEL_HEIGHT:float = 1.8;
+const BIRCH_SWAY:float = 0.10;
+const BIRCH_HEIGHT:float = 3.4;
+const PALM_SWAY :float = 0.16;
+const PALM_HEIGHT:float = 4.0;
+const DEAD_SWAY :float = 0.03;
+const DEAD_HEIGHT:float = 2.5;
+
+# Birch leaves over the year (same scale as OAK_LEAVES): lighter, and yellow before the oaks turn.
+const BIRCH_LEAVES:Array = [
+    [0.0, Color(0.58, 0.72, 0.34)], [0.6, Color(0.4, 0.62, 0.24)], [1.3, Color(0.3, 0.52, 0.2)],
+    [2.0, Color(0.5, 0.6, 0.2)], [2.4, Color(0.92, 0.76, 0.18)], [2.75, Color(0.85, 0.6, 0.14)], [3.0, Color(0.6, 0.4, 0.14)],
+];
+const PALM_LEAVES:Color = Color(0.3, 0.52, 0.2);
+
+# The tree models (assets/models/trees, made by tools/make_trees.py): per kind, the files, how many variants there are,
+# whether the crown is a separate layer that hides in winter (leaves), and whether it has a crown at all.
+const TREE_DIR:String = "res://assets/models/trees/";
+const SAPLING_UNTIL:float = 0.3;          # below this growth a tree is drawn as its sapling model
+const TREE_SPECS:Dictionary = {
+    &"tree":  {"file": "pine",  "variants": 3, "leaves": false, "crown": true},
+    &"oak":   {"file": "oak",   "variants": 3, "leaves": true, "crown": true},
+    &"birch": {"file": "birch", "variants": 2, "leaves": true, "crown": true},
+    &"palm":  {"file": "palm",  "variants": 3, "leaves": false, "crown": true},
+    &"dead":  {"file": "dead",  "variants": 3, "leaves": false, "crown": false},
+    &"sapling_pine":  {"file": "sapling_pine",  "variants": 1, "leaves": false, "crown": true, "single": true},
+    &"sapling_broad": {"file": "sapling_broad", "variants": 1, "leaves": true, "crown": true, "single": true},
+    &"sapling_palm":  {"file": "sapling_palm",  "variants": 1, "leaves": false, "crown": true, "single": true},
+};
+const SAPLING_OF:Dictionary = {&"tree": &"sapling_pine", &"oak": &"sapling_broad", &"birch": &"sapling_broad", &"palm": &"sapling_palm"};
 
 var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
 var _markers    :MultiMeshInstance3D;
@@ -46,8 +75,10 @@ var _canopy_mat :ShaderMaterial;
 const PICKED_MUSHROOM:StringName = &"mushroom_picked";       # a render layer, not a resource kind
 var _bush_mat   :ShaderMaterial;
 var _oak_leaf_mat:ShaderMaterial;
+var _birch_leaf_mat:ShaderMaterial;
+var _palm_leaf_mat:ShaderMaterial;
+var _leaf_layers:Dictionary = {};     # layer key -> MultiMeshInstance3D of the crowns that fall in winter (oaks and birches)
 var _berries    :MultiMeshInstance3D;      # berries on the bushes that have fruit, one clump per bush
-var _oak_leaves :MultiMeshInstance3D;      # follows the oak layer's instances, hidden in winter
 var _dirty      :bool = true;
 var _preview_rect:Rect2i = Rect2i();
 var _preview_filter:Callable = Callable();
@@ -57,74 +88,14 @@ func _ready() -> void:
     _bush_mat = WindSway.make(BUSH_BY_SEASON[0], BUSH_SWAY, BUSH_HEIGHT);
     _oak_leaf_mat = WindSway.make(OAK_LEAVES[0][1], OAK_SWAY, OAK_HEIGHT);
     var trunk_color:Color = Color(0.4, 0.27, 0.17);
-    var trunk_mat:ShaderMaterial = WindSway.make(trunk_color, PINE_SWAY, PINE_HEIGHT);
-    var oak_trunk_mat:ShaderMaterial = WindSway.make(trunk_color, OAK_SWAY, OAK_HEIGHT);
+    _birch_leaf_mat = WindSway.make(BIRCH_LEAVES[0][1], BIRCH_SWAY, BIRCH_HEIGHT);
+    _palm_leaf_mat = WindSway.make(PALM_LEAVES, PALM_SWAY, PALM_HEIGHT);
     var twig_mat:ShaderMaterial = WindSway.make(trunk_color, BUSH_SWAY, BUSH_HEIGHT);
     var hazel_stem_mat:ShaderMaterial = WindSway.make(trunk_color, HAZEL_SWAY, HAZEL_HEIGHT);
+    WindSway.hold_snow(_canopy_mat);
+    WindSway.hold_snow(_bush_mat);
+    _make_tree_layers(trunk_color);
 
-    var tree:ArrayMesh = ArrayMesh.new();
-    var trunk:CylinderMesh = CylinderMesh.new();
-    trunk.top_radius = 0.07;
-    trunk.bottom_radius = 0.15;
-    trunk.height = 1.7;
-    trunk.radial_segments = 6;
-    trunk.rings = 1;
-    add_part(tree, trunk, Transform3D(Basis(), Vector3(0, 0.85, 0)), trunk_mat);
-    var flare:CylinderMesh = CylinderMesh.new();      # roots spreading at the foot
-    flare.top_radius = 0.15;
-    flare.bottom_radius = 0.27;
-    flare.height = 0.22;
-    flare.radial_segments = 6;
-    flare.rings = 1;
-    add_part(tree, flare, Transform3D(Basis(), Vector3(0, 0.11, 0)), trunk_mat, Color(0.85, 0.85, 0.85));
-    # four tiers of branches, wide and dark at the bottom, each turned a little against the one below
-    var tiers:Array = [[1.0, 1.5, 1.75, 8, 0.8], [0.8, 1.4, 2.3, 7, 0.88], [0.6, 1.25, 2.85, 7, 0.95], [0.36, 1.1, 3.35, 6, 1.0]];
-    for i in tiers.size():
-        var tier:CylinderMesh = CylinderMesh.new();
-        tier.top_radius = 0.0;
-        tier.bottom_radius = tiers[i][0];
-        tier.height = tiers[i][1];
-        tier.radial_segments = tiers[i][3];
-        tier.rings = 1;
-        tier.cap_bottom = false;
-        var shade:float = tiers[i][4];
-        add_part(tree, tier, Transform3D(Basis(Vector3.UP, i * 0.55), Vector3(0, tiers[i][2], 0)), _canopy_mat, Color(shade, shade, shade));
-
-    var oak:ArrayMesh = ArrayMesh.new();
-    var oak_trunk:CylinderMesh = CylinderMesh.new();
-    oak_trunk.top_radius = 0.12;
-    oak_trunk.bottom_radius = 0.22;
-    oak_trunk.height = 1.5;
-    oak_trunk.radial_segments = 6;
-    add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), oak_trunk_mat);
-    var oak_flare:CylinderMesh = CylinderMesh.new();      # buttress roots at the foot
-    oak_flare.top_radius = 0.22;
-    oak_flare.bottom_radius = 0.4;
-    oak_flare.height = 0.3;
-    oak_flare.radial_segments = 6;
-    oak_flare.rings = 1;
-    add_part(oak, oak_flare, Transform3D(Basis(), Vector3(0, 0.15, 0)), oak_trunk_mat, Color(0.85, 0.85, 0.85));
-    for i in 3:                                  # bare boughs, all that shows in winter
-        var bough:CylinderMesh = CylinderMesh.new();
-        bough.top_radius = 0.03;
-        bough.bottom_radius = 0.07;
-        bough.height = 1.3;
-        bough.radial_segments = 4;
-        var yaw:float = i * TAU / 3.0;
-        var lean:Basis = Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, 0.6);
-        add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), oak_trunk_mat);
-    var oak_canopy:ArrayMesh = ArrayMesh.new();
-    # a crown of overlapping lobes, the upper ones lighter
-    var lobes:Array = [[Vector3(0, 2.6, 0), 0.95, 1.0], [Vector3(0.7, 2.25, 0.2), 0.7, 0.9], [Vector3(-0.65, 2.3, -0.3), 0.72, 0.95],
-        [Vector3(0.1, 2.2, -0.75), 0.66, 0.88], [Vector3(-0.2, 2.35, 0.7), 0.68, 0.92], [Vector3(0.15, 3.15, 0.05), 0.62, 1.08]];
-    for lobe in lobes:
-        var ball:SphereMesh = SphereMesh.new();
-        ball.radius = lobe[1];
-        ball.height = lobe[1] * 1.7;
-        ball.radial_segments = 7;
-        ball.rings = 3;
-        var light:float = lobe[2];
-        add_part(oak_canopy, ball, Transform3D(Basis(), lobe[0]), _oak_leaf_mat, Color(light, light, light));
     var rock_shape:SphereMesh = SphereMesh.new();
     rock_shape.radius = 0.7;
     rock_shape.height = 1.0;
@@ -218,9 +189,6 @@ func _ready() -> void:
             var dir:Vector3 = (Basis(Vector3.UP, turn * (1.0 if k % 2 == 0 else -1.0)) * (out * 0.75 + Vector3.UP * 0.65)).normalized();
             add_part(berries, berry_shape, Transform3D(Basis(), centre + dir * lobe[1] * 0.97), berry_mat);
     _berries = _make_layer(berries);
-    _layers[&"tree"] = _make_layer(tree);
-    _layers[&"oak"] = _make_layer(oak);
-    _oak_leaves = _make_layer(oak_canopy);
     _layers[&"rock"] = _make_layer(rock);
     _layers[&"ore"] = _make_layer(ore);
     _layers[&"bush"] = _make_layer(bush);
@@ -257,18 +225,101 @@ func set_season(s:int) -> void:
     WindSway.set_color(_bush_mat, BUSH_BY_SEASON[s]);
     update_foliage();
 
-# Oak leaves follow the day of the year: fresh green in spring, orange and red in autumn, gone in winter.
+# Oak and birch leaves follow the day of the year: fresh green in spring, orange and red or yellow in autumn, gone in winter.
 func update_foliage() -> void:
     var f:float = GameClock.year_fraction_seasons() if Climate.data()["winter"] else 1.3;       # no winter: green all year
-    _oak_leaves.visible = f < 3.0;
-    var col:Color = OAK_LEAVES[0][1];
-    for i in range(1, OAK_LEAVES.size()):
-        var a:Array = OAK_LEAVES[i - 1];
-        var b:Array = OAK_LEAVES[i];
+    for key in _leaf_layers:
+        (_leaf_layers[key] as MultiMeshInstance3D).visible = f < 3.0;
+    WindSway.set_color(_oak_leaf_mat, _leaf_colour(OAK_LEAVES, f));
+    WindSway.set_color(_birch_leaf_mat, _leaf_colour(BIRCH_LEAVES, f));
+
+func _leaf_colour(table:Array, f:float) -> Color:
+    var col:Color = table[0][1];
+    for i in range(1, table.size()):
+        var a:Array = table[i - 1];
+        var b:Array = table[i];
         if f <= b[0]:
             col = (a[1] as Color).lerp(b[1], inverse_lerp(a[0], b[0], f));
             break;
-    WindSway.set_color(_oak_leaf_mat, col);
+    return col;
+
+# A felled tree: shows it tipping over, away from `from` (where the woodcutter stood), as its own short-lived visual. Call it
+# before the node is removed.
+func fell(rn:ResourceNode, from:Vector3) -> void:
+    var key:StringName = _layer_key(rn);
+    if not _layers.has(key) or World.instance == null:
+        return;
+    var parts:Array = [(_layers[key] as MultiMeshInstance3D).multimesh.mesh];
+    if _leaf_layers.has(key) and (_leaf_layers[key] as MultiMeshInstance3D).visible:
+        parts.append((_leaf_layers[key] as MultiMeshInstance3D).multimesh.mesh);
+    var foot:Vector3 = _node_position(World.instance, rn);
+    var s:float = rn.scale;
+    if not rn.is_mature():
+        s *= _growth_scale(rn.growth);
+    var tree:FallingTree = FallingTree.new();
+    add_child(tree);
+    tree.setup(parts, foot, rn.yaw, s, foot - from);
+    Sfx.at(&"treefall", foot);
+
+# Whether the crowns that fall in winter are drawn now.
+func leaves_visible() -> bool:
+    for key in _leaf_layers:
+        return (_leaf_layers[key] as MultiMeshInstance3D).visible;
+    return false;
+
+# --------------------------------
+# Trees: the models, and which one a node is drawn with
+
+# Makes a layer per tree kind and variant, and per sapling model. A layer's mesh is the trunk with the crown on a second surface; for
+# kinds whose crown falls in winter the crown is a layer of its own that follows the trunk's instances.
+func _make_tree_layers(trunk_color:Color) -> void:
+    var trunks:Dictionary = {
+        &"tree": WindSway.make(trunk_color, PINE_SWAY, PINE_HEIGHT), &"oak": WindSway.make(trunk_color, OAK_SWAY, OAK_HEIGHT),
+        &"birch": WindSway.make(Color(0.88, 0.86, 0.8), BIRCH_SWAY, BIRCH_HEIGHT), &"palm": WindSway.make(Color(0.62, 0.5, 0.36), PALM_SWAY, PALM_HEIGHT),
+        &"dead": WindSway.make(Color(0.52, 0.47, 0.42), DEAD_SWAY, DEAD_HEIGHT),
+    };
+    var crowns:Dictionary = {&"tree": _canopy_mat, &"oak": _oak_leaf_mat, &"birch": _birch_leaf_mat, &"palm": _palm_leaf_mat};
+    var young:Dictionary = {&"sapling_pine": &"tree", &"sapling_broad": &"oak", &"sapling_palm": &"palm"};
+    for kind in TREE_SPECS:
+        var spec:Dictionary = TREE_SPECS[kind];
+        var base:StringName = young.get(kind, kind);
+        for v in spec["variants"]:
+            var name:String = spec["file"] if spec.get("single", false) else "%s_%d" % [spec["file"], v];
+            var trunk:Mesh = load("%s%s_trunk.obj" % [TREE_DIR, name]) as Mesh;
+            var key:StringName = _key(kind, v);
+            var mesh:ArrayMesh = ArrayMesh.new();
+            _add_surface(mesh, trunk, trunks[base]);
+            if spec["crown"]:
+                var crown:Mesh = load("%s%s_crown.obj" % [TREE_DIR, name]) as Mesh;
+                if spec["leaves"]:
+                    var cm:ArrayMesh = ArrayMesh.new();
+                    _add_surface(cm, crown, crowns[base]);
+                    _leaf_layers[key] = _make_layer(cm);
+                else:
+                    _add_surface(mesh, crown, crowns[base]);
+            _layers[key] = _make_layer(mesh);
+
+static func _add_surface(target:ArrayMesh, src:Mesh, mat:Material) -> void:
+    target.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(0));
+    target.surface_set_material(target.get_surface_count() - 1, mat);
+
+static func _key(kind:StringName, variant:int) -> StringName:
+    return StringName("%s:%d" % [kind, variant]);
+
+# The layer a node is drawn in: a tree by kind, variant (from its cell, so it never changes) and age; picked mushrooms are their own.
+func _layer_key(rn:ResourceNode) -> StringName:
+    if rn.is_tree():
+        var kind:StringName = rn.kind;
+        if rn.growth < SAPLING_UNTIL and SAPLING_OF.has(kind):
+            kind = SAPLING_OF[kind];
+        return _key(kind, posmod(hash(rn.cell), int(TREE_SPECS[kind]["variants"])));
+    return PICKED_MUSHROOM if rn.kind == &"mushroom" and rn.amount <= 0 else rn.kind;
+
+# How big a young tree is drawn: saplings grow into the sapling model's full size, and then the young tree grows into the full one.
+static func _growth_scale(g:float) -> float:
+    if g < SAPLING_UNTIL:
+        return lerpf(0.55, 1.0, g / SAPLING_UNTIL);
+    return lerpf(0.5, 1.0, (g - SAPLING_UNTIL) / (1.0 - SAPLING_UNTIL));
 
 func _process(_delta:float) -> void:
     if _dirty:
@@ -282,7 +333,7 @@ func _rebuild() -> void:
         by_kind[k] = [];
     var marked:Array[ResourceNode] = [];
     for rn in world.nodes:
-        by_kind[PICKED_MUSHROOM if rn.kind == &"mushroom" and rn.amount <= 0 else rn.kind].append(rn);
+        by_kind[_layer_key(rn)].append(rn);
         if rn.designated:
             marked.append(rn);
 
@@ -290,14 +341,14 @@ func _rebuild() -> void:
         var list:Array = by_kind[k];
         var mm:MultiMesh = (_layers[k] as MultiMeshInstance3D).multimesh;
         mm.instance_count = list.size();
-        var leaves:MultiMesh = _oak_leaves.multimesh;
-        if k == &"oak":
+        var leaves:MultiMesh = (_leaf_layers[k] as MultiMeshInstance3D).multimesh if _leaf_layers.has(k) else null;
+        if leaves != null:
             leaves.instance_count = list.size();
         for i in list.size():
             var rn:ResourceNode = list[i];
             var s:float = rn.scale;
             if not rn.is_mature():
-                s *= lerpf(0.25, 1.0, rn.growth);
+                s *= _growth_scale(rn.growth);
             var tint:Color = Color.WHITE;
             if rn.regrows:
                 # bushes shrink and dull as they are picked clean
@@ -310,7 +361,7 @@ func _rebuild() -> void:
                 tint = PREVIEW_TINT;
             mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rn.yaw).scaled(Vector3.ONE * s), _node_position(world, rn)));
             mm.set_instance_color(i, tint);
-            if k == &"oak":
+            if leaves != null:
                 leaves.set_instance_transform(i, mm.get_instance_transform(i));
                 leaves.set_instance_color(i, tint);
 
