@@ -19,6 +19,7 @@ var _min_pop:int = 99;
 var _lowest_food:int = 999999;
 var _done:bool = false;
 var verbose:bool = false;          # a fifth argument turns on a line per citizen in each report
+var time_scale:float = 4.0;        # a seventh argument: Engine.time_scale (with the 5x game speed, 4 is 20x; 10 is 50x)
 var crop_list:String = "";         # a sixth argument: the fields' crops, comma separated (default barley, wheat, radish)
 var fields:int = 0;       # how many fields the colony also starts (the bot builds them; sown with hardy crops)
 
@@ -35,12 +36,17 @@ func _ready() -> void:
         fields = args[2].to_int();
     verbose = args.size() > 4 and args[4] == "v";
     crop_list = args[5] if args.size() > 5 else "";
+    time_scale = args[6].to_float() if args.size() > 6 else 4.0;
     var map_seed:int = args[3].to_int() if args.size() > 3 else 0;       # the map changes every run; pass one to compare runs
+    if map_seed > 0:
+        seed(map_seed);                    # the global rng and the weather's own, so the same map seed repeats the same game
+        Weather._rng.seed = map_seed;
+        Weather.reset();                   # rolls the first day again from that seed
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     world.world_seed = map_seed;
     add_child(world);
     await get_tree().process_frame;
-    Engine.time_scale = 4.0;
+    Engine.time_scale = time_scale;
     _build();
     GameClock.set_speed(3);
 
