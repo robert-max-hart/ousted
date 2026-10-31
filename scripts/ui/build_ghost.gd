@@ -81,7 +81,9 @@ func _hide_extras(n:Node) -> void:
 
 func _tint(n:Node, tint:Material) -> void:
     for c in n.get_children():
-        if c is GeometryInstance3D and not (c is PileGoods):
+        if c is PileGoods:
+            continue;
+        if c is GeometryInstance3D:
             (c as GeometryInstance3D).material_override = tint;
             (c as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
         _tint(c, tint);
