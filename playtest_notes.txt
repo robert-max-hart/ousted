@@ -1,0 +1,63 @@
+### Playtest Results ###
+# mechanics #
+- homeless people who are cold build little fires to stay warm
+-- Maybe have a chance to start fires that way? future pin: fires
+- farm field: scarecrow upgrade (reduces pests?)
+- Idle workers should be laborers, if not already
+- Food is spoiling too quickly, investigate mitigation
+- x10 speed option
+- Roads require work, no materials
+- Building homeless shacks should not be a toggle-able policy, it should always be on
+- Variable-sized buildings (farms, stockpiles, etc) can be expanded in size
+# map generation #
+- Need more surface stone at start
+- Iron balancing might be needed
+- not terribly clear if hills are too steep to build on at a glance
+# visual improvements #
+- Granary needs to look like a silo maybe
+- Houses can look squatter
+- Mine should have more detail, just a few blocks isn't very indicitive of what it is
+- Town hall shouldn't look like a big house
+- Forager's hut needs visual difference - just looks like a house
+- Blacksmith also needs a big chimney / forge 
+- Give a little texture to farm fields, add a woooden fence around it
+- Storage pile needs something to differentiate it from an in-progress building
+- Some kind of animation to indicate a citizen is working
+- Iron deposits need to be more than just red rocks
+- Graveyard should be more than just a slab, shouldn't clip through the terrain
+- School needs to be more than just a big house
+- Mushrooms need a "picked" visual state
+- Stockpiles need a visual indicator of their fullness
+# UI updates #
+- Log text can be smaller
+- "Needs X resource" too obtrusive / always on
+- Building placement should show preview of building and not solid block
+- Placement ghost should be a different color (yellow/orange) if there is not enough resources to build it
+- Some kind of indication of idle citizens
+- Blacksmith toggles: shouldn't need toggle, if the cap is over 0 it should be enough
+- Indicator for construction priority
+- Baisc "resume/save/settings/quit" esc menu
+-- exposing the world seed
+- Inspector should have more options:
+-- Resources can be marked for harvesting
+- Be able to show/locate workers from a work building's inspector
+- Hovering over buttons shows too much information - just show the cost
+- Top and bottom bars should be static, not moveable
+- Remove policies from profressions panel, be it's own panel
+- Remove save and load from profressions panel, should be in ESC menu
+- Panels should have a toolbar category to open/close from
+- Professions tab shouldn't list children unless they have an actual job - currently they look like they are always laborers, even if they're students
+- Woodcutter building should have its default behavior be 'cut mature trees only'
+- A panel for listing all citezens, listing basic stats and being able to select one from the list
+- A separate "cancel" tool that cancels in-progress actions like building or harvesting
+# ideas #
+- LONG STRETCH GOAL: picking different cliamtes at start (temperate, desert, arctic, tropial)
+- "Realism" mode where time moves slower, aging progresses more realistically
+- Overheating as well as too cold
+- More weather
+-- Thunderstorms
+# questions #
+- How are forager and gatherer different?
+- Is 00:00 midnight or noon? Feels like it should be midnight
+- How shouold we go about texturing these meshes?
+- Clear up some of the text descriptions for crap planting requirements

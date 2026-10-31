@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.12-dev | 31 Oct 2026 | Clouds round the edge of the map
+- The map no longer ends in a hard cut with empty sky beyond it. A bank of cloud billows stands along all four edges, rising a little above the ground there, and a sea of cloud stretches out under and around the map to the horizon. From the edge, from above and from outside, the land now looks like an island in the clouds.
+- The clouds follow the sky: white by day, gold at dusk and bluish at night, and they swell and drift slowly with the game clock (and stop when it is paused).
+
 # 0.6.11 | 31 Oct 2026 | Graphics settings for trees and crops, and a fairer mix of trees
 - Settings has two new options for weaker graphics cards. **Tree and crop distance** (Near, Normal, Far) stops drawing trees, bushes, rocks and crops past a set distance from the camera; Far, the default, draws everything as before. **Model detail** (Full, Reduced) swaps trees, bushes, rocks, orchard trees and crops for simpler models with fewer sides, leaves and stalks, about 40% fewer triangles for trees, bushes and rocks.
 - The map's trees, bushes and rocks are now drawn in blocks, so the parts of the map that are off-screen are no longer drawn at all. This helps at every setting.

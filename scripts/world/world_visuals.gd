@@ -15,6 +15,7 @@ var _rain       :CPUParticles3D;
 var _snow       :CPUParticles3D;
 var _water_mat  :ShaderMaterial;
 var snow_cover :float = 0.0;            # how much of the ground is under snow, 0 to 1: it builds in snowfall and melts in warm weather
+var edge_clouds:MapEdgeClouds;         # the cloud bank and cloud sea round the map's edge
 var _fx_clock:float = 0.0;           # advances with the game's speed (World.fx_speed), so the water stops when paused
 
 func _init(w:World) -> void:
@@ -75,6 +76,9 @@ func setup_environment() -> void:
     _water.material_override = _water_mat;
     apply_settings();
     start_snow_cover();
+    edge_clouds = MapEdgeClouds.new();
+    world.add_child(edge_clouds);
+    edge_clouds.build(world.terrain, world.world_seed);
     _water.position = Vector3(0.0, Terrain.WATER_LEVEL, 0.0);
     _water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     add_child(_water);
@@ -259,6 +263,8 @@ func _update_lighting() -> void:
     _env.ambient_light_color = (a[3] as Color).lerp(b[3], t);
     _env.ambient_light_energy = lerpf(a[4], b[4], t) * lerpf(1.0, 0.72, wet);       # rain and snow dim the sky light too, not only the sun
     _env.fog_light_color = horizon;
+    if edge_clouds != null:
+        edge_clouds.set_tint(horizon);
     _env.fog_density = lerpf(0.0012, 0.004, wet);
 
 const RAIN_PARTICLES :int = 2500;

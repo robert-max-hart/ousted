@@ -1,0 +1,37 @@
+# Questions #
+- frame rate and load time appear fine on this machine
+- iron feels scarce, but there's also not a lot of need for iron in the beginning
+- flatter terrain feels better, but the starting building area still feels somewhat cramped
+- palette feels better, but still feels a bit washed out - textures might help this, so defer until we start adding textures and check again
+# balance #
+- Getting wood starved pretty early on (beginning of summer)
+- Do laborers/foragers have a range? It seemed like they were traveling very far to gather things
+- A few days into summer and most citizens are idle - what should they be doing?
+# visual #
+- People stop their working animation when paused, intead of freezing the animation
+- Road tile coloration is too varied, a texture would help too
+- scarecrows in the fields shouldn't be directly on top of a crop tile - would make more sense for them to be placed between tiles
+- grass tufts seem too large/spread apart to look like grass, especially when zoomed in
+- The lighting transition between day and night seems very abrupt
+# map gen #
+- More sparse groups of trees between the dense groves
+- river generation
+# gameplay #
+- Fishing huts
+- decorative items
+- planting singular trees
+- woodcutter building could probably plant trees more densely
+# UI #
+- UI overall would use an art pass, is very plain
+- child job is not capitalized like the rest of the jobs
+- Remove raise/lower/flatten terrain options from the bottom toolbar
+- Replace inventory labels on the top bar (wood, firewood, etc) with icons
+- replace "idle" label for citizens with an icon
+- indicator on building ghosts which direction "front" is - it doesn't matter gameplay wise but for aesthetics it would be nice
+- Road building tool should be in Civic> category, not on its own
+- An option in the inspector when selecting a building to build a copy of that building
+- School inspector should have a list of students as well
+- need some kind of messaging confirming a game was saved when pressing the Save (f5) button in the pause menu or pressing F5
+- Clicking on Merchant on the way message should bring the camera to the merchant
+- Trade UI could use some refactoring - screenshot it and we can go over it more in-dpeth
+- An option in the trading post inspetor to dismiss a trader early
