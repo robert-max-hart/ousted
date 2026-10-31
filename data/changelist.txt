@@ -3,7 +3,7 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.6.2-dev | 31 Oct 2026 | Stockpiles show what they really hold
+# 0.6.2 | 31 Oct 2026 | Stockpiles show what they really hold
 - Stockpiles now show real goods instead of identical crates: logs, split firewood, cut stone, ingots of iron, silver and gold, lumps of coal, sacks of grain, barrels of milk, honey and spirits, bales of wool and leather, pots, bundles of tools, and crates of produce with the food showing on top. Each kind is stacked in its own part of the pile, taller as the store fills up.
 
 # 0.6.1 | 31 Oct 2026 | M7 begins: moving water, swaying trees and grass, real snow, a new interface look, icons and graphics settings
