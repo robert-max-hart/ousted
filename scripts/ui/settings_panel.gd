@@ -23,11 +23,7 @@ func _init() -> void:
     center.mouse_filter = Control.MOUSE_FILTER_IGNORE;
     add_child(center);
     var panel:PanelContainer = PanelContainer.new();
-    var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 1.0);
-    style.set_corner_radius_all(6);
-    style.set_content_margin_all(12);
-    panel.add_theme_stylebox_override("panel", style);
+    panel.add_theme_stylebox_override("panel", UITheme.panel_box(1.0, 6, 12));
     center.add_child(panel);
     var col:VBoxContainer = VBoxContainer.new();
     col.custom_minimum_size = Vector2(380, 0);

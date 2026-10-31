@@ -26,11 +26,7 @@ func setup() -> void:
     offset_top = 48.0;
     custom_minimum_size = Vector2(470, 0);
     mouse_filter = Control.MOUSE_FILTER_STOP;
-    var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.92);
-    style.set_corner_radius_all(6);
-    style.set_content_margin_all(8);
-    add_theme_stylebox_override("panel", style);
+    add_theme_stylebox_override("panel", UITheme.panel_box(0.92, 6, 8));
     PanelMover.make_movable(self, &"citizens");
     var col:VBoxContainer = VBoxContainer.new();
     add_child(col);

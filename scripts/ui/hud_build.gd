@@ -16,15 +16,15 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     row.add_theme_constant_override("separation", 8);
     panel.add_child(row);
     hud._date = Label.new();
-    hud._date.custom_minimum_size.x = 155;
+    hud._date.custom_minimum_size.x = 145;
     row.add_child(hud._date);
     hud._weather = Label.new();
-    hud._weather.custom_minimum_size.x = 90;
+    hud._weather.custom_minimum_size.x = 78;
     row.add_child(hud._weather);
     hud._stock = HBoxContainer.new();
     hud._stock.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
     hud._stock.clip_contents = true;           # a long stock line is cut off instead of pushing the speed buttons off-screen
-    hud._stock.add_theme_constant_override("separation", 14);
+    hud._stock.add_theme_constant_override("separation", 10);
     hud._stock.mouse_filter = Control.MOUSE_FILTER_PASS;
     row.add_child(hud._stock);
     for id in hud.SHOWN_ITEMS:

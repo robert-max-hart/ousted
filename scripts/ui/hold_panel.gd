@@ -26,11 +26,7 @@ func setup() -> void:
     offset_top = -220.0;
     offset_bottom = 220.0;
     mouse_filter = Control.MOUSE_FILTER_STOP;
-    var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.97);
-    style.set_corner_radius_all(6);
-    style.set_content_margin_all(10);
-    add_theme_stylebox_override("panel", style);
+    add_theme_stylebox_override("panel", UITheme.panel_box(0.97, 6, 10));
     PanelMover.make_movable(self, &"hold");
     var col:VBoxContainer = VBoxContainer.new();
     col.add_theme_constant_override("separation", 6);

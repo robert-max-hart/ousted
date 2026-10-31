@@ -94,9 +94,7 @@ func _ready() -> void:
     var root:Control = Control.new();
     root.set_anchors_preset(Control.PRESET_FULL_RECT);
     root.mouse_filter = Control.MOUSE_FILTER_IGNORE;
-    var theme:Theme = Theme.new();
-    theme.default_font_size = FONT_SIZE;
-    root.theme = theme;
+    root.theme = UITheme.make(FONT_SIZE);
     add_child(root);
     _build_top_bar(root);
     _build_toolbar(root);
@@ -133,11 +131,7 @@ func _ready() -> void:
     _site_panel = PanelContainer.new();
     _site_panel.visible = false;
     _site_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE;
-    var site_style:StyleBoxFlat = StyleBoxFlat.new();
-    site_style.bg_color = Color(0.06, 0.06, 0.05, 0.88);
-    site_style.set_corner_radius_all(5);
-    site_style.set_content_margin_all(8);
-    _site_panel.add_theme_stylebox_override("panel", site_style);
+    _site_panel.add_theme_stylebox_override("panel", UITheme.panel_box(0.9, 5, 8));
     _site_text = RichTextLabel.new();
     _site_text.bbcode_enabled = true;
     _site_text.fit_content = true;
@@ -719,11 +713,7 @@ func world_camera() -> RTSCamera:
 func _panel(root:Control, id:StringName = &"") -> PanelContainer:
     var p:PanelContainer = PanelContainer.new();
     p.mouse_filter = Control.MOUSE_FILTER_STOP;
-    var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.78);
-    style.set_corner_radius_all(6);
-    style.set_content_margin_all(8);
-    p.add_theme_stylebox_override("panel", style);
+    p.add_theme_stylebox_override("panel", UITheme.panel_box(0.86));
     root.add_child(p);
     if id != &"":
         PanelMover.make_movable(p, id);

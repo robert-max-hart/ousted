@@ -79,11 +79,7 @@ func setup() -> void:
     offset_top = -240.0;
     offset_bottom = 240.0;
     mouse_filter = Control.MOUSE_FILTER_STOP;
-    var style:StyleBoxFlat = StyleBoxFlat.new();
-    style.bg_color = Color(0.08, 0.07, 0.06, 0.97);
-    style.set_corner_radius_all(6);
-    style.set_content_margin_all(10);
-    add_theme_stylebox_override("panel", style);
+    add_theme_stylebox_override("panel", UITheme.panel_box(0.97, 6, 10));
     PanelMover.make_movable(self, &"trade");
     _bold = FontVariation.new();
     _bold.base_font = ThemeDB.fallback_font;
