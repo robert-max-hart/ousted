@@ -12,6 +12,7 @@
 - A new look for the interface: dark warm-brown panels with a thin gold edge, buttons that warm up under the cursor and turn gold when selected, gold-ticked check boxes, matching scroll bars, menus and tooltips, shared by the game screens, the pop-up windows and the title screen's windows.
 - Small icons on the tool, build category and panel buttons, and beside each profession in the Professions list. The Soil, Water and Slope overlay buttons are icon-only to save room in the top bar (hover for the name).
 - The icons are now image files (SVG) in `assets/icons/`, so they can be edited or replaced without touching code; a PNG with the same name takes precedence.
+- Every building button in the build menu (and Road) now has its own icon, drawn as an SVG file in `assets/icons/buildings`.
 
 # 0.6.0 | 30 Oct 2026 | Meta is complete: hills, overwrite confirmation and a steadier fishing catch
 - This build closes the Meta milestone: save slots, settings, map size, water layouts, hills, climates, custom rules, realism mode, start options, the slope overlay, a tutorial and scenarios. The Arctic climate is still flagged as not yet tuned.

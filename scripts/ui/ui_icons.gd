@@ -6,12 +6,15 @@
 #     over citizens) in assets/icons/stock. Each is <id>.svg, imported at
 #     the size in the file; a <id>.png beside it takes precedence, so an
 #     artist can replace any icon without touching code. Ids are unique
-#     across both folders. tools/make_icons.py regenerates the SVGs.
+#     across those two folders. The build menu's icons, one per building
+#     def id (and `road`), are in assets/icons/buildings, drawn by hand:
+#     building(id). tools/make_icons.py regenerates the SVGs.
 #     texture(id) caches the loaded file.
 # ----------------------------------------------------------------
 class_name UIIcons extends RefCounted;
 
 const SIZE:int = 18;           # the size the button glyphs are made at (and the room buttons leave for them)
+const BUILDING_DIR:String = "res://assets/icons/buildings/";
 const DIRS:Array[String] = ["res://assets/icons/ui/", "res://assets/icons/stock/"];
 
 static var _cache:Dictionary = {};
@@ -22,9 +25,16 @@ static func texture(id:StringName) -> Texture2D:
         _cache[id] = _load(id);
     return _cache[id];
 
-static func _load(id:StringName) -> Texture2D:
+# The build-menu icon for a building def id, or for `road`.
+static func building(id:StringName) -> Texture2D:
+    var key:String = "building:" + id;
+    if not _cache.has(key):
+        _cache[key] = _load(id, [BUILDING_DIR]);
+    return _cache[key];
+
+static func _load(id:StringName, dirs:Array = DIRS) -> Texture2D:
     for ext in ["png", "svg"]:
-        for dir in DIRS:
+        for dir in dirs:
             var path:String = "%s%s.%s" % [dir, id, ext];
             if ResourceLoader.exists(path):
                 return load(path) as Texture2D;

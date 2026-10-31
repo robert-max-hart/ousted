@@ -25,6 +25,24 @@ func _ready() -> void:
         if UIIcons.texture(id) == null:
             missing += 1;
             print("FAIL: no stock icon file for ", id);
+    for id in Defs.BUILD_MENU:
+        if UIIcons.building(id) == null:
+            missing += 1;
+            print("FAIL: no building icon for ", id);
+    if UIIcons.building(&"road") == null:
+        missing += 1;
+        print("FAIL: no road icon");
+    var bids:Array[StringName] = [];
+    for cat in Defs.BUILD_CATEGORIES:
+        bids.append_array(cat[1]);
+    bids.append(&"road");
+    var bsheet:Image = Image.create(cell * 8, cell * ((bids.size() + 7) / 8), false, Image.FORMAT_RGBA8);
+    bsheet.fill(Color(0.15, 0.125, 0.095));
+    for i in bids.size():
+        var bimg:Image = UIIcons.building(bids[i]).get_image();
+        bimg.resize(UIIcons.SIZE * scale, UIIcons.SIZE * scale, Image.INTERPOLATE_BILINEAR);
+        bsheet.blend_rect(bimg, Rect2i(Vector2i.ZERO, bimg.get_size()), Vector2i((i % 8) * cell + 8, (i / 8) * cell + 8));
+    bsheet.save_png(out.path_join("building_icons.png"));
     for i in ids.size():
         var img:Image = UIIcons.texture(ids[i]).get_image();
         img.resize(UIIcons.SIZE * scale, UIIcons.SIZE * scale, Image.INTERPOLATE_NEAREST);

@@ -69,7 +69,7 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
         b.text = labels[i];
         b.toggle_mode = true;
         b.focus_mode = Control.FOCUS_NONE;
-        b.custom_minimum_size.x = 36;
+        b.custom_minimum_size.x = 30;
         b.pressed.connect(GameClock.set_speed.bind(i));
         row.add_child(b);
         hud._speed_btns.append(b);
@@ -145,10 +145,14 @@ static func _build_toolbar(hud:HUD, root:Control) -> void:
         for id in Defs.BUILD_CATEGORIES[ci][1]:
             var def:Dictionary = Defs.BUILDINGS[id];
             var b:Button = hud._tool_button(hud._build_row, group, def["name"], "Cost: %s" % Defs.cost_string(def["cost"]));
+            b.icon = UIIcons.building(id);
+            b.add_theme_constant_override("h_separation", 5);
             b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
             hud._tool_btns[String(id)] = b;
         if Defs.BUILD_CATEGORIES[ci][0] == "Civic":
             var rb:Button = hud._tool_button(hud._build_row, group, "Road", PlayerTools.MODE_HINTS[PlayerTools.Mode.ROAD]);
+            rb.icon = UIIcons.building(&"road");
+            rb.add_theme_constant_override("h_separation", 5);
             rb.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.ROAD, &""));
             hud._tool_btns[str(PlayerTools.Mode.ROAD)] = rb;
             hud._road_cat = ci;
