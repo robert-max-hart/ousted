@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://brvs8h1o3tbjk"
+path="res://.godot/imported/orchard_plum_fruit.obj-a4652c119ca6492c8d2c3e8ba265e85a.mesh"
+
+[deps]
+
+files=["res://.godot/imported/orchard_plum_fruit.obj-a4652c119ca6492c8d2c3e8ba265e85a.mesh"]
+
+source_file="res://assets/models/plants/orchard_plum_fruit.obj"
+dest_files=["res://.godot/imported/orchard_plum_fruit.obj-a4652c119ca6492c8d2c3e8ba265e85a.mesh", "res://.godot/imported/orchard_plum_fruit.obj-a4652c119ca6492c8d2c3e8ba265e85a.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

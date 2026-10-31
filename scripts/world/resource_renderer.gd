@@ -15,17 +15,6 @@ const OAK_LEAVES:Array = [
     [0.0, Color(0.45, 0.58, 0.27)], [0.6, Color(0.26, 0.48, 0.18)], [1.3, Color(0.15, 0.36, 0.15)],
     [2.0, Color(0.34, 0.47, 0.16)], [2.4, Color(0.76, 0.56, 0.14)], [2.75, Color(0.72, 0.3, 0.12)], [3.0, Color(0.5, 0.28, 0.14)],
 ];
-# Shrubs are clumps of lobes: [centre, radius, shade]. A berry bush is low and spread; a hazel stool taller.
-const BUSH_LOBES:Array = [
-    [Vector3(0, 0.3, 0), 0.34, 1.0], [Vector3(0.32, 0.22, 0.1), 0.27, 0.9], [Vector3(-0.3, 0.24, 0.14), 0.28, 0.95],
-    [Vector3(0.05, 0.2, -0.33), 0.27, 0.88], [Vector3(-0.1, 0.22, 0.34), 0.26, 0.92], [Vector3(0.12, 0.5, 0.0), 0.22, 1.1],
-];
-const HAZEL_LOBES:Array = [
-    [Vector3(0, 1.15, 0), 0.34, 1.0], [Vector3(0.34, 0.9, 0.1), 0.28, 0.9], [Vector3(-0.34, 0.95, -0.1), 0.29, 0.94],
-    [Vector3(0.05, 0.85, -0.36), 0.27, 0.88], [Vector3(-0.08, 0.88, 0.36), 0.27, 0.92], [Vector3(0.08, 1.6, 0.05), 0.26, 1.1],
-    [Vector3(0.25, 1.45, -0.2), 0.22, 1.05], [Vector3(-0.2, 1.4, 0.15), 0.22, 1.02],
-];
-
 const BUSH_BY_SEASON:Array[Color] = [
     Color(0.3, 0.55, 0.22), Color(0.28, 0.5, 0.2), Color(0.55, 0.42, 0.2), Color(0.45, 0.42, 0.38),
 ];
@@ -67,6 +56,9 @@ const TREE_SPECS:Dictionary = {
     &"sapling_broad": {"file": "sapling_broad", "variants": 1, "leaves": true, "crown": true, "single": true},
     &"sapling_palm":  {"file": "sapling_palm",  "variants": 1, "leaves": false, "crown": true, "single": true},
 };
+# Rocks, ore and shrubs come in a few shapes each (assets/models/plants, made by tools/make_plants.py), chosen like a tree's.
+const PLANT_DIR:String = "res://assets/models/plants/";
+const PLANT_VARIANTS:Dictionary = {&"rock": 4, &"ore": 2, &"bush": 2, &"hazel": 2};
 const SAPLING_OF:Dictionary = {&"tree": &"sapling_pine", &"oak": &"sapling_broad", &"birch": &"sapling_broad", &"palm": &"sapling_palm"};
 
 var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
@@ -78,7 +70,7 @@ var _oak_leaf_mat:ShaderMaterial;
 var _birch_leaf_mat:ShaderMaterial;
 var _palm_leaf_mat:ShaderMaterial;
 var _leaf_layers:Dictionary = {};     # layer key -> MultiMeshInstance3D of the crowns that fall in winter (oaks and birches)
-var _berries    :MultiMeshInstance3D;      # berries on the bushes that have fruit, one clump per bush
+var _berry_layers:Dictionary = {};       # bush variant -> MultiMeshInstance3D of the berries on the bushes that have fruit, one clump per bush
 var _dirty      :bool = true;
 var _preview_rect:Rect2i = Rect2i();
 var _preview_filter:Callable = Callable();
@@ -90,111 +82,11 @@ func _ready() -> void:
     var trunk_color:Color = Color(0.4, 0.27, 0.17);
     _birch_leaf_mat = WindSway.make(BIRCH_LEAVES[0][1], BIRCH_SWAY, BIRCH_HEIGHT);
     _palm_leaf_mat = WindSway.make(PALM_LEAVES, PALM_SWAY, PALM_HEIGHT);
-    var twig_mat:ShaderMaterial = WindSway.make(trunk_color, BUSH_SWAY, BUSH_HEIGHT);
-    var hazel_stem_mat:ShaderMaterial = WindSway.make(trunk_color, HAZEL_SWAY, HAZEL_HEIGHT);
     WindSway.hold_snow(_canopy_mat);
     WindSway.hold_snow(_bush_mat);
     _make_tree_layers(trunk_color);
 
-    var rock_shape:SphereMesh = SphereMesh.new();
-    rock_shape.radius = 0.7;
-    rock_shape.height = 1.0;
-    rock_shape.radial_segments = 6;
-    rock_shape.rings = 3;
-    var rock:ArrayMesh = ArrayMesh.new();
-    add_part(rock, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.55, 0.54, 0.52)));
-    var ore:ArrayMesh = ArrayMesh.new();
-    # an outcrop: a dark boulder with rusty iron seams breaking out of it and a few bright metallic flecks
-    add_part(ore, rock_shape, Transform3D(Basis(), Vector3(0, 0.25, 0)), _make_material(Color(0.36, 0.35, 0.36)));
-    var rust_mat:StandardMaterial3D = _make_material(Color(0.66, 0.31, 0.16));
-    var glint_mat:StandardMaterial3D = _make_material(Color(0.72, 0.74, 0.78));
-    glint_mat.metallic = 0.7;
-    glint_mat.roughness = 0.35;
-    for k in 6:
-        var chunk:BoxMesh = BoxMesh.new();
-        var cs:float = 0.2 + 0.07 * (k % 3);
-        chunk.size = Vector3(cs, cs * 1.5, cs * 0.8);
-        var turn:Basis = Basis(Vector3.UP, k * 1.1) * Basis(Vector3.RIGHT, 0.5 + 0.15 * (k % 2)) * Basis(Vector3.FORWARD, 0.3 * (k % 3));
-        var spot:Vector3 = Vector3(sin(k * 1.9) * 0.42, 0.3 + 0.08 * (k % 3) + (0.2 if k < 2 else 0.0), cos(k * 1.9) * 0.4);
-        add_part(ore, chunk, Transform3D(turn, spot), rust_mat, Color(1.0, 0.85 + 0.05 * (k % 3), 0.85));
-    for k in 3:
-        var fleck:BoxMesh = BoxMesh.new();
-        fleck.size = Vector3(0.1, 0.1, 0.1);
-        var fturn:Basis = Basis(Vector3.UP, k * 2.3) * Basis(Vector3.RIGHT, 0.7);
-        add_part(ore, fleck, Transform3D(fturn, Vector3(sin(k * 2.6 + 0.5) * 0.5, 0.42 + 0.06 * k, cos(k * 2.6 + 0.5) * 0.45)), glint_mat);
-
-    var bush:ArrayMesh = ArrayMesh.new();
-    add_lobes(bush, BUSH_LOBES, _bush_mat);
-    for k in 5:                                  # a few bare twigs at the foot
-        var twig:CylinderMesh = CylinderMesh.new();
-        twig.top_radius = 0.01;
-        twig.bottom_radius = 0.028;
-        twig.height = 0.34;
-        twig.radial_segments = 3;
-        twig.rings = 1;
-        var lean:Basis = Basis(Vector3.UP, k * 1.9) * Basis(Vector3.RIGHT, 0.55);
-        add_part(bush, twig, Transform3D(lean, Vector3(0, 0.1, 0) + lean * Vector3(0, 0.12, 0)), twig_mat, Color(0.8, 0.8, 0.8));
-
-    var cap_shape:SphereMesh = SphereMesh.new();
-    cap_shape.radius = 0.22;
-    cap_shape.height = 0.3;
-    cap_shape.radial_segments = 6;
-    cap_shape.rings = 3;
-    var mushroom:ArrayMesh = ArrayMesh.new();       # ripe: stems with caps
-    var picked:ArrayMesh = ArrayMesh.new();         # picked: just the stumps left in the ground
-    var stem_mat:StandardMaterial3D = _make_material(Color(0.88, 0.84, 0.74));
-    var spots:Array = [[Vector3(-0.2, 0, 0.1), Color(0.72, 0.5, 0.3)], [Vector3(0.15, 0, -0.1), Color(0.8, 0.35, 0.25)], [Vector3(0.05, 0, 0.25), Color(0.72, 0.5, 0.3)]];
-    for spot in spots:
-        var at:Vector3 = spot[0];
-        var stem:CylinderMesh = CylinderMesh.new();
-        stem.top_radius = 0.045;
-        stem.bottom_radius = 0.06;
-        stem.height = 0.16;
-        stem.radial_segments = 5;
-        stem.rings = 1;
-        add_part(mushroom, stem, Transform3D(Basis(), at + Vector3(0, 0.08, 0)), stem_mat);
-        add_part(mushroom, cap_shape, Transform3D(Basis(), at + Vector3(0, 0.17, 0)), _make_material(spot[1]));
-        var stump:CylinderMesh = CylinderMesh.new();
-        stump.top_radius = 0.04;
-        stump.bottom_radius = 0.055;
-        stump.height = 0.04;
-        stump.radial_segments = 5;
-        stump.rings = 1;
-        add_part(picked, stump, Transform3D(Basis(), at + Vector3(0, 0.02, 0)), stem_mat, Color(0.8, 0.75, 0.65));
-    var hazel:ArrayMesh = ArrayMesh.new();
-    var hazel_mat:ShaderMaterial = WindSway.make(Color(0.6, 0.58, 0.2), HAZEL_SWAY, HAZEL_HEIGHT);
-    for k in 5:                                  # several tall stems rising from one stool
-        var stem:CylinderMesh = CylinderMesh.new();
-        stem.top_radius = 0.025;
-        stem.bottom_radius = 0.05;
-        stem.height = 1.3;
-        stem.radial_segments = 4;
-        stem.rings = 1;
-        var tilt:Basis = Basis(Vector3.UP, k * 2.1) * Basis(Vector3.RIGHT, 0.28);
-        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.65, 0)), hazel_stem_mat);
-    add_lobes(hazel, HAZEL_LOBES, hazel_mat);
-
-    var berry_shape:SphereMesh = SphereMesh.new();
-    berry_shape.radius = 0.075;
-    berry_shape.height = 0.15;
-    berry_shape.radial_segments = 6;
-    berry_shape.rings = 3;
-    var berries:ArrayMesh = ArrayMesh.new();
-    var berry_mat:ShaderMaterial = WindSway.make(Color.WHITE, BUSH_SWAY, BUSH_HEIGHT);       # the colour comes from the instance, red or blue
-    for k in BUSH_LOBES.size():                  # one berry on the outside of each lobe, and a second on the bigger ones
-        var lobe:Array = BUSH_LOBES[k];
-        var centre:Vector3 = lobe[0];
-        var out:Vector3 = Vector3(centre.x, 0.0, centre.z).normalized() if Vector2(centre.x, centre.z).length() > 0.01 else Vector3.RIGHT;
-        for turn in ([0.0, 1.1] if lobe[1] > 0.27 else [0.0]):
-            var dir:Vector3 = (Basis(Vector3.UP, turn * (1.0 if k % 2 == 0 else -1.0)) * (out * 0.75 + Vector3.UP * 0.65)).normalized();
-            add_part(berries, berry_shape, Transform3D(Basis(), centre + dir * lobe[1] * 0.97), berry_mat);
-    _berries = _make_layer(berries);
-    _layers[&"rock"] = _make_layer(rock);
-    _layers[&"ore"] = _make_layer(ore);
-    _layers[&"bush"] = _make_layer(bush);
-    _layers[&"mushroom"] = _make_layer(mushroom);
-    _layers[PICKED_MUSHROOM] = _make_layer(picked);
-    _layers[&"hazel"] = _make_layer(hazel);
+    _make_plant_layers(trunk_color);
 
     var marker_shape:SphereMesh = SphereMesh.new();
     marker_shape.radius = 0.18;
@@ -261,6 +153,13 @@ func fell(rn:ResourceNode, from:Vector3) -> void:
     tree.setup(parts, foot, rn.yaw, s, foot - from);
     Sfx.at(&"treefall", foot);
 
+# How many bushes are drawn with berries on them.
+func berry_count() -> int:
+    var n:int = 0;
+    for v in _berry_layers:
+        n += (_berry_layers[v] as MultiMeshInstance3D).multimesh.instance_count;
+    return n;
+
 # Whether the crowns that fall in winter are drawn now.
 func leaves_visible() -> bool:
     for key in _leaf_layers:
@@ -299,6 +198,52 @@ func _make_tree_layers(trunk_color:Color) -> void:
                     _add_surface(mesh, crown, crowns[base]);
             _layers[key] = _make_layer(mesh);
 
+# The layers for rocks, ore, shrubs and mushrooms, from the plant models.
+func _make_plant_layers(trunk_color:Color) -> void:
+    var rock_mat:StandardMaterial3D = _make_material(Color(0.55, 0.54, 0.52));
+    var dark_mat:StandardMaterial3D = _make_material(Color(0.36, 0.35, 0.36));
+    var rust_mat:StandardMaterial3D = _make_material(Color(0.66, 0.31, 0.16));
+    var glint_mat:StandardMaterial3D = _make_material(Color(0.72, 0.74, 0.78));
+    glint_mat.metallic = 0.7;
+    glint_mat.roughness = 0.35;
+    var twig_mat:ShaderMaterial = WindSway.make(trunk_color, BUSH_SWAY, BUSH_HEIGHT);
+    var hazel_stem_mat:ShaderMaterial = WindSway.make(trunk_color, HAZEL_SWAY, HAZEL_HEIGHT);
+    var hazel_mat:ShaderMaterial = WindSway.make(Color(0.6, 0.58, 0.2), HAZEL_SWAY, HAZEL_HEIGHT);
+    var berry_mat:ShaderMaterial = WindSway.make(Color.WHITE, BUSH_SWAY, BUSH_HEIGHT);       # the colour comes from the instance, red or blue
+    for v in PLANT_VARIANTS[&"rock"]:
+        var rock:ArrayMesh = ArrayMesh.new();
+        _add_surface(rock, _plant("rock_%d" % v), rock_mat);
+        _layers[_key(&"rock", v)] = _make_layer(rock);
+    for v in PLANT_VARIANTS[&"ore"]:       # a dark outcrop with rusty seams breaking out of it and a few bright metallic flecks
+        var ore:ArrayMesh = ArrayMesh.new();
+        _add_surface(ore, _plant("ore_%d_body" % v), dark_mat);
+        _add_surface(ore, _plant("ore_%d_rust" % v), rust_mat);
+        _add_surface(ore, _plant("ore_%d_glint" % v), glint_mat);
+        _layers[_key(&"ore", v)] = _make_layer(ore);
+    for v in PLANT_VARIANTS[&"bush"]:
+        var bush:ArrayMesh = ArrayMesh.new();
+        _add_surface(bush, _plant("bush_%d_leaves" % v), _bush_mat);
+        _add_surface(bush, _plant("bush_%d_twigs" % v), twig_mat);
+        _layers[_key(&"bush", v)] = _make_layer(bush);
+        var berries:ArrayMesh = ArrayMesh.new();
+        _add_surface(berries, _plant("bush_%d_berries" % v), berry_mat);
+        _berry_layers[v] = _make_layer(berries);
+    for v in PLANT_VARIANTS[&"hazel"]:
+        var hazel:ArrayMesh = ArrayMesh.new();
+        _add_surface(hazel, _plant("hazel_%d_leaves" % v), hazel_mat);
+        _add_surface(hazel, _plant("hazel_%d_stems" % v), hazel_stem_mat);
+        _layers[_key(&"hazel", v)] = _make_layer(hazel);
+    var plain:StandardMaterial3D = _make_material(Color.WHITE);
+    var ripe:ArrayMesh = ArrayMesh.new();
+    _add_surface(ripe, _plant("mushroom_ripe"), plain);
+    _layers[&"mushroom"] = _make_layer(ripe);
+    var picked:ArrayMesh = ArrayMesh.new();            # picked: just the stumps left in the ground
+    _add_surface(picked, _plant("mushroom_picked"), plain);
+    _layers[PICKED_MUSHROOM] = _make_layer(picked);
+
+static func _plant(name:String) -> Mesh:
+    return load("%s%s.obj" % [PLANT_DIR, name]) as Mesh;
+
 static func _add_surface(target:ArrayMesh, src:Mesh, mat:Material) -> void:
     target.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(0));
     target.surface_set_material(target.get_surface_count() - 1, mat);
@@ -313,6 +258,8 @@ func _layer_key(rn:ResourceNode) -> StringName:
         if rn.growth < SAPLING_UNTIL and SAPLING_OF.has(kind):
             kind = SAPLING_OF[kind];
         return _key(kind, posmod(hash(rn.cell), int(TREE_SPECS[kind]["variants"])));
+    if PLANT_VARIANTS.has(rn.kind):
+        return _key(rn.kind, posmod(hash(rn.cell), int(PLANT_VARIANTS[rn.kind])));
     return PICKED_MUSHROOM if rn.kind == &"mushroom" and rn.amount <= 0 else rn.kind;
 
 # How big a young tree is drawn: saplings grow into the sapling model's full size, and then the young tree grows into the full one.
@@ -365,15 +312,22 @@ func _rebuild() -> void:
                 leaves.set_instance_transform(i, mm.get_instance_transform(i));
                 leaves.set_instance_color(i, tint);
 
-    var fruiting:Array = (by_kind[&"bush"] as Array).filter(func(b:ResourceNode) -> bool: return b.amount > 0);
-    var bm:MultiMesh = _berries.multimesh;
-    bm.instance_count = fruiting.size();
-    for i in fruiting.size():
-        var bush:ResourceNode = fruiting[i];
-        var ratio:float = float(bush.amount) / bush.max_amount;
-        var s:float = bush.scale * (0.7 + 0.3 * ratio) * (0.6 + 0.4 * ratio);       # fewer berries shrink the clump
-        bm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, bush.yaw).scaled(Vector3.ONE * s), _node_position(world, bush)));
-        bm.set_instance_color(i, Color(0.85, 0.12, 0.18) if (bush.cell.x + bush.cell.y * 3) % 3 != 0 else Color(0.25, 0.3, 0.85));
+    var fruiting:Dictionary = {};          # bush variant -> bushes with fruit on them
+    for v in PLANT_VARIANTS[&"bush"]:
+        fruiting[v] = [];
+    for rn in world.nodes:
+        if rn.kind == &"bush" and rn.amount > 0:
+            fruiting[posmod(hash(rn.cell), int(PLANT_VARIANTS[&"bush"]))].append(rn);
+    for v in fruiting:
+        var list:Array = fruiting[v];
+        var bm:MultiMesh = (_berry_layers[v] as MultiMeshInstance3D).multimesh;
+        bm.instance_count = list.size();
+        for i in list.size():
+            var bush:ResourceNode = list[i];
+            var ratio:float = float(bush.amount) / bush.max_amount;
+            var s:float = bush.scale * (0.7 + 0.3 * ratio) * (0.6 + 0.4 * ratio);       # fewer berries shrink the clump
+            bm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, bush.yaw).scaled(Vector3.ONE * s), _node_position(world, bush)));
+            bm.set_instance_color(i, Color(0.85, 0.12, 0.18) if (bush.cell.x + bush.cell.y * 3) % 3 != 0 else Color(0.25, 0.3, 0.85));
 
     var mmm:MultiMesh = _markers.multimesh;
     mmm.instance_count = marked.size();
@@ -404,17 +358,6 @@ func _make_layer(mesh:Mesh) -> MultiMeshInstance3D:
     mmi.multimesh = mm;
     add_child(mmi);
     return mmi;
-
-# Adds a clump of squashed spheres to a mesh: lobes are [centre, radius, shade].
-static func add_lobes(target:ArrayMesh, lobes:Array, mat:Material) -> void:
-    for lobe in lobes:
-        var ball:SphereMesh = SphereMesh.new();
-        ball.radius = lobe[1];
-        ball.height = lobe[1] * 1.6;
-        ball.radial_segments = 7;
-        ball.rings = 3;
-        var shade:float = lobe[2];
-        add_part(target, ball, Transform3D(Basis(), lobe[0]), mat, Color(shade, shade, shade));
 
 # Bakes a primitive into target as a new surface, offset by xf.
 # tint: multiplied into the part's colour (a little shading variation inside one mesh).

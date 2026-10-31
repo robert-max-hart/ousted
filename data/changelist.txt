@@ -3,6 +3,11 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.6-dev | 31 Oct 2026 | Orchard trees with blossom and fruit, new bushes, rocks and ore
+- Each orchard tree has its own shape: apples and plums round and low, pears and pecans tall and narrow, cherries spreading, walnuts big. Ripe fruit hangs on the tree in its colour, young trees grow from small to full, and the trees blossom in early spring (white and pink), turn gold in autumn and stand bare in winter.
+- Berry bushes and hazel come in two shapes each, with berries on the bush, and boulders come in four (one with moss). Iron outcrops have rust seams and bright flecks of metal, in two shapes. Mushrooms are new models too.
+- Bushes lie under the snow in winter like the pines.
+
 # 0.6.5 | 31 Oct 2026 | New trees: three kinds of pine, oak and birch, palms, dead trees, saplings, snow on the boughs, and trees that fall
 - The forest has more variety: three shapes each of pine and oak, birches with white bark and a light crown, palms with arching fronds, and bare dead trees. A tree's shape is fixed by where it stands, so a forest never reshuffles.
 - Each climate grows its own trees: temperate has pines, oaks and birches where they meet; arctic mostly pines and birches with a few dead trees; desert palms and many dead trees; tropical palms and broadleaf trees. Woodcutters replant what suits the climate.

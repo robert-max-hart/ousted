@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://imipbrhwnocc"
+path="res://.godot/imported/orchard_walnut_trunk.obj-31e75e0f90ec7d41352dff24bf6ce7cc.mesh"
+
+[deps]
+
+files=["res://.godot/imported/orchard_walnut_trunk.obj-31e75e0f90ec7d41352dff24bf6ce7cc.mesh"]
+
+source_file="res://assets/models/plants/orchard_walnut_trunk.obj"
+dest_files=["res://.godot/imported/orchard_walnut_trunk.obj-31e75e0f90ec7d41352dff24bf6ce7cc.mesh", "res://.godot/imported/orchard_walnut_trunk.obj-31e75e0f90ec7d41352dff24bf6ce7cc.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

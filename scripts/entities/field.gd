@@ -50,6 +50,7 @@ var irrigated   :PackedByteArray;          # 1 where a flowing channel is within
 var _irrigation_seen:int = -1;
 var reserved    :Array = [];                # Pawn or null per plot
 var _layers     :Dictionary = {};           # plant shape -> MultiMeshInstance3D drawing those plots
+var _tree_layers:Dictionary = {};           # orchard crop -> {part -> MultiMeshInstance3D}, made when a plot of that tree first shows
 var _visual_dirty:bool = true;
 var _scarecrows :Node3D;
 var _scarecrows_for:Rect2i = Rect2i();      # the footprint they were built for
@@ -413,6 +414,8 @@ func _has_growing_plots() -> bool:
     return false;
 
 func on_day() -> void:
+    if is_orchard():
+        _visual_dirty = true;            # the leaves change colour through the year
     for i in plot_count():
         if plot_state[i] == Plot.FALLOW:
             _set_fertility(i, fertility(i) + FALLOW_RECOVERY);
@@ -607,13 +610,85 @@ func help_text() -> String:
     s += "\nFrozen plots can be harvested for part of the crop for a day, then they are lost.";
     return s;
 
+# Draws the orchard trees: per species a trunk, a crown (bare in winter, blossom or leaves otherwise) and, on ripe plots, the fruit.
+func _rebuild_orchard(trees:Dictionary) -> void:
+    for crop in _tree_layers:
+        if not trees.has(crop):
+            trees[crop] = [];                    # a species that is no longer here: empty its layers
+    for crop in trees:
+        var list:Array = trees[crop];
+        var layers:Dictionary = _tree_layer(crop);
+        var leaf:Color = CropMeshes.leaf_colour(crop);
+        var trunks:Array = [];
+        var crowns:Array = [];
+        var fruits:Array = [];
+        for i in list:
+            var h:float;
+            var col:Color = leaf;
+            match plot_state[i]:
+                Plot.PLANTED:
+                    h = 0.25 + growth[i] * 0.75;
+                Plot.RIPE:
+                    h = 1.0;
+                Plot.FROZEN:
+                    h = 0.25 + growth[i] * 0.75;
+                    col = Color(0.72, 0.84, 0.9);       # white with frost
+                _:
+                    h = 0.5;
+                    col = Color(0, 0, 0, 0);             # dead: the trunk stands bare
+            var cell:Vector2i = plot_cell(i);
+            var yaw:float = float(((cell.x * 73856093) ^ (cell.y * 19349663)) & 1023) / 1023.0 * TAU;
+            var xf:Transform3D = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(h, h, h)), world.terrain.cell_center(cell));
+            trunks.append([xf, Color.WHITE]);
+            if col.a > 0.0 and (growth[i] >= 0.15 or plot_state[i] == Plot.RIPE):
+                if pests[i] > 0.0:
+                    col = col.lerp(Color(0.5, 0.33, 0.16), pests[i] * 0.8);       # nibbled and browning
+                crowns.append([xf, col]);
+                if plot_state[i] == Plot.RIPE:
+                    fruits.append([xf, Defs.CROPS[crop]["color"]]);
+        _fill_layer(layers[&"trunk"], trunks);
+        _fill_layer(layers[&"crown"], crowns);
+        _fill_layer(layers[&"fruit"], fruits);
+
+func _fill_layer(mmi:MultiMeshInstance3D, list:Array) -> void:
+    var mm:MultiMesh = mmi.multimesh;
+    mm.instance_count = list.size();
+    for j in list.size():
+        mm.set_instance_transform(j, list[j][0]);
+        mm.set_instance_color(j, list[j][1]);
+
+# The layers (trunk, crown, fruit) for an orchard crop, made the first time they are needed.
+func _tree_layer(crop:StringName) -> Dictionary:
+    if not _tree_layers.has(crop):
+        var d:Dictionary = {};
+        for part in CropMeshes.ORCHARD_PARTS:
+            var mm:MultiMesh = MultiMesh.new();
+            mm.transform_format = MultiMesh.TRANSFORM_3D;
+            mm.use_colors = true;
+            mm.mesh = CropMeshes.orchard_mesh(crop, part);
+            var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
+            mmi.multimesh = mm;
+            mmi.material_override = CropMeshes.orchard_material(part);
+            add_child(mmi);
+            d[part] = mmi;
+        _tree_layers[crop] = d;
+    return _tree_layers[crop];
+
 func _rebuild_crops() -> void:
     var by_shape:Dictionary = {};
+    var trees:Dictionary = {};         # orchard crop -> plots drawn as that tree
     for shape in CropMeshes.SHAPES:
         by_shape[shape] = [];
     for i in plot_count():
         if plot_state[i] != Plot.FALLOW:
-            by_shape[CropMeshes.shape_of(plot_crop[i])].append(i);
+            var shape:StringName = CropMeshes.shape_of(plot_crop[i]);
+            if shape == &"tree":
+                if not trees.has(plot_crop[i]):
+                    trees[plot_crop[i]] = [];
+                trees[plot_crop[i]].append(i);
+            else:
+                by_shape[shape].append(i);
+    _rebuild_orchard(trees);
     for shape in CropMeshes.SHAPES:
         var list:Array = by_shape[shape];
         var mm:MultiMesh = (_layers[shape] as MultiMeshInstance3D).multimesh;

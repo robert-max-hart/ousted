@@ -42,11 +42,11 @@ func _ready() -> void:
     # --- berries and crops
     var bush:ResourceNode = world.add_node(&"bush", _free_cell());
     world.renderer._rebuild();
-    _expect("a bush with fruit gets berries", world.renderer._berries.multimesh.instance_count >= 1);
+    _expect("a bush with fruit gets berries", world.renderer.berry_count() >= 1);
     bush.amount = 0;
-    var before:int = world.renderer._berries.multimesh.instance_count;
+    var before:int = world.renderer.berry_count();
     world.renderer._rebuild();
-    _expect("a picked bush loses them", world.renderer._berries.multimesh.instance_count == before - 1);
+    _expect("a picked bush loses them", world.renderer.berry_count() == before - 1);
     _expect("each crop has a plant shape", CropMeshes.shape_of(&"wheat") == &"grain" and CropMeshes.shape_of(&"pumpkin") == &"vine" and CropMeshes.mesh_for(&"leafy").get_surface_count() > 3);
 
     # --- spreading
