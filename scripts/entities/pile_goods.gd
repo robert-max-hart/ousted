@@ -41,7 +41,7 @@ var _forms      :Dictionary = {};       # form -> MultiMeshInstance3D
 static func form_of(item:StringName) -> StringName:
     return FORMS.get(item, DEFAULT_FORM);
 
-static func _mesh(form:StringName) -> Mesh:
+static func mesh_for(form:StringName) -> Mesh:
     if not _meshes.has(form):
         _meshes[form] = load("%s%s.obj" % [DIR, form]) as Mesh;
     return _meshes[form];
@@ -51,6 +51,13 @@ static func _mat() -> ShaderMaterial:
         _material = ShaderMaterial.new();
         _material.shader = load("res://shaders/goods.gdshader") as Shader;
     return _material;
+
+# A material for one good carried by a citizen: tinted with a colour of its own (set the "item_tint" parameter).
+static func carry_material() -> ShaderMaterial:
+    var m:ShaderMaterial = ShaderMaterial.new();
+    m.shader = load("res://shaders/goods.gdshader") as Shader;
+    m.set_shader_parameter("use_item_tint", 1.0);
+    return m;
 
 func _init(b:Building) -> void:
     _b = b;
@@ -73,7 +80,7 @@ func _form_node(form:StringName) -> MultiMeshInstance3D:
         mm.transform_format = MultiMesh.TRANSFORM_3D;
         mm.use_colors = true;             # kept white: the item's colour goes in the custom data, so it can tint only some parts
         mm.use_custom_data = true;
-        mm.mesh = _mesh(form);
+        mm.mesh = mesh_for(form);
         var node:MultiMeshInstance3D = MultiMeshInstance3D.new();
         node.multimesh = mm;
         node.material_override = _mat();

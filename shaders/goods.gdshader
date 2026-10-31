@@ -11,11 +11,15 @@
 shader_type spatial;
 render_mode cull_back;
 
+uniform vec3 item_tint = vec3(1.0);       // used instead of the instance's colour when use_item_tint is 1 (one good carried by a citizen)
+uniform float use_item_tint = 0.0;
+
 varying vec3 shown;
 
 void vertex() {
 	float tinted = step(0.8, min(COLOR.r, min(COLOR.g, COLOR.b)));
-	shown = mix(COLOR.rgb, COLOR.rgb * INSTANCE_CUSTOM.rgb, tinted);
+	vec3 item = mix(INSTANCE_CUSTOM.rgb, item_tint, use_item_tint);
+	shown = mix(COLOR.rgb, COLOR.rgb * item, tinted);
 }
 
 void fragment() {

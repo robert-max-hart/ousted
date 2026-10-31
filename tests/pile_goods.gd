@@ -15,7 +15,7 @@ func _ready() -> void:
     Defs.difficulty = &"easy";
     for item in Defs.ITEMS:
         var form:StringName = PileGoods.form_of(item);
-        var mesh:Mesh = PileGoods._mesh(form);
+        var mesh:Mesh = PileGoods.mesh_for(form);
         _expect("%s has a mesh (%s)" % [item, form], mesh != null);
         if mesh != null:
             var arr:Array = mesh.surface_get_arrays(0);

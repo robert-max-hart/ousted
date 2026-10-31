@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://b5fgq7cebd4ll"
+path="res://.godot/imported/basket.obj-3b6a793f5e845c0a972df42edb64dbef.mesh"
+
+[deps]
+
+files=["res://.godot/imported/basket.obj-3b6a793f5e845c0a972df42edb64dbef.mesh"]
+
+source_file="res://assets/models/citizens/basket.obj"
+dest_files=["res://.godot/imported/basket.obj-3b6a793f5e845c0a972df42edb64dbef.mesh", "res://.godot/imported/basket.obj-3b6a793f5e845c0a972df42edb64dbef.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

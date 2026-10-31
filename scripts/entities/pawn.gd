@@ -72,16 +72,13 @@ var _path           :Array[Vector2i] = [];
 var _path_i         :int = 0;
 var _failed         :Dictionary = {};       # target -> game hour it can be retried
 var _need_block_until:float = -1.0;
-var _rig            :Node3D;                  # the body and head, tilted to work and bobbed to walk (visual only)
+var _rig            :PawnRig;                 # the body: limbs, tools and carried goods, posed from _animate (visual only)
 var _last_phase     :float = 0.0;             # where the swing was last frame (a strike sounds when it passes the bottom)
-var _prop           :Node3D;                  # a hand tool that swings while they work
 var _idle_mark      :Sprite3D;                # a small icon over a citizen with nothing to do (UIIcons)
 var _anim_t         :float = 0.0;
 var _work_now       :bool = false;            # what the last frame did, for the animation
 var _move_now       :bool = false;
 var _inside_work    :Building = null;         # a workplace this citizen is working inside of (out of sight), see Defs "indoor_work"
-var _carry_mesh     :MeshInstance3D;
-var _carry_mat      :StandardMaterial3D;
 
 func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[String] = []) -> void:
     world = w;
@@ -208,6 +205,7 @@ func cold_resist() -> float:
 func dress(item:StringName) -> void:
     clothing = item;
     clothing_hours = Defs.ITEMS[item]["clothing"]["days"] * GameClock.HOURS_PER_DAY;
+    _rig.set_clothing(clothing);
 
 func _wear_clothing(dh:float) -> void:
     if clothing == &"":
@@ -216,6 +214,7 @@ func _wear_clothing(dh:float) -> void:
     if clothing_hours <= 0.0:
         world.notify("%s's %s wore out." % [first_name, Defs.item_name(clothing).to_lower()]);
         clothing = &"";
+        _rig.set_clothing(clothing);
 
 func cell() -> Vector2i:
     return world.terrain.world_to_cell(position);
@@ -666,7 +665,8 @@ func _bar(v:float) -> String:
 func is_idle() -> bool:
     return task != null and task.kind == &"idle" and not is_baby();
 
-# Working: lean into it and swing a tool. Walking: a small bob. Runs at the game speed (up to 3x, faster looks frantic).
+# Poses the body (see PawnRig): working swings the tool of the job, walking swings the limbs, carrying holds the goods out in front.
+# Runs at the game speed (up to 3x, faster looks frantic).
 func _animate(delta:float) -> void:
     var speed:float = minf(GameClock.speed(), 3.0);
     if speed <= 0.0:         # paused: freeze the pose where it is
@@ -676,26 +676,21 @@ func _animate(delta:float) -> void:
     var move:bool = _move_now and speed > 0.0;
     _work_now = false;
     _move_now = false;
-    _prop.visible = work;
     _idle_mark.visible = is_idle();
+    _rig.set_stage(age, is_baby(), is_adult(), age >= Defs.OLD_AGE_EFFICIENCY[0][0]);
+    var carrying:bool = carry_amount > 0;
     if sleeping and not indoors:         # out in the open (homeless): lie down, with a slow breath
-        _rig.rotation.x = lerpf(_rig.rotation.x, -PI * 0.5, 0.15);
-        _rig.position.y = lerpf(_rig.position.y, 0.22 + 0.01 * sin(_anim_t * 2.0), 0.15);
+        _rig.pose(PawnRig.Mode.SLEEP, _anim_t, 0.2, &"", false);
     elif work:
-        var swing:float = sin(_anim_t * 7.0);
-        var phase:float = fposmod(_anim_t * 7.0, TAU);
+        var phase:float = fposmod(_anim_t * PawnRig.WORK_RATE, TAU);
         if _last_phase < 1.5 * PI and phase >= 1.5 * PI:          # the tool comes down
             _strike();
         _last_phase = phase;
-        _rig.rotation.x = 0.28 + 0.14 * swing;
-        _rig.position.y = -0.04 * absf(swing);
-        _prop.rotation.x = -0.4 - 0.9 * swing;
+        _rig.pose(PawnRig.Mode.WORK, _anim_t, 0.6, _work_sound(), carrying);
     elif move:
-        _rig.rotation.x = 0.0;
-        _rig.position.y = 0.05 * absf(sin(_anim_t * 9.0));
+        _rig.pose(PawnRig.Mode.WALK, _anim_t, 0.5, &"", carrying);
     else:
-        _rig.rotation.x = lerpf(_rig.rotation.x, 0.0, 0.3);
-        _rig.position.y = lerpf(_rig.position.y, 0.0, 0.3);
+        _rig.pose(PawnRig.Mode.IDLE, _anim_t, 0.25, &"", carrying);
 
 # The sound of one swing of the tool at what this citizen is working on (see Sfx).
 func _strike() -> void:
@@ -723,56 +718,10 @@ func _work_sound() -> StringName:
     return &"dig" if task.job == JobManager.Profession.WOODCUTTER else &"";
 
 func _build_visual(rng:RandomNumberGenerator) -> void:
-    _rig = Node3D.new();
+    _rig = PawnRig.new();
     add_child(_rig);
-    var body:MeshInstance3D = MeshInstance3D.new();
-    var capsule:CapsuleMesh = CapsuleMesh.new();
-    capsule.radius = 0.2;
-    capsule.height = 1.1;
-    body.mesh = capsule;
-    body.position.y = 0.55;
-    var body_mat:StandardMaterial3D = StandardMaterial3D.new();
-    var shirts:Array[Color] = [Color(0.25, 0.35, 0.6), Color(0.3, 0.5, 0.3), Color(0.55, 0.3, 0.25), Color(0.5, 0.45, 0.3)];
-    if not is_male:
-        shirts = [Color(0.6, 0.3, 0.4), Color(0.55, 0.45, 0.6), Color(0.65, 0.5, 0.3), Color(0.35, 0.5, 0.55)];
-    body_mat.albedo_color = shirts[rng.randi() % shirts.size()];
-    body.material_override = body_mat;
-    _rig.add_child(body);
-
-    var head:MeshInstance3D = MeshInstance3D.new();
-    var sphere:SphereMesh = SphereMesh.new();
-    sphere.radius = 0.15;
-    sphere.height = 0.3;
-    head.mesh = sphere;
-    head.position.y = 1.25;
-    var skin:StandardMaterial3D = StandardMaterial3D.new();
-    skin.albedo_color = Color(0.93, 0.78, 0.65).darkened(rng.randf() * 0.4);
-    head.material_override = skin;
-    _rig.add_child(head);
-
-    _prop = Node3D.new();                        # a pick or hammer: a handle with a head, held out at the shoulder
-    _prop.position = Vector3(0.26, 0.85, 0.05);
-    var handle:MeshInstance3D = MeshInstance3D.new();
-    var stick:BoxMesh = BoxMesh.new();
-    stick.size = Vector3(0.05, 0.05, 0.55);
-    handle.mesh = stick;
-    handle.position = Vector3(0, 0, 0.27);
-    var wood:StandardMaterial3D = StandardMaterial3D.new();
-    wood.albedo_color = Color(0.45, 0.32, 0.2);
-    handle.material_override = wood;
-    _prop.add_child(handle);
-    var blade:MeshInstance3D = MeshInstance3D.new();
-    var iron:BoxMesh = BoxMesh.new();
-    iron.size = Vector3(0.22, 0.07, 0.08);
-    blade.mesh = iron;
-    blade.position = Vector3(0, 0, 0.55);
-    var metal:StandardMaterial3D = StandardMaterial3D.new();
-    metal.albedo_color = Color(0.45, 0.46, 0.5);
-    blade.material_override = metal;
-    _prop.add_child(blade);
-    _prop.visible = false;
-    _rig.add_child(_prop);
-
+    _rig.build(is_male, rng);
+    _rig.set_clothing(clothing);
     _idle_mark = Sprite3D.new();
     _idle_mark.texture = UIIcons.texture(&"idle");
     _idle_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
@@ -783,18 +732,7 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
     _idle_mark.position = Vector3(0, 1.65, 0);
     _idle_mark.visible = false;
     add_child(_idle_mark);
-
-    _carry_mesh = MeshInstance3D.new();
-    var box:BoxMesh = BoxMesh.new();
-    box.size = Vector3(0.35, 0.3, 0.3);
-    _carry_mesh.mesh = box;
-    _carry_mesh.position = Vector3(0, 0.75, 0.28);
-    _carry_mat = StandardMaterial3D.new();
-    _carry_mesh.material_override = _carry_mat;
-    _carry_mesh.visible = false;
-    _rig.add_child(_carry_mesh);
+    _rig.set_carry(carry_item, carry_amount);
 
 func _update_carry_visual() -> void:
-    _carry_mesh.visible = carry_amount > 0;
-    if carry_amount > 0:
-        _carry_mat.albedo_color = Defs.ITEMS[carry_item]["color"];
+    _rig.set_carry(carry_item, carry_amount);
