@@ -3,7 +3,7 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.6.10-dev | 31 Oct 2026 | Fences, bridges and headstones with real shapes
+# 0.6.10 | 31 Oct 2026 | Fences, bridges and headstones with real shapes
 - Fences are built from modelled pieces: wooden posts with capped tops and rails with nail heads, low field fences, rope posts with a drooping rope, and a graveyard wall of stacked stone blocks with piers. The gate gap now has a taller gatepost at each end (with a ball finial on the stone ones).
 - Bridges have planked decks on stringers, handrails with capped posts along both sides, and stilts down into the water every other cell, however long you drag them and whichever way they run.
 - The graveyard's headstones sit on little mounds of earth: a slab with cut lines of inscription, a round-topped stone with a bunch of flowers, and a cross on a stepped base.
