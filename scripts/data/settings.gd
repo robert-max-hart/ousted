@@ -22,6 +22,10 @@ static var grass_sway :bool = true;
 static var ground     :bool = true;       # ground grain and rock strata
 static var snow_edge  :bool = true;       # ragged, patchy snow edges
 static var shadows    :bool = true;
+static var volume_master :int = 80;      # 0 to 100
+static var volume_sfx    :int = 80;
+static var volume_ambient:int = 60;
+static var volume_music  :int = 60;       # (no music yet: the bus is there for it)
 static var fullscreen :bool = false;
 static var vsync      :bool = true;
 static var _loaded    :bool = false;
@@ -36,6 +40,10 @@ static func ensure_loaded() -> void:
         return;
     grass = clampi(int(cfg.get_value("graphics", "grass", grass)), 0, GRASS_NAMES.size() - 1);
     shadows = bool(cfg.get_value("graphics", "shadows", shadows));
+    volume_master = clampi(int(cfg.get_value("audio", "master", volume_master)), 0, 100);
+    volume_sfx = clampi(int(cfg.get_value("audio", "sfx", volume_sfx)), 0, 100);
+    volume_ambient = clampi(int(cfg.get_value("audio", "ambient", volume_ambient)), 0, 100);
+    volume_music = clampi(int(cfg.get_value("audio", "music", volume_music)), 0, 100);
     water = clampi(int(cfg.get_value("graphics", "water", water)), 0, WATER_NAMES.size() - 1);
     sway = bool(cfg.get_value("graphics", "sway", sway));
     grass_sway = bool(cfg.get_value("graphics", "grass_sway", grass_sway));
@@ -48,6 +56,10 @@ static func save() -> void:
     var cfg:ConfigFile = ConfigFile.new();
     cfg.set_value("graphics", "grass", grass);
     cfg.set_value("graphics", "shadows", shadows);
+    cfg.set_value("audio", "master", volume_master);
+    cfg.set_value("audio", "sfx", volume_sfx);
+    cfg.set_value("audio", "ambient", volume_ambient);
+    cfg.set_value("audio", "music", volume_music);
     cfg.set_value("graphics", "water", water);
     cfg.set_value("graphics", "sway", sway);
     cfg.set_value("graphics", "grass_sway", grass_sway);
@@ -81,12 +93,16 @@ static func snow_shading_on() -> bool:
     ensure_loaded();
     return snow_edge;
 
-# Changes one setting ("grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "fullscreen" or "vsync"), saves and applies it.
+# Changes one setting ("volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "fullscreen" or "vsync"), saves and applies it.
 static func set_value(key:String, value:Variant) -> void:
     ensure_loaded();
     match key:
         "grass": grass = clampi(int(value), 0, GRASS_NAMES.size() - 1);
         "shadows": shadows = bool(value);
+        "volume_master": volume_master = clampi(int(value), 0, 100);
+        "volume_sfx": volume_sfx = clampi(int(value), 0, 100);
+        "volume_ambient": volume_ambient = clampi(int(value), 0, 100);
+        "volume_music": volume_music = clampi(int(value), 0, 100);
         "water": water = clampi(int(value), 0, WATER_NAMES.size() - 1);
         "sway": sway = bool(value);
         "grass_sway": grass_sway = bool(value);
@@ -102,6 +118,7 @@ static func set_value(key:String, value:Variant) -> void:
 static func apply() -> void:
     ensure_loaded();
     apply_window();
+    Sfx.apply_volumes();
     var w:World = World.instance;
     if w != null and is_instance_valid(w):
         if w.visuals != null:

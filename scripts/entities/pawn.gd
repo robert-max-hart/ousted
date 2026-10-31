@@ -73,6 +73,7 @@ var _path_i         :int = 0;
 var _failed         :Dictionary = {};       # target -> game hour it can be retried
 var _need_block_until:float = -1.0;
 var _rig            :Node3D;                  # the body and head, tilted to work and bobbed to walk (visual only)
+var _last_phase     :float = 0.0;             # where the swing was last frame (a strike sounds when it passes the bottom)
 var _prop           :Node3D;                  # a hand tool that swings while they work
 var _idle_mark      :Sprite3D;                # a small icon over a citizen with nothing to do (UIIcons)
 var _anim_t         :float = 0.0;
@@ -682,6 +683,10 @@ func _animate(delta:float) -> void:
         _rig.position.y = lerpf(_rig.position.y, 0.22 + 0.01 * sin(_anim_t * 2.0), 0.15);
     elif work:
         var swing:float = sin(_anim_t * 7.0);
+        var phase:float = fposmod(_anim_t * 7.0, TAU);
+        if _last_phase < 1.5 * PI and phase >= 1.5 * PI:          # the tool comes down
+            _strike();
+        _last_phase = phase;
         _rig.rotation.x = 0.28 + 0.14 * swing;
         _rig.position.y = -0.04 * absf(swing);
         _prop.rotation.x = -0.4 - 0.9 * swing;
@@ -691,6 +696,31 @@ func _animate(delta:float) -> void:
     else:
         _rig.rotation.x = lerpf(_rig.rotation.x, 0.0, 0.3);
         _rig.position.y = lerpf(_rig.position.y, 0.0, 0.3);
+
+# The sound of one swing of the tool at what this citizen is working on (see Sfx).
+func _strike() -> void:
+    var id:StringName = _work_sound();
+    if id != &"":
+        Sfx.at(id, global_position);
+
+func _work_sound() -> StringName:
+    if task == null:
+        return &"";
+    match task.job:
+        JobManager.Profession.BUILDER: return &"hammer";
+        JobManager.Profession.FARMER: return &"dig";
+        JobManager.Profession.MINER: return &"pick";
+        JobManager.Profession.FORAGER: return &"rustle";
+        JobManager.Profession.BLACKSMITH: return &"anvil";
+        JobManager.Profession.ARTISAN: return &"hammer";
+    var t:Variant = task.target;
+    if is_instance_valid(t):
+        if t is ResourceNode:
+            var rn:ResourceNode = t;
+            return &"chop" if rn.is_tree() else &"rustle" if rn.is_forageable() else &"pick";
+        if t is Building:
+            return &"hammer";
+    return &"dig" if task.job == JobManager.Profession.WOODCUTTER else &"";
 
 func _build_visual(rng:RandomNumberGenerator) -> void:
     _rig = Node3D.new();

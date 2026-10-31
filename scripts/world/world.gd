@@ -144,6 +144,9 @@ func _ready() -> void:
     visuals.name = "Visuals";
     add_child(visuals);
     visuals.setup_environment();
+    var ambient:AmbientAudio = AmbientAudio.new(self);
+    ambient.name = "Ambient";
+    add_child(ambient);
     traders = Traders.new(self);
     _entities = Node3D.new();
     _entities.name = "Entities";
@@ -595,6 +598,7 @@ func on_building_completed(b:Building) -> void:
         families.assign_homes();
     if hud != null:
         notify("%s completed." % b.display_name());
+        Sfx.ui(&"done");
 
 func nearest_building(pos:Vector3, pred:Callable) -> Building:
     var best:Building = null;
@@ -856,6 +860,7 @@ func _on_season(s:int) -> void:
     _apply_season(s);
     if GameClock.total_hours > GameClock.START_HOUR + 1.0:
         notify("%s has arrived." % GameClock.SEASON_NAMES[s]);
+        Sfx.ui(&"season");
         SaveGame.autosave(self);
 
 # --------------------------------

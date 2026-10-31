@@ -251,6 +251,9 @@ func _on_press() -> void:
                 select(moved);
             elif error == "":
                 World.instance.place_building(build_id, origin, build_size, false, false, build_facing);
+                Sfx.ui(&"place");
+            else:
+                Sfx.ui(&"error");
         Mode.EXPAND:
             if World.alive(expanding):
                 var grown:Rect2i = Expansion.target_rect(expanding, _hover_cell);
@@ -275,6 +278,9 @@ func _on_release() -> void:
             error = World.instance.can_place(build_id, fr.position, fr.size) if _field_rect_valid(fr) else "%s must be at least %dx%d." % [Defs.BUILDINGS[build_id]["name"], _min_side(), _min_side()];
             if error == "":
                 World.instance.place_building(build_id, fr.position, fr.size);
+                Sfx.ui(&"place");
+            else:
+                Sfx.ui(&"error");
         Mode.HARVEST:
             var n:int = 0;
             for rn in w.nodes:
@@ -305,9 +311,13 @@ func _on_release() -> void:
                 w.plan_road(c, Terrain.Overlay.CHANNEL);
         Mode.DEMOLISH:
             var r:Rect2i = _drag_rect();
+            var razed:bool = false;
             for b in w.buildings.duplicate():
                 if b.rect().intersects(r):
                     w.remove_building(b, true);
+                    razed = true;
+            if razed:
+                Sfx.ui(&"demolish");
             for z in range(r.position.y, r.end.y):
                 for x in range(r.position.x, r.end.x):
                     w.set_road(Vector2i(x, z), false);

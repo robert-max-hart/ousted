@@ -190,6 +190,7 @@ func _spawn(from:Vector2i, route:Array[Vector2i], st:int) -> void:
 
 func _on_arrived() -> void:
     visit["arrived"] = true;
+    Sfx.ui(&"merchant");
     world.notify("The %s has reached the Trading Post. They will stay %d days." % [type_name(), visit["days_left"]]);
 
 func _on_gone() -> void:

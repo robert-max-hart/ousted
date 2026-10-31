@@ -34,6 +34,9 @@ func _init() -> void:
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
     col.add_child(title);
 
+    _volume(col, "Master volume", Settings.volume_master, "volume_master", "");
+    _volume(col, "Effects volume", Settings.volume_sfx, "volume_sfx", "Work sounds, clicks and the chimes for events.");
+    _volume(col, "Ambience volume", Settings.volume_ambient, "volume_ambient", "Wind, rain, water, birds and crickets.");
     var grass:OptionButton = OptionButton.new();
     grass.focus_mode = Control.FOCUS_NONE;
     for n in Settings.GRASS_NAMES:
@@ -71,6 +74,18 @@ func _row(col:Container, text:String, control:Control, tip:String) -> void:
     row.add_child(l);
     row.add_child(control);
     col.add_child(row);
+
+func _volume(col:Container, text:String, value:int, key:String, tip:String) -> void:
+    var slider:HSlider = HSlider.new();
+    slider.min_value = 0;
+    slider.max_value = 100;
+    slider.step = 5;
+    slider.value = value;
+    slider.custom_minimum_size = Vector2(150, 0);
+    slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER;
+    slider.focus_mode = Control.FOCUS_NONE;
+    slider.value_changed.connect(func(v:float) -> void: Settings.set_value(key, int(v)));
+    _row(col, text, slider, tip);
 
 func _check(col:Container, text:String, on:bool, key:String, tip:String) -> void:
     var c:CheckBox = CheckBox.new();

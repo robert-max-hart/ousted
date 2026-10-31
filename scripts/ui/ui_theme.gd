@@ -121,6 +121,10 @@ static func make(font_size:int) -> Theme:
         t.set_stylebox("grabber_highlight", cls, grab_hi);
         t.set_stylebox("grabber_pressed", cls, grab_hi);
 
+    t.set_stylebox("slider", "HSlider", _box(Color(0, 0, 0, 0.45), EDGE_SOFT, 3, 0, 2));
+    t.set_stylebox("grabber_area", "HSlider", _box(Color(0.62, 0.48, 0.14, 0.95), Color(0, 0, 0, 0), 3, 0, 2, 0));
+    t.set_stylebox("grabber_area_highlight", "HSlider", _box(Color(0.8, 0.62, 0.2, 1.0), Color(0, 0, 0, 0), 3, 0, 2, 0));
+
     t.set_stylebox("background", "ProgressBar", _box(Color(0, 0, 0, 0.4), EDGE_SOFT, 3, 2, 2));
     t.set_stylebox("fill", "ProgressBar", _box(Color(0.62, 0.48, 0.14, 0.95), Color(0, 0, 0, 0), 3, 2, 2, 0));
     t.set_color("font_color", "ProgressBar", TEXT);

@@ -10,6 +10,7 @@ static func leave_colony(world:World, p:Pawn) -> void:
     if p.removed:
         return;
     p.removed = true;
+    Sfx.ui(&"death");
     p.end_task(false);
     if p.carry_amount > 0:
         world.drop_pile(p.carry_item, p.carry_amount, p.cell());

@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.3-dev | 31 Oct 2026 | Sound: work noises, weather and wildlife ambience, interface clicks
+- The first sounds: citizens' tools can be heard as they work (axes on trees, hammers on building sites, picks on rock, digging in the fields, rustling in the berry bushes, the anvil in the smithy), softer with distance and thinned out at the fast speeds. Placing a building thumps, a refused placement buzzes, demolishing crumbles, and every button clicks.
+- Chimes for a building being finished, a birth, a death, a merchant arriving and a new season.
+- The land has a background of its own: wind (stronger in rain and snow), rain, running water when you look at a river or the sea, birdsong by day in the warm months and crickets on warm nights.
+- Settings has Master, Effects and Ambience volume sliders.
+- All sounds are generated placeholders (the files are in `assets/audio`); any of them can be replaced by a recording of the same name. There is no music yet.
+
 # 0.6.2 | 31 Oct 2026 | Stockpiles show what they really hold
 - Stockpiles now show real goods instead of identical crates: logs, split firewood, cut stone, ingots of iron, silver and gold, lumps of coal, sacks of grain, barrels of milk, honey and spirits, bales of wool and leather, pots, bundles of tools, and crates of produce with the food showing on top. Each kind is stacked in its own part of the pile, taller as the store fills up.
 

@@ -136,6 +136,7 @@ func _give_birth(carrier:Pawn) -> void:
     var names:Array[String] = [];
     for p in world.pawns:
         names.append(p.first_name);
+    Sfx.ui(&"birth");
     var baby:Pawn = Pawn.new();
     baby.setup(world, home.origin + home.size / 2, world.rng, names);
     baby.age = 0.0;

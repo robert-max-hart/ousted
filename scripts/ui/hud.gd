@@ -91,6 +91,7 @@ const TITLE_SCENE:String = "res://scenes/title.tscn";
 const LOG_FONT_SIZE:int = 11;     # the event log is secondary text
 
 func _ready() -> void:
+    Sfx.hook_buttons(get_tree());
     var root:Control = Control.new();
     root.set_anchors_preset(Control.PRESET_FULL_RECT);
     root.mouse_filter = Control.MOUSE_FILTER_IGNORE;
