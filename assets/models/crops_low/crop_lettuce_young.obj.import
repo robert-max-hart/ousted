@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://ci338ckq00sil"
+path="res://.godot/imported/crop_lettuce_young.obj-151811c40e66145d925ec2c0f3632aa0.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crop_lettuce_young.obj-151811c40e66145d925ec2c0f3632aa0.mesh"]
+
+source_file="res://assets/models/crops_low/crop_lettuce_young.obj"
+dest_files=["res://.godot/imported/crop_lettuce_young.obj-151811c40e66145d925ec2c0f3632aa0.mesh", "res://.godot/imported/crop_lettuce_young.obj-151811c40e66145d925ec2c0f3632aa0.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

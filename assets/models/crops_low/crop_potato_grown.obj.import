@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://bw3nfc3f4eufu"
+path="res://.godot/imported/crop_potato_grown.obj-57dc2e43e37ddf79a5b8d6f221a442b8.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crop_potato_grown.obj-57dc2e43e37ddf79a5b8d6f221a442b8.mesh"]
+
+source_file="res://assets/models/crops_low/crop_potato_grown.obj"
+dest_files=["res://.godot/imported/crop_potato_grown.obj-57dc2e43e37ddf79a5b8d6f221a442b8.mesh", "res://.godot/imported/crop_potato_grown.obj-57dc2e43e37ddf79a5b8d6f221a442b8.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

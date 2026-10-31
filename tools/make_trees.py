@@ -20,7 +20,10 @@
 import math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshlib
 from meshlib import Mesh, shade
+
+meshlib.configure()
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "models", "trees")
 rng = random.Random(77)
@@ -116,7 +119,7 @@ def birch(lean, two_stems=False):
         top = pts[-1]
         t.limb(pts[3], v(top[0] - 0.55 * (1 if sx <= 0 else -1) * 0.6, top[1] - 0.2, top[2] + 0.3), 0.035, 0.015, shade(0.9), segs=4)
         t.limb(pts[3], v(top[0] + 0.5, top[1] - 0.15, top[2] - 0.35), 0.035, 0.015, shade(0.9), segs=4)
-        for (dx, dy, dz, r, k2) in ((0, 0.45, 0, 0.62, 1.0), (0.5, 0.05, 0.2, 0.5, 0.92), (-0.5, 0.0, -0.2, 0.52, 0.95), (0.1, -0.2, 0.55, 0.45, 0.9), (-0.15, 0.25, -0.5, 0.45, 0.94)):
+        for (dx, dy, dz, r, k2) in ((0, 0.45, 0, 0.62, 1.0), (0.5, 0.05, 0.2, 0.5, 0.92), (-0.5, 0.0, -0.2, 0.52, 0.95), (0.1, -0.2, 0.55, 0.45, 0.9)):
             c.ball(top[0] + dx, top[1] + dy, top[2] + dz, r, r * 1.05, r, shade(k2), segs=6, rings=4, wobble=0.1)
     return t, c
 
@@ -157,6 +160,7 @@ def palm(height, lean, fronds=9, length=1.6, coconuts=True, thick=0.1):
         for k in range(3):
             a = k * 2.2
             t.ball(top[0] + math.cos(a) * 0.14, top[1] - 0.05, top[2] + math.sin(a) * 0.14, 0.09, 0.09, 0.09, (0.95, 0.9, 0.85), segs=5, rings=3)
+    fronds = meshlib.count(fronds, 5)
     for i in range(fronds):
         a = i * 2 * math.pi / fronds + rng.uniform(-0.15, 0.15)
         frond(c, top, a, length * rng.uniform(0.85, 1.1), 0.95, 0.34, 0.9 + 0.1 * rng.random())

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cqkc1ru1g3tjm"
+path="res://.godot/imported/crop_dead_vine.obj-5a9a0bcaeebf75290c2ebacd76b68cf9.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crop_dead_vine.obj-5a9a0bcaeebf75290c2ebacd76b68cf9.mesh"]
+
+source_file="res://assets/models/crops_low/crop_dead_vine.obj"
+dest_files=["res://.godot/imported/crop_dead_vine.obj-5a9a0bcaeebf75290c2ebacd76b68cf9.mesh", "res://.godot/imported/crop_dead_vine.obj-5a9a0bcaeebf75290c2ebacd76b68cf9.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

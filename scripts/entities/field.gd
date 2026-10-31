@@ -50,6 +50,7 @@ var irrigated   :PackedByteArray;          # 1 where a flowing channel is within
 var _irrigation_seen:int = -1;
 var reserved    :Array = [];                # Pawn or null per plot
 var _crop_layers:Dictionary = {};           # model key (see CropMeshes.crop_key) -> MultiMeshInstance3D drawing those plots
+var _layers_low :bool = false;              # which model set the layers were made from
 var _tree_layers:Dictionary = {};           # orchard crop -> {part -> MultiMeshInstance3D}, made when a plot of that tree first shows
 var _visual_dirty:bool = true;
 var _scarecrows :Node3D;
@@ -660,6 +661,7 @@ func _tree_layer(crop:StringName) -> Dictionary:
             var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
             mmi.multimesh = mm;
             mmi.material_override = CropMeshes.orchard_material(part);
+            _apply_distance(mmi);
             add_child(mmi);
             d[part] = mmi;
         _tree_layers[crop] = d;
@@ -701,6 +703,31 @@ func _rebuild_crops() -> void:
             mm.set_instance_transform(j, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(size, size, size)), world.terrain.cell_center(cell)));
             mm.set_instance_color(j, col);
 
+# Plants and trees past the draw distance (Settings) are not drawn: measured to the middle of the field, so a margin for its size.
+func _apply_distance(mmi:MultiMeshInstance3D) -> void:
+    var d:float = Settings.draw_distance();
+    mmi.visibility_range_end = d + maxf(size.x, size.y) * 0.75 + 4.0 if d > 0.0 else 0.0;
+    mmi.visibility_range_end_margin = 4.0 if d > 0.0 else 0.0;
+
+# Follows the Settings: the draw distance, and the model set (the plants are loaded again when it changes).
+func apply_settings() -> void:
+    var low:bool = Settings.models_reduced();
+    if low != _layers_low:
+        _layers_low = low;
+        for key in _crop_layers:
+            (_crop_layers[key] as Node).queue_free();
+        _crop_layers.clear();
+        for crop in _tree_layers:
+            for part in _tree_layers[crop]:
+                (_tree_layers[crop][part] as Node).queue_free();
+        _tree_layers.clear();
+        _visual_dirty = true;
+    for key in _crop_layers:
+        _apply_distance(_crop_layers[key]);
+    for crop in _tree_layers:
+        for part in _tree_layers[crop]:
+            _apply_distance(_tree_layers[crop][part]);
+
 # The layer for a crop model, made the first time a plot needs it.
 func _crop_layer(key:String) -> MultiMeshInstance3D:
     if not _crop_layers.has(key):
@@ -711,6 +738,7 @@ func _crop_layer(key:String) -> MultiMeshInstance3D:
         var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
         mmi.multimesh = mm;
         mmi.material_override = CropMeshes.crop_material();
+        _apply_distance(mmi);
         add_child(mmi);
         _crop_layers[key] = mmi;
     return _crop_layers[key];

@@ -17,7 +17,10 @@
 import math, os, random, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshlib
 from meshlib import Mesh, shade
+
+meshlib.configure()
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "models", "crops")
 rng = random.Random(909)
@@ -66,7 +69,7 @@ def stalk(m, x, z, h, yaw, lean, col, r=0.011):
 
 def grain(stage, ear_col, stalk_col, leaf_col, height, ear_len, ear_rx, droop=0.0, awns=False, n=12):
     m = Mesh()
-    for k, (x, z, a) in enumerate(scatter(n, 0.36)):
+    for k, (x, z, a) in enumerate(scatter(meshlib.count(n, 5), 0.36)):
         h = height * rng.uniform(0.85, 1.1)
         top = stalk(m, x, z, h, a, 0.1 + droop, stalk_col)
         if k % 3 == 0:                                  # a leaf on some of the stalks (the model is drawn thousands of times)
@@ -94,8 +97,9 @@ def make_grain():
 
 def rosette(m, layers, radius, lift, droop, col, heart=None, width=0.2):
     for (count, scale, k) in layers:
-        for i in range(count):
-            leaf(m, v(0, 0.02 + 0.03 * k, 0), i * 2 * math.pi / count + k * 0.7, radius * scale, width * scale, dark(col, 0.82 + 0.18 * k), lift=lift, droop=droop)
+        n = meshlib.count(count, 3)
+        for i in range(n):
+            leaf(m, v(0, 0.02 + 0.03 * k, 0), i * 2 * math.pi / n + k * 0.7, radius * scale, width * scale, dark(col, 0.82 + 0.18 * k), lift=lift, droop=droop)
     if heart:
         m.ball(0, 0.13, 0, radius * 0.38, radius * 0.34, radius * 0.38, heart, segs=7, rings=4, wobble=0.1)
 
@@ -131,7 +135,7 @@ def make_leafy():
 # Bush plants: beans and potatoes
 
 def bush_plant(m, n, height, spread, col, droop=0.6):
-    for (x, z, a) in scatter(n, spread):
+    for (x, z, a) in scatter(meshlib.count(n, 3), spread):
         leaf(m, v(x * 0.4, 0.02, z * 0.4), a, spread * 1.1 + 0.08, 0.15, col, lift=0.9 * height / 0.6, droop=droop)
 
 def make_bush():

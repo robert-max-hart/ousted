@@ -51,6 +51,20 @@ func _init() -> void:
     water.select(Settings.water);
     water.item_selected.connect(func(i:int) -> void: Settings.set_value("water", i));
     _row(col, "Water detail", water, "Simple is a flat tint. Medium adds swells and ripples; Full adds a second ripple layer and shore foam.");
+    var dist:OptionButton = OptionButton.new();
+    dist.focus_mode = Control.FOCUS_NONE;
+    for n in Settings.DISTANCE_NAMES:
+        dist.add_item(n);
+    dist.select(Settings.tree_distance);
+    dist.item_selected.connect(func(i:int) -> void: Settings.set_value("tree_distance", i));
+    _row(col, "Tree and crop distance", dist, "How far away trees, bushes, rocks and crops are drawn. Near is the lightest on the graphics card; Far draws them out to the horizon.");
+    var detail:OptionButton = OptionButton.new();
+    detail.focus_mode = Control.FOCUS_NONE;
+    for n in Settings.DETAIL_NAMES:
+        detail.add_item(n);
+    detail.select(Settings.model_detail);
+    detail.item_selected.connect(func(i:int) -> void: Settings.set_value("model_detail", i));
+    _row(col, "Model detail", detail, "Reduced uses simpler trees, bushes, rocks and crops (fewer sides, leaves and stalks). Helps weak graphics cards.");
     _check(col, "Tree sway", Settings.sway, "sway", "Trees, bushes and hazel bend in the wind. Off helps weak graphics cards.");
     _check(col, "Grass sway", Settings.grass_sway, "grass_sway", "The grass tufts bend in the wind. Off helps weak graphics cards.");
     _check(col, "Ground detail", Settings.ground, "ground", "Grain on the ground and bands on steep slopes. Off shows the plain ground colour.");

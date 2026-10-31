@@ -6,7 +6,25 @@
 #     per-vertex colours ("v x y z r g b"). Shapes are built clockwise seen
 #     from outside; write() flips them to the counter-clockwise OBJ wants.
 # ----------------------------------------------------------------
-import math, os
+import math, os, sys
+
+# How detailed the models are: 1 for the full set, less for the reduced set (`--low` on a generator's command line), which has
+# fewer sides on round things and fewer stalks, fronds and leaves, and is written to a sibling folder (trees -> trees_low).
+DETAIL = 1.0
+LOW = 0.6
+
+def configure():
+    global DETAIL
+    if "--low" in sys.argv:
+        DETAIL = LOW
+
+def _s(n, lo):
+    return n if DETAIL >= 1.0 else max(lo, int(round(n * DETAIL)))
+
+def count(n, lo=2):
+    """How many of something (stalks, fronds, petals) a model has at this level of detail."""
+    return _s(n, lo)
+
 
 
 class Mesh:
@@ -42,6 +60,7 @@ class Mesh:
     def cyl(self, axis, cx, cy, cz, r, length, col, cap=None, segs=10, squash=1.0):
         """A cylinder along 'x' or 'y'; `cap` colours its ends (default the same as the sides)."""
         cap = cap or col
+        segs = _s(segs, 4)
         def p(a, d):             # a: angle round the axis, d: distance along it
             u, v = math.cos(a) * r, math.sin(a) * r * squash
             if axis == "y":
@@ -62,6 +81,7 @@ class Mesh:
     def tcyl(self, cx, y0, cz, r0, r1, y1, col, segs=10, squash=1.0, cap_col=None, top=True, bottom=True):
         """A round column up the y axis from y0 (radius r0) to y1 (radius r1); `squash` scales the z radius."""
         cap_col = cap_col or col
+        segs = _s(segs, 4)
         def p(a, r, y):
             return (cx + math.cos(a) * r, y, cz + math.sin(a) * r * squash)
         for i in range(segs):
@@ -75,6 +95,7 @@ class Mesh:
     def limb(self, p0, p1, r0, r1, col, segs=6, cap_col=None):
         """A tapered round limb between two points (radius r0 at p0, r1 at p1), for branches, bent trunks and fronds' stems."""
         cap_col = cap_col or col
+        segs = _s(segs, 3)
         ux, uy, uz = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
         n = math.sqrt(ux * ux + uy * uy + uz * uz)
         if n < 1e-9:
@@ -114,6 +135,7 @@ class Mesh:
             self.quad(r0, r1, l1, l0, c)
 
     def ball(self, cx, cy, cz, rx, ry, rz, col, segs=8, rings=5, yaw=0.0, wobble=0.0):
+        segs, rings = _s(segs, 4), _s(rings, 3)
         def p(i, j):
             a = 2 * math.pi * i / segs
             b = math.pi * j / rings
@@ -131,6 +153,8 @@ class Mesh:
                     self.quad(a, b, c, d, col)
 
     def write(self, name, out_dir):
+        if DETAIL < 1.0:
+            out_dir = out_dir.rstrip("/\\") + "_low"
         verts, norms, faces = [], [], []
         for a, c, b, col in self.tris:       # (the shapes are built clockwise seen from outside; OBJ wants counter-clockwise)
             ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]

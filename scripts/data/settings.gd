@@ -15,7 +15,15 @@ const GRASS_SHARES:Array[float]  = [0.0, 0.4, 1.0, 1.4];
 # Water detail: a flat tint; swells and one ripple layer; everything (two ripple layers and foam).
 const WATER_NAMES:Array[String] = ["Simple", "Medium", "Full"];
 
+# How far away trees, bushes, rocks and crops are drawn (metres from the camera; 0 is no limit), and which set of models: the full
+# one or the reduced one with fewer sides, stalks and leaves (assets/models/<set>_low, see tools/make_models.py).
+const DISTANCE_NAMES:Array[String] = ["Near", "Normal", "Far"];
+const DISTANCES:Array[float] = [60.0, 110.0, 0.0];
+const DETAIL_NAMES:Array[String] = ["Full", "Reduced"];
+
 static var grass      :int  = 2;
+static var tree_distance:int = 2;
+static var model_detail:int = 0;
 static var water      :int  = 2;
 static var sway       :bool = true;       # trees, bushes and hazel
 static var grass_sway :bool = true;
@@ -45,6 +53,8 @@ static func ensure_loaded() -> void:
     volume_ambient = clampi(int(cfg.get_value("audio", "ambient", volume_ambient)), 0, 100);
     volume_music = clampi(int(cfg.get_value("audio", "music", volume_music)), 0, 100);
     water = clampi(int(cfg.get_value("graphics", "water", water)), 0, WATER_NAMES.size() - 1);
+    tree_distance = clampi(int(cfg.get_value("graphics", "tree_distance", tree_distance)), 0, DISTANCE_NAMES.size() - 1);
+    model_detail = clampi(int(cfg.get_value("graphics", "model_detail", model_detail)), 0, DETAIL_NAMES.size() - 1);
     sway = bool(cfg.get_value("graphics", "sway", sway));
     grass_sway = bool(cfg.get_value("graphics", "grass_sway", grass_sway));
     ground = bool(cfg.get_value("graphics", "ground", ground));
@@ -61,6 +71,8 @@ static func save() -> void:
     cfg.set_value("audio", "ambient", volume_ambient);
     cfg.set_value("audio", "music", volume_music);
     cfg.set_value("graphics", "water", water);
+    cfg.set_value("graphics", "tree_distance", tree_distance);
+    cfg.set_value("graphics", "model_detail", model_detail);
     cfg.set_value("graphics", "sway", sway);
     cfg.set_value("graphics", "grass_sway", grass_sway);
     cfg.set_value("graphics", "ground", ground);
@@ -76,6 +88,19 @@ static func grass_share() -> float:
 static func shadows_on() -> bool:
     ensure_loaded();
     return shadows;
+
+# The draw distance for trees, bushes, rocks and crops in metres (0: no limit).
+static func draw_distance() -> float:
+    ensure_loaded();
+    return DISTANCES[tree_distance];
+
+static func models_reduced() -> bool:
+    ensure_loaded();
+    return model_detail == 1;
+
+# The folder of a model set at the chosen detail ("res://assets/models/trees/" or its "_low" sibling).
+static func model_dir(base:String) -> String:
+    return base.trim_suffix("/") + "_low/" if models_reduced() else base;
 
 static func sway_on() -> bool:
     ensure_loaded();
@@ -93,7 +118,7 @@ static func snow_shading_on() -> bool:
     ensure_loaded();
     return snow_edge;
 
-# Changes one setting ("volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "fullscreen" or "vsync"), saves and applies it.
+# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "fullscreen" or "vsync"), saves and applies it.
 static func set_value(key:String, value:Variant) -> void:
     ensure_loaded();
     match key:
@@ -104,6 +129,8 @@ static func set_value(key:String, value:Variant) -> void:
         "volume_ambient": volume_ambient = clampi(int(value), 0, 100);
         "volume_music": volume_music = clampi(int(value), 0, 100);
         "water": water = clampi(int(value), 0, WATER_NAMES.size() - 1);
+        "tree_distance": tree_distance = clampi(int(value), 0, DISTANCE_NAMES.size() - 1);
+        "model_detail": model_detail = clampi(int(value), 0, DETAIL_NAMES.size() - 1);
         "sway": sway = bool(value);
         "grass_sway": grass_sway = bool(value);
         "ground": ground = bool(value);
@@ -120,7 +147,13 @@ static func apply() -> void:
     apply_window();
     Sfx.apply_volumes();
     var w:World = World.instance;
+    CropMeshes.reload_if_needed();
     if w != null and is_instance_valid(w):
+        if w.renderer != null:
+            w.renderer.apply_settings();
+        for b in w.buildings:
+            if b is Field:
+                (b as Field).apply_settings();
         if w.visuals != null:
             w.visuals.apply_settings();
         for c in w.get_children():

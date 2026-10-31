@@ -44,6 +44,9 @@ const DEFS:Dictionary = {
     },
 };
 
+# How hard pick_tree stretches the species noise (about 0.29 standard deviation) so each kind gets about its listed share of the ground.
+const PATCH_SHARPNESS:float = 5.0;
+
 static var current:int = Id.TEMPERATE;
 
 static func data() -> Dictionary:
@@ -72,7 +75,7 @@ static func pick_tree(patch:float, cell:Vector2i) -> StringName:
     var d:Dictionary = DEFS[current];
     if float(d["dead"]) > 0.0 and float(posmod(hash(cell), 1000)) / 1000.0 < float(d["dead"]):
         return &"dead";
-    var t:float = clampf((patch + 1.0) * 0.5, 0.0, 0.9999);
+    var t:float = 1.0 / (1.0 + exp(-patch * PATCH_SHARPNESS));       # (the noise bunches up near zero, which would make the middle kinds far too common: this spreads it out evenly)
     var at:float = 0.0;
     var total:float = 0.0;
     for e in d["species"]:

@@ -45,7 +45,7 @@ static var _orchard_mats:Dictionary = {};
 static func orchard_mesh(crop:StringName, part:StringName) -> Mesh:
     var key:String = "%s_%s" % [crop, part];
     if not _orchard_meshes.has(key):
-        _orchard_meshes[key] = load("%sorchard_%s.obj" % [ORCHARD_DIR, key]) as Mesh;
+        _orchard_meshes[key] = load("%sorchard_%s.obj" % [Settings.model_dir(ORCHARD_DIR), key]) as Mesh;
     return _orchard_meshes[key];
 
 # One swaying material per part, shared by every orchard (the instance colour does the tinting).
@@ -107,8 +107,17 @@ static func stage_progress(state:int, growth:float) -> float:
 
 static func crop_model(key:String) -> Mesh:
     if not _crop_meshes.has(key):
-        _crop_meshes[key] = load("%scrop_%s.obj" % [CROP_DIR, key]) as Mesh;
+        _crop_meshes[key] = load("%scrop_%s.obj" % [Settings.model_dir(CROP_DIR), key]) as Mesh;
     return _crop_meshes[key];
+
+static var _loaded_low:bool = false;
+
+# Forgets the loaded crop and orchard models when the model detail has changed (they are loaded again from the other set).
+static func reload_if_needed() -> void:
+    if Settings.models_reduced() != _loaded_low:
+        _loaded_low = Settings.models_reduced();
+        _crop_meshes.clear();
+        _orchard_meshes.clear();
 
 # The crops sway in the wind like the grass (and follow the grass sway setting).
 static func crop_material() -> ShaderMaterial:

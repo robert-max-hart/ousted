@@ -1,7 +1,10 @@
 # ----------------------------------------------------------------
 # ResourceRenderer
-#     Draws every ResourceNode through one MultiMesh per kind, plus
-#     floating markers over designated nodes. Rebuilds lazily.
+#     Draws every ResourceNode through multimeshes, one kind of model per
+#     ChunkedLayer (a multimesh per 48 by 48 block, so the renderer can skip
+#     the blocks out of view or past the draw distance), plus floating
+#     markers over designated nodes. Rebuilds lazily. The models are the
+#     full or the reduced set (Settings), and apply_settings swaps them.
 # ----------------------------------------------------------------
 class_name ResourceRenderer extends Node3D;
 
@@ -61,7 +64,10 @@ const PLANT_DIR:String = "res://assets/models/plants/";
 const PLANT_VARIANTS:Dictionary = {&"rock": 4, &"ore": 2, &"bush": 2, &"hazel": 2};
 const SAPLING_OF:Dictionary = {&"tree": &"sapling_pine", &"oak": &"sapling_broad", &"birch": &"sapling_broad", &"palm": &"sapling_palm"};
 
-var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
+var _layers     :Dictionary = {};   # layer key -> ChunkedLayer
+var _trunk_color:Color = Color(0.4, 0.27, 0.17);
+var _models_low :bool = false;      # which model set the layers were made from
+var _leaves_on  :bool = true;
 var _markers    :MultiMeshInstance3D;
 var _canopy_mat :ShaderMaterial;
 const PICKED_MUSHROOM:StringName = &"mushroom_picked";       # a render layer, not a resource kind
@@ -69,8 +75,8 @@ var _bush_mat   :ShaderMaterial;
 var _oak_leaf_mat:ShaderMaterial;
 var _birch_leaf_mat:ShaderMaterial;
 var _palm_leaf_mat:ShaderMaterial;
-var _leaf_layers:Dictionary = {};     # layer key -> MultiMeshInstance3D of the crowns that fall in winter (oaks and birches)
-var _berry_layers:Dictionary = {};       # bush variant -> MultiMeshInstance3D of the berries on the bushes that have fruit, one clump per bush
+var _leaf_layers:Dictionary = {};     # layer key -> ChunkedLayer of the crowns that fall in winter (oaks and birches)
+var _berry_layers:Dictionary = {};       # bush variant -> ChunkedLayer of the berries on the bushes that have fruit, one clump per bush
 var _dirty      :bool = true;
 var _preview_rect:Rect2i = Rect2i();
 var _preview_filter:Callable = Callable();
@@ -79,14 +85,11 @@ func _ready() -> void:
     _canopy_mat = WindSway.make(CANOPY_BY_SEASON[0], PINE_SWAY, PINE_HEIGHT);
     _bush_mat = WindSway.make(BUSH_BY_SEASON[0], BUSH_SWAY, BUSH_HEIGHT);
     _oak_leaf_mat = WindSway.make(OAK_LEAVES[0][1], OAK_SWAY, OAK_HEIGHT);
-    var trunk_color:Color = Color(0.4, 0.27, 0.17);
     _birch_leaf_mat = WindSway.make(BIRCH_LEAVES[0][1], BIRCH_SWAY, BIRCH_HEIGHT);
     _palm_leaf_mat = WindSway.make(PALM_LEAVES, PALM_SWAY, PALM_HEIGHT);
     WindSway.hold_snow(_canopy_mat);
     WindSway.hold_snow(_bush_mat);
-    _make_tree_layers(trunk_color);
-
-    _make_plant_layers(trunk_color);
+    _build_models();
 
     var marker_shape:SphereMesh = SphereMesh.new();
     marker_shape.radius = 0.18;
@@ -100,6 +103,30 @@ func _ready() -> void:
     add_part(marker, marker_shape, Transform3D(), marker_mat);
     _markers = _make_layer(marker);
     _markers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+
+# Makes the layers for the chosen model set (full or reduced).
+func _build_models() -> void:
+    _models_low = Settings.models_reduced();
+    _make_tree_layers(_trunk_color);
+    _make_plant_layers(_trunk_color);
+    for dict in [_layers, _leaf_layers, _berry_layers]:
+        for key in dict:
+            (dict[key] as ChunkedLayer).set_distance(Settings.draw_distance());
+    for key in _leaf_layers:
+        (_leaf_layers[key] as ChunkedLayer).set_shown(_leaves_on);
+
+# Follows the Settings: the draw distance, and the model set (the layers are made again when it changes).
+func apply_settings() -> void:
+    if Settings.models_reduced() != _models_low:
+        for dict in [_layers, _leaf_layers, _berry_layers]:
+            for key in dict:
+                (dict[key] as ChunkedLayer).free_all();
+            dict.clear();
+        _build_models();
+        _dirty = true;
+    for dict in [_layers, _leaf_layers, _berry_layers]:
+        for key in dict:
+            (dict[key] as ChunkedLayer).set_distance(Settings.draw_distance());
 
 func mark_dirty() -> void:
     _dirty = true;
@@ -120,8 +147,9 @@ func set_season(s:int) -> void:
 # Oak and birch leaves follow the day of the year: fresh green in spring, orange and red or yellow in autumn, gone in winter.
 func update_foliage() -> void:
     var f:float = GameClock.year_fraction_seasons() if Climate.data()["winter"] else 1.3;       # no winter: green all year
+    _leaves_on = f < 3.0;
     for key in _leaf_layers:
-        (_leaf_layers[key] as MultiMeshInstance3D).visible = f < 3.0;
+        (_leaf_layers[key] as ChunkedLayer).set_shown(_leaves_on);
     WindSway.set_color(_oak_leaf_mat, _leaf_colour(OAK_LEAVES, f));
     WindSway.set_color(_birch_leaf_mat, _leaf_colour(BIRCH_LEAVES, f));
 
@@ -141,9 +169,9 @@ func fell(rn:ResourceNode, from:Vector3) -> void:
     var key:StringName = _layer_key(rn);
     if not _layers.has(key) or World.instance == null:
         return;
-    var parts:Array = [(_layers[key] as MultiMeshInstance3D).multimesh.mesh];
-    if _leaf_layers.has(key) and (_leaf_layers[key] as MultiMeshInstance3D).visible:
-        parts.append((_leaf_layers[key] as MultiMeshInstance3D).multimesh.mesh);
+    var parts:Array = [(_layers[key] as ChunkedLayer).mesh];
+    if _leaf_layers.has(key) and _leaves_on:
+        parts.append((_leaf_layers[key] as ChunkedLayer).mesh);
     var foot:Vector3 = _node_position(World.instance, rn);
     var s:float = rn.scale;
     if not rn.is_mature():
@@ -157,14 +185,12 @@ func fell(rn:ResourceNode, from:Vector3) -> void:
 func berry_count() -> int:
     var n:int = 0;
     for v in _berry_layers:
-        n += (_berry_layers[v] as MultiMeshInstance3D).multimesh.instance_count;
+        n += (_berry_layers[v] as ChunkedLayer).total();
     return n;
 
 # Whether the crowns that fall in winter are drawn now.
 func leaves_visible() -> bool:
-    for key in _leaf_layers:
-        return (_leaf_layers[key] as MultiMeshInstance3D).visible;
-    return false;
+    return _leaves_on and not _leaf_layers.is_empty();
 
 # --------------------------------
 # Trees: the models, and which one a node is drawn with
@@ -184,19 +210,19 @@ func _make_tree_layers(trunk_color:Color) -> void:
         var base:StringName = young.get(kind, kind);
         for v in spec["variants"]:
             var name:String = spec["file"] if spec.get("single", false) else "%s_%d" % [spec["file"], v];
-            var trunk:Mesh = load("%s%s_trunk.obj" % [TREE_DIR, name]) as Mesh;
+            var trunk:Mesh = load("%s%s_trunk.obj" % [Settings.model_dir(TREE_DIR), name]) as Mesh;
             var key:StringName = _key(kind, v);
             var mesh:ArrayMesh = ArrayMesh.new();
             _add_surface(mesh, trunk, trunks[base]);
             if spec["crown"]:
-                var crown:Mesh = load("%s%s_crown.obj" % [TREE_DIR, name]) as Mesh;
+                var crown:Mesh = load("%s%s_crown.obj" % [Settings.model_dir(TREE_DIR), name]) as Mesh;
                 if spec["leaves"]:
                     var cm:ArrayMesh = ArrayMesh.new();
                     _add_surface(cm, crown, crowns[base]);
-                    _leaf_layers[key] = _make_layer(cm);
+                    _leaf_layers[key] = ChunkedLayer.new(self, cm);
                 else:
                     _add_surface(mesh, crown, crowns[base]);
-            _layers[key] = _make_layer(mesh);
+            _layers[key] = ChunkedLayer.new(self, mesh);
 
 # The layers for rocks, ore, shrubs and mushrooms, from the plant models.
 func _make_plant_layers(trunk_color:Color) -> void:
@@ -213,36 +239,36 @@ func _make_plant_layers(trunk_color:Color) -> void:
     for v in PLANT_VARIANTS[&"rock"]:
         var rock:ArrayMesh = ArrayMesh.new();
         _add_surface(rock, _plant("rock_%d" % v), rock_mat);
-        _layers[_key(&"rock", v)] = _make_layer(rock);
+        _layers[_key(&"rock", v)] = ChunkedLayer.new(self, rock);
     for v in PLANT_VARIANTS[&"ore"]:       # a dark outcrop with rusty seams breaking out of it and a few bright metallic flecks
         var ore:ArrayMesh = ArrayMesh.new();
         _add_surface(ore, _plant("ore_%d_body" % v), dark_mat);
         _add_surface(ore, _plant("ore_%d_rust" % v), rust_mat);
         _add_surface(ore, _plant("ore_%d_glint" % v), glint_mat);
-        _layers[_key(&"ore", v)] = _make_layer(ore);
+        _layers[_key(&"ore", v)] = ChunkedLayer.new(self, ore);
     for v in PLANT_VARIANTS[&"bush"]:
         var bush:ArrayMesh = ArrayMesh.new();
         _add_surface(bush, _plant("bush_%d_leaves" % v), _bush_mat);
         _add_surface(bush, _plant("bush_%d_twigs" % v), twig_mat);
-        _layers[_key(&"bush", v)] = _make_layer(bush);
+        _layers[_key(&"bush", v)] = ChunkedLayer.new(self, bush);
         var berries:ArrayMesh = ArrayMesh.new();
         _add_surface(berries, _plant("bush_%d_berries" % v), berry_mat);
-        _berry_layers[v] = _make_layer(berries);
+        _berry_layers[v] = ChunkedLayer.new(self, berries);
     for v in PLANT_VARIANTS[&"hazel"]:
         var hazel:ArrayMesh = ArrayMesh.new();
         _add_surface(hazel, _plant("hazel_%d_leaves" % v), hazel_mat);
         _add_surface(hazel, _plant("hazel_%d_stems" % v), hazel_stem_mat);
-        _layers[_key(&"hazel", v)] = _make_layer(hazel);
+        _layers[_key(&"hazel", v)] = ChunkedLayer.new(self, hazel);
     var plain:StandardMaterial3D = _make_material(Color.WHITE);
     var ripe:ArrayMesh = ArrayMesh.new();
     _add_surface(ripe, _plant("mushroom_ripe"), plain);
-    _layers[&"mushroom"] = _make_layer(ripe);
+    _layers[&"mushroom"] = ChunkedLayer.new(self, ripe);
     var picked:ArrayMesh = ArrayMesh.new();            # picked: just the stumps left in the ground
     _add_surface(picked, _plant("mushroom_picked"), plain);
-    _layers[PICKED_MUSHROOM] = _make_layer(picked);
+    _layers[PICKED_MUSHROOM] = ChunkedLayer.new(self, picked);
 
 static func _plant(name:String) -> Mesh:
-    return load("%s%s.obj" % [PLANT_DIR, name]) as Mesh;
+    return load("%s%s.obj" % [Settings.model_dir(PLANT_DIR), name]) as Mesh;
 
 static func _add_surface(target:ArrayMesh, src:Mesh, mat:Material) -> void:
     target.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(0));
@@ -275,59 +301,77 @@ func _process(_delta:float) -> void:
 
 func _rebuild() -> void:
     var world:World = World.instance;
-    var by_kind:Dictionary = {};
-    for k in _layers:
-        by_kind[k] = [];
+    var groups:Dictionary = {};            # layer key -> block -> the nodes drawn there
     var marked:Array[ResourceNode] = [];
     for rn in world.nodes:
-        by_kind[_layer_key(rn)].append(rn);
+        var key:StringName = _layer_key(rn);
+        var blocks:Dictionary = groups.get(key, {});
+        groups[key] = blocks;
+        var blk:Vector2i = ChunkedLayer.block_of(rn.cell);
+        if not blocks.has(blk):
+            blocks[blk] = [];
+        blocks[blk].append(rn);
         if rn.designated:
             marked.append(rn);
 
     for k in _layers:
-        var list:Array = by_kind[k];
-        var mm:MultiMesh = (_layers[k] as MultiMeshInstance3D).multimesh;
-        mm.instance_count = list.size();
-        var leaves:MultiMesh = (_leaf_layers[k] as MultiMeshInstance3D).multimesh if _leaf_layers.has(k) else null;
-        if leaves != null:
-            leaves.instance_count = list.size();
-        for i in list.size():
-            var rn:ResourceNode = list[i];
-            var s:float = rn.scale;
-            if not rn.is_mature():
-                s *= _growth_scale(rn.growth);
-            var tint:Color = Color.WHITE;
-            if rn.regrows:
-                # bushes shrink and dull as they are picked clean
-                var ratio:float = float(rn.amount) / rn.max_amount;
-                s *= 0.7 + 0.3 * ratio;
-                tint = Color(1.0, lerpf(0.8, 1.0, 1.0 - ratio), lerpf(0.8, 1.0, 1.0 - ratio));
-            if rn.designated:
-                tint = DESIGNATED_TINT;
-            elif _preview_rect.has_point(rn.cell) and _preview_filter.is_valid() and _preview_filter.call(rn):
-                tint = PREVIEW_TINT;
-            mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rn.yaw).scaled(Vector3.ONE * s), _node_position(world, rn)));
-            mm.set_instance_color(i, tint);
-            if leaves != null:
-                leaves.set_instance_transform(i, mm.get_instance_transform(i));
-                leaves.set_instance_color(i, tint);
+        var layer:ChunkedLayer = _layers[k];
+        var leaf_layer:ChunkedLayer = _leaf_layers.get(k);
+        layer.begin();
+        if leaf_layer != null:
+            leaf_layer.begin();
+        for blk in groups.get(k, {}):
+            var list:Array = groups[k][blk];
+            var mm:MultiMesh = layer.fill(blk, list.size());
+            var leaves:MultiMesh = leaf_layer.fill(blk, list.size()) if leaf_layer != null else null;
+            for i in list.size():
+                var rn:ResourceNode = list[i];
+                var s:float = rn.scale;
+                if not rn.is_mature():
+                    s *= _growth_scale(rn.growth);
+                var tint:Color = Color.WHITE;
+                if rn.regrows:
+                    # bushes shrink and dull as they are picked clean
+                    var ratio:float = float(rn.amount) / rn.max_amount;
+                    s *= 0.7 + 0.3 * ratio;
+                    tint = Color(1.0, lerpf(0.8, 1.0, 1.0 - ratio), lerpf(0.8, 1.0, 1.0 - ratio));
+                if rn.designated:
+                    tint = DESIGNATED_TINT;
+                elif _preview_rect.has_point(rn.cell) and _preview_filter.is_valid() and _preview_filter.call(rn):
+                    tint = PREVIEW_TINT;
+                var xf:Transform3D = Transform3D(Basis(Vector3.UP, rn.yaw).scaled(Vector3.ONE * s), _node_position(world, rn));
+                mm.set_instance_transform(i, xf);
+                mm.set_instance_color(i, tint);
+                if leaves != null:
+                    leaves.set_instance_transform(i, xf);
+                    leaves.set_instance_color(i, tint);
+        layer.finish();
+        if leaf_layer != null:
+            leaf_layer.finish();
 
-    var fruiting:Dictionary = {};          # bush variant -> bushes with fruit on them
+    var fruiting:Dictionary = {};          # bush variant -> block -> bushes with fruit on them
     for v in PLANT_VARIANTS[&"bush"]:
-        fruiting[v] = [];
+        fruiting[v] = {};
     for rn in world.nodes:
         if rn.kind == &"bush" and rn.amount > 0:
-            fruiting[posmod(hash(rn.cell), int(PLANT_VARIANTS[&"bush"]))].append(rn);
+            var blocks:Dictionary = fruiting[posmod(hash(rn.cell), int(PLANT_VARIANTS[&"bush"]))];
+            var blk:Vector2i = ChunkedLayer.block_of(rn.cell);
+            if not blocks.has(blk):
+                blocks[blk] = [];
+            blocks[blk].append(rn);
     for v in fruiting:
-        var list:Array = fruiting[v];
-        var bm:MultiMesh = (_berry_layers[v] as MultiMeshInstance3D).multimesh;
-        bm.instance_count = list.size();
-        for i in list.size():
-            var bush:ResourceNode = list[i];
-            var ratio:float = float(bush.amount) / bush.max_amount;
-            var s:float = bush.scale * (0.7 + 0.3 * ratio) * (0.6 + 0.4 * ratio);       # fewer berries shrink the clump
-            bm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, bush.yaw).scaled(Vector3.ONE * s), _node_position(world, bush)));
-            bm.set_instance_color(i, Color(0.85, 0.12, 0.18) if (bush.cell.x + bush.cell.y * 3) % 3 != 0 else Color(0.25, 0.3, 0.85));
+        var berry_layer:ChunkedLayer = _berry_layers[v];
+        berry_layer.begin();
+        for blk in fruiting[v]:
+            var list:Array = fruiting[v][blk];
+            var bm:MultiMesh = berry_layer.fill(blk, list.size());
+            for i in list.size():
+                var bush:ResourceNode = list[i];
+                var ratio:float = float(bush.amount) / bush.max_amount;
+                var s:float = bush.scale * (0.7 + 0.3 * ratio) * (0.6 + 0.4 * ratio);       # fewer berries shrink the clump
+                bm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, bush.yaw).scaled(Vector3.ONE * s), _node_position(world, bush)));
+                bm.set_instance_color(i, Color(0.85, 0.12, 0.18) if (bush.cell.x + bush.cell.y * 3) % 3 != 0 else Color(0.25, 0.3, 0.85));
+        berry_layer.finish();
 
     var mmm:MultiMesh = _markers.multimesh;
     mmm.instance_count = marked.size();

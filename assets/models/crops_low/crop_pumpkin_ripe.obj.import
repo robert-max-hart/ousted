@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://co53s6ulxfjqj"
+path="res://.godot/imported/crop_pumpkin_ripe.obj-bbc70532059ec1001ecba1ebb4e645ee.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crop_pumpkin_ripe.obj-bbc70532059ec1001ecba1ebb4e645ee.mesh"]
+
+source_file="res://assets/models/crops_low/crop_pumpkin_ripe.obj"
+dest_files=["res://.godot/imported/crop_pumpkin_ripe.obj-bbc70532059ec1001ecba1ebb4e645ee.mesh", "res://.godot/imported/crop_pumpkin_ripe.obj-bbc70532059ec1001ecba1ebb4e645ee.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

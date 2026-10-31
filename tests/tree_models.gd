@@ -66,7 +66,7 @@ func _ready() -> void:
     var drawn:int = 0;
     for k in world.renderer._layers:
         if String(k).begins_with("oak:") or String(k).begins_with("dead:") or String(k).begins_with("sapling"):
-            drawn += (world.renderer._layers[k] as MultiMeshInstance3D).multimesh.instance_count;
+            drawn += (world.renderer._layers[k] as ChunkedLayer).total();
     _expect("the nodes are in the layers", drawn >= 3);
 
     # felling
