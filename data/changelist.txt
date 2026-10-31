@@ -3,7 +3,8 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.5.2-dev | 30 Oct 2026 | Hills option, a steadier fishing catch and a probe runner
+# 0.6.0 | 30 Oct 2026 | Meta is complete: hills, overwrite confirmation and a steadier fishing catch
+- This build closes the Meta milestone: save slots, settings, map size, water layouts, hills, climates, custom rules, realism mode, start options, the slope overlay, a tutorial and scenarios. The Arctic climate is still flagged as not yet tuned.
 - New Game has a "Hills" choice (Flat, Few, Normal, Many): how many hill regions the map has and how high they rise. Flat has almost no steep ground, so stone and iron are scarce beyond the start; Many is hilly and rich in both but has little level ground. Saves remember it.
 - Saving over an existing save now asks first: the Save button turns into Overwrite. The save, settings and scenario windows are opaque, so the menu no longer shows through them.
 - Fishing huts catch more on a river: the catch grows with the square root of the water share instead of the share itself.
