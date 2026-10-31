@@ -160,26 +160,25 @@ func _build_visual() -> void:
     _donkey = Node3D.new();
     _donkey.position = Vector3(0, 0, 1.55);
     add_child(_donkey);
-    var coat:StandardMaterial3D = _tinted(Color(0.55, 0.5, 0.45));
-    var pale:StandardMaterial3D = _tinted(Color(0.82, 0.78, 0.7));
-    _child(_donkey, _box(0.38, 0.4, 0.85), coat, Vector3(0, 0.82, 0));
-    var neck:MeshInstance3D = _child(_donkey, _box(0.2, 0.5, 0.2), coat, Vector3(0, 1.02, 0.5));
-    neck.rotation.x = 0.55;
-    _child(_donkey, _box(0.2, 0.22, 0.34), coat, Vector3(0, 1.22, 0.75));
-    _child(_donkey, _box(0.17, 0.14, 0.14), pale, Vector3(0, 1.17, 0.95));
-    for ex in [-0.07, 0.07]:
-        _child(_donkey, _box(0.05, 0.22, 0.07), coat, Vector3(ex, 1.42, 0.68));
-    _child(_donkey, _box(0.05, 0.05, 0.4), coat, Vector3(0, 0.82, -0.58)).rotation.x = 0.6;       # tail
-    _child(_donkey, _box(0.44, 0.06, 0.5), red, Vector3(0, 1.04, -0.02));                        # saddle cloth
-    _child(_donkey, _ball(0.12, _tinted(Color(0.78, 0.7, 0.5)), 0.9), _tinted(Color(0.78, 0.7, 0.5)), Vector3(-0.24, 1.0, -0.02));
-    _child(_donkey, _ball(0.12, _tinted(Color(0.78, 0.7, 0.5)), 0.9), _tinted(Color(0.78, 0.7, 0.5)), Vector3(0.24, 1.0, -0.02));
+    # (the models face +x and the donkey +z, so the body is turned a quarter; the legs hang from hip nodes that swing about the lateral axis)
+    var donkey_rig:Node3D = Node3D.new();
+    donkey_rig.rotation.y = -PI * 0.5;
+    _donkey.add_child(donkey_rig);
+    var body_mi:MeshInstance3D = MeshInstance3D.new();
+    body_mi.mesh = load("res://assets/models/animals/animal_donkey_body.obj") as Mesh;
+    body_mi.material_override = CropMeshes.material();
+    donkey_rig.add_child(body_mi);
+    var leg_mesh:Mesh = load("res://assets/models/animals/animal_donkey_leg.obj") as Mesh;
     for lx in [-0.12, 0.12]:
         for lz in [-0.3, 0.3]:
             var hip:Node3D = Node3D.new();
             hip.position = Vector3(lx, 0.62, lz);
             _donkey.add_child(hip);
-            _child(hip, _box(0.08, 0.62, 0.08), coat, Vector3(0, -0.31, 0));
-            _child(hip, _box(0.1, 0.08, 0.12), _tinted(Color(0.2, 0.17, 0.14)), Vector3(0, -0.64, 0.01));
+            var leg_mi:MeshInstance3D = MeshInstance3D.new();
+            leg_mi.mesh = leg_mesh;
+            leg_mi.material_override = CropMeshes.material();
+            leg_mi.rotation.y = -PI * 0.5;
+            hip.add_child(leg_mi);
             _legs.append(hip);
     # the trader, walking at the donkey's head with a stick
     _trader = Node3D.new();

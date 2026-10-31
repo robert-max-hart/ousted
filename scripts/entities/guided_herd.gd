@@ -19,12 +19,11 @@ static func lead(world:World, kind:StringName, n:int, leader:Node3D) -> GuidedHe
     world.add_child(h);
     h._leader = leader;
     h.name = "GuidedHerd";
-    var mesh:ArrayMesh = Pasture._mesh_for(kind);
+    var mesh:ArrayMesh = Animals.whole(kind);
     for i in n:
         var mi:MeshInstance3D = MeshInstance3D.new();
         mi.mesh = mesh;
         mi.material_override = CropMeshes.material();
-        mi.scale = Vector3.ONE * (0.9 if kind == &"cow" else 1.0);
         h.add_child(mi);
         h._animals.append(mi);
         mi.position = leader.position;
@@ -46,4 +45,4 @@ func _process(_delta:float) -> void:
         a.position = a.position.lerp(at, 0.35);
         var dir:Vector2 = Vector2(ahead.x - at.x, ahead.z - at.z);
         if dir.length() > 0.01:
-            a.rotation.y = lerp_angle(a.rotation.y, atan2(dir.x, dir.y) - PI * 0.5, 0.2);
+            a.rotation.y = lerp_angle(a.rotation.y, atan2(dir.x, dir.y) - PI * 0.5, 0.2);       # (the models face +x)

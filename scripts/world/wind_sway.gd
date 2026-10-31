@@ -27,6 +27,10 @@ static func make(color:Color, sway:float, height_ref:float, double_sided:bool = 
 static func hold_snow(m:ShaderMaterial) -> void:
     m.set_shader_parameter("snow_hold", 1.0);
 
+# Also give this shader material the shared clock (the animals' legs and heads use it).
+static func track(m:ShaderMaterial) -> void:
+    _materials.append(m);
+
 static func set_color(m:ShaderMaterial, color:Color) -> void:
     m.set_shader_parameter("albedo", color);
 
