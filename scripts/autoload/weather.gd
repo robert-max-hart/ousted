@@ -7,13 +7,8 @@ extends Node;
 signal weather_changed;
 signal drought_changed(on:bool);       # a dry spell began or ended (the world tells the player)
 
-# Mid-season mean temperatures (C): spring, summer, autumn, winter
-const SEASON_TEMP       :Array[float] = [11.0, 21.0, 9.0, -5.0];
-const DAILY_SWING       :float = 4.0;
-const RAIN_START_CHANCE :Array[float] = [0.06, 0.03, 0.06, 0.05];   # per hour
-const RAIN_STOP_CHANCE  :float = 0.12;                                # per hour
+# The temperatures, rain and drought chances of the year come from the map's climate (Climate).
 const RAIN_COOLING      :float = 2.0;
-const DROUGHT_CHANCE    :Array[float] = [0.02, 0.05, 0.02, 0.0];     # per day, by season: none in winter
 const DROUGHT_DAYS      :Vector2i = Vector2i(5, 11);                 # how long one lasts
 const DROUGHT_REST       :int = 10;                                   # days after one ends before another can start
 const DROUGHT_WARMING   :float = 3.0;                                # C hotter than the season while it lasts
@@ -57,7 +52,7 @@ func _on_day(_day:int) -> void:
             drought_changed.emit(false);
     elif drought_rest > 0:
         drought_rest -= 1;
-    elif drought_enabled and _rng.randf() < DROUGHT_CHANCE[GameClock.season()]:
+    elif drought_enabled and GameRules.droughts and _rng.randf() < float(Climate.data()["drought"][GameClock.season()]):
         drought_days = _rng.randi_range(DROUGHT_DAYS.x, DROUGHT_DAYS.y);
         is_raining = false;
         drought_changed.emit(true);
@@ -68,9 +63,9 @@ func _roll_day() -> void:
 func _on_hour(_hour:int) -> void:
     var s:int = GameClock.season();
     if is_raining:
-        if drought_days > 0 or _rng.randf() < RAIN_STOP_CHANCE:
+        if drought_days > 0 or _rng.randf() < float(Climate.data()["rain_stop"]):
             is_raining = false;
-    elif drought_days == 0 and _rng.randf() < RAIN_START_CHANCE[s]:
+    elif drought_days == 0 and _rng.randf() < float(Climate.data()["rain"][s]):
         is_raining = true;
     _update_temperature();
     weather_changed.emit();
@@ -100,7 +95,7 @@ func climate_at(hours_ahead:float) -> float:
     var sf:float = fmod((GameClock.total_hours + hours_ahead) / (GameClock.HOURS_PER_DAY * GameClock.DAYS_PER_SEASON), 4.0) - 0.5;
     var i:int = floori(sf);
     var t:float = sf - i;
-    return lerpf(SEASON_TEMP[posmod(i, 4)], SEASON_TEMP[posmod(i + 1, 4)], t);
+    return lerpf(Climate.temps()[posmod(i, 4)], Climate.temps()[posmod(i + 1, 4)], t);
 
 # Whether a crop can be sown now. Warm enough today is all that is asked (no ripening check): a crop that
 # frost catches can still be harvested early or salvaged (Field.EARLY_SHARE, FROZEN_SHARE).
@@ -116,18 +111,18 @@ func sow_block_reason(crop:Dictionary) -> String:
 
 # Mean temperature for the current day (no daily swing / rain).
 func mean_temperature() -> float:
-    # SEASON_TEMP values sit at the middle of each season; blend between them
+    # the climate's temperatures sit at the middle of each season; blend between them
     var sf:float = GameClock.year_fraction_seasons() - 0.5;
     var i:int = floori(sf);
     var t:float = sf - i;
-    var a:float = SEASON_TEMP[posmod(i, 4)];
-    var b:float = SEASON_TEMP[posmod(i + 1, 4)];
+    var a:float = Climate.temps()[posmod(i, 4)];
+    var b:float = Climate.temps()[posmod(i + 1, 4)];
     return lerpf(a, b, t) + _day_offset;
 
 func _update_temperature() -> void:
     var h:float = GameClock.hour();
     # coldest around 04:00, warmest around 16:00
-    var daily:float = -cos((h - 4.0) / 24.0 * TAU) * DAILY_SWING;
+    var daily:float = -cos((h - 4.0) / 24.0 * TAU) * float(Climate.data()["swing"]);
     _dry_temperature = mean_temperature() + daily;
     temperature = _dry_temperature - RAIN_COOLING * intensity + (DROUGHT_WARMING if drought_days > 0 else 0.0);
 

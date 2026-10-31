@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------
 extends Node;
 
-var DAYS:int = 6;               # a year is 32 days; pass a number after -- to change it
+var DAYS:int = 6;               # a year is 32 days; pass a number after -- to change it (a second one picks the climate: 0 temperate, 1 arctic, 2 desert, 3 tropical; a third the water: 0 none to 6 coast)
 
 var world:World;
 var _last_day:int = -1;
@@ -26,6 +26,10 @@ func _ready() -> void:
     var args:PackedStringArray = OS.get_cmdline_user_args();
     if args.size() > 0:
         DAYS = args[0].to_int();
+    if args.size() > 1:
+        Climate.current = args[1].to_int();       # 0 temperate, 1 arctic, 2 desert, 3 tropical
+    if args.size() > 2:
+        Terrain.river_style = args[2].to_int();   # 0 none, 1 gentle, 2 winding, 3 wild, 4 wide, 5 wetlands, 6 coast
     Defs.difficulty = &"easy";        # the whole starting stock fits in the Town Hall
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);

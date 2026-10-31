@@ -11,9 +11,19 @@ signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting
 
 enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET, ORCHARD };      # (new ids go last: saves keep the numbers)
 
-const SIZE              :int = 160;
+# The map's side in cells. A new game picks one of MAP_SIZES (see set_size) before the World is built, a loaded
+# game takes the saved one; SIZE and CHUNKS are read like constants everywhere.
+const DEFAULT_SIZE      :int = 160;
+const MAP_SIZES         :Array[int] = [96, 128, 160, 192];
+const MAP_SIZE_NAMES    :Array[String] = ["Small", "Medium", "Large", "Huge"];
 const CHUNK             :int = 32;
-const CHUNKS            :int = 5;       # SIZE / CHUNK
+static var SIZE         :int = DEFAULT_SIZE;
+static var CHUNKS       :int = DEFAULT_SIZE / CHUNK;       # SIZE / CHUNK
+
+# A multiple of CHUNK, so the map divides into whole chunks.
+static func set_size(cells:int) -> void:
+    SIZE = maxi(CHUNK * 2, cells / CHUNK * CHUNK);
+    CHUNKS = SIZE / CHUNK;
 const WATER_LEVEL       :float = 0.0;
 const SHALLOW_FROM      :float = -0.45;       # water no deeper than this (below the surface) can be waded through
 const MAX_HEIGHT        :float = 40.0;
@@ -40,6 +50,7 @@ var overlay :PackedByteArray;
 var _chunks :Array[MeshInstance3D] = [];
 var _dirty  :Dictionary = {};
 var soil_view :bool = false;            # colour the ground by soil fertility (set_soil_view)
+var slope_view :bool = false;           # colour the ground by how steep it is for building (set_slope_view)
 var water_view :bool = false;           # colour the ground by reach of water (where a building that needs a water source may stand)
 var water_source :Callable;              # cell index -> distance (cells) to the nearest water source, set by World
 var soil_source :Callable;               # cell index -> fertility 0..1, set by World
@@ -87,6 +98,29 @@ const RIVER_BED       :float = -0.95;      # height of the bed in the middle of 
 const RIVER_BANK      :float = 8.0;       # cells over which the banks blend into the land
 const RIVER_STEP      :float = 1.6;       # cells between points of the centre line
 const FORDS           :int = 3;
+
+# Water layouts (the New Game screen's "Water" choice; the code calls it river_style because it began as the river).
+# "land" says how the water is made: a river (the rest of the entry: how hard its centre line wanders, `meander`
+# scales the heading bias, `freq` is how fast it changes, `width` scales the half widths), none, a wetland (most of
+# the map is shallow water, with a dry rise to start on) or a coast (one side of the map is ocean).
+enum RiverStyle { NONE, GENTLE, WINDING, WILD, WIDE, WETLANDS, COAST };      # (new ids go last: saves keep the numbers)
+const RIVER_STYLES:Dictionary = {
+    RiverStyle.NONE:    {"name": "None",    "land": &"dry",      "desc": "No river. Water is only where the land dips into ponds, plus wells and rain.", "meander": 0.0, "freq": 0.03, "width": 1.0},
+    RiverStyle.GENTLE:  {"name": "Gentle",  "land": &"river",    "desc": "A nearly straight river with a few lazy bends.",               "meander": 0.4, "freq": 0.02, "width": 1.0},
+    RiverStyle.WINDING: {"name": "Winding", "land": &"river",    "desc": "One river that winds across the map.",                          "meander": 1.5, "freq": 0.03, "width": 1.0},
+    RiverStyle.WILD:    {"name": "Wild",    "land": &"river",    "desc": "A river that doubles back on itself in tight loops.",           "meander": 2.8, "freq": 0.055, "width": 1.0},
+    RiverStyle.WIDE:    {"name": "Wide",    "land": &"river",    "desc": "A broad river: more water, fewer places to cross.",             "meander": 1.2, "freq": 0.03, "width": 1.6},
+    RiverStyle.WETLANDS:{"name": "Wetlands","land": &"wetlands", "desc": "Most of the map is shallow water you can wade through, with islands and rises of dry land. Build on the dry parts; bridge the deep channels.", "meander": 0.0, "freq": 0.03, "width": 1.0},
+    RiverStyle.COAST:   {"name": "Coast",   "land": &"coast",    "desc": "One side of the map is open ocean, with a wandering shoreline and a shallow beach. Fish from piers.", "meander": 0.0, "freq": 0.03, "width": 1.0},
+};
+const WET_SHARE       :float = 0.74;      # wetlands: about this share of the map ends up under water
+const WET_SOFT        :float = 4.5;       # ... and how gently it deepens (a bigger number keeps more of it wadeable)
+const WET_ISLAND      :float = 1.8;       # height of the dry rise the colony starts on
+const COAST_AT        :float = 0.21;      # the shoreline's mean distance from its edge, as a share of the map
+const COAST_WOBBLE    :float = 0.07;      # how far it wanders, as a share of the map
+const COAST_BEACH     :float = 10.0;      # cells over which the shore climbs from the sea to the land
+const COAST_SLOPE     :float = 0.15;      # how fast the sea floor deepens (height per cell off the shore)
+static var river_style:int = RiverStyle.WINDING;
 const FORD_BED        :float = -0.35;     # a hand deep: there is water over the ford, and it can still be waded (SHALLOW_FROM)
 const FORD_HALF       :int = 2;           # points on each side of a ford's middle that stay shallow
 const FORD_RAMP       :int = 3;           # points over which the bed deepens again
@@ -98,6 +132,7 @@ var river_fords:PackedVector2Array;       # the middle of each ford, in cells
 var river_dist :PackedFloat32Array;       # per corner: distance to the centre line, 999 beyond the valley
 
 func _carve_river(world_seed:int) -> void:
+    var style:Dictionary = RIVER_STYLES[river_style];
     var n:int = SIZE + 1;
     river_dist = PackedFloat32Array();
     river_dist.resize(n * n);
@@ -108,7 +143,7 @@ func _carve_river(world_seed:int) -> void:
     rng.seed = world_seed + 91;
     var meander:FastNoiseLite = FastNoiseLite.new();
     meander.seed = world_seed + 92;
-    meander.frequency = 0.03;
+    meander.frequency = float(style["freq"]);
     var side:int = rng.randi_range(0, 3);
     var a:float = rng.randf_range(0.25, 0.75) * SIZE;
     var b:float = rng.randf_range(0.25, 0.75) * SIZE;
@@ -120,7 +155,7 @@ func _carve_river(world_seed:int) -> void:
     for i in 600:
         var best:float = INF;
         var best_h:float = heading;
-        var bias:float = meander.get_noise_1d(i) * 1.5;      # the heading the river wants, around the straight line to its goal
+        var bias:float = meander.get_noise_1d(i) * float(style["meander"]);      # the heading the river wants, around the straight line to its goal
         for off in [-0.5, -0.25, 0.0, 0.25, 0.5]:
             var h:float = heading + off;
             var q:Vector2 = pos + Vector2.from_angle(h) * RIVER_STEP;
@@ -163,7 +198,7 @@ func _carve_river(world_seed:int) -> void:
         if i < 0:
             continue;
         var t:float = float(i) / float(count - 1);
-        var half:float = lerpf(RIVER_HALF_UP, RIVER_HALF_DOWN, t);
+        var half:float = lerpf(RIVER_HALF_UP, RIVER_HALF_DOWN, t) * float(style["width"]);
         var d:float = river_dist[k];
         if d > half + RIVER_BANK:
             continue;
@@ -176,6 +211,50 @@ func _carve_river(world_seed:int) -> void:
         heights[k] = minf(heights[k], lerpf(original[k], level, 1.0 - smoothstep(half, half + RIVER_BANK, d)));
 
 # How far (cells) a cell is from the river's centre line; 999 when it is far from it or the map has none.
+# Wetlands: the whole land is lowered until about WET_SHARE of it is under water (the underwater part is
+# squeezed so most of it can be waded), and a dry level rise near the middle is where the colony starts.
+func _flood(world_seed:int) -> void:
+    var n:int = SIZE + 1;
+    var sorted:PackedFloat32Array = heights.duplicate();
+    sorted.sort();
+    var shift:float = sorted[int(sorted.size() * WET_SHARE)];
+    var rng:RandomNumberGenerator = RandomNumberGenerator.new();
+    rng.seed = world_seed + 95;
+    var mid:Vector2 = Vector2(SIZE * 0.5, SIZE * 0.5) + Vector2(rng.randf_range(-0.1, 0.1), rng.randf_range(-0.1, 0.1)) * SIZE;
+    var radius:float = clampf(SIZE * 0.12, 14.0, 24.0);
+    for z in n:
+        for x in n:
+            var h:float = heights[z * n + x] - shift;
+            if h < 0.0:
+                h = -0.9 * (1.0 - exp(h / WET_SOFT));
+            var w:float = 1.0 - smoothstep(radius, radius + 12.0, Vector2(x, z).distance_to(mid));
+            heights[z * n + x] = lerpf(h, WET_ISLAND + _detail_noise.get_noise_2d(x, z) * 0.15, w);
+
+# Coast: one side of the map (by the seed) is sea. The shoreline wanders; off it the floor deepens, inland it
+# climbs over COAST_BEACH cells to the land. river_dist holds the distance inland from the shore (the start site
+# and the soil use it like a river's).
+func _carve_coast(world_seed:int) -> void:
+    var n:int = SIZE + 1;
+    river_dist = PackedFloat32Array();
+    river_dist.resize(n * n);
+    river_dist.fill(999.0);
+    var rng:RandomNumberGenerator = RandomNumberGenerator.new();
+    rng.seed = world_seed + 93;
+    var side:int = rng.randi_range(0, 3);
+    var wobble:FastNoiseLite = FastNoiseLite.new();
+    wobble.seed = world_seed + 94;
+    wobble.frequency = 0.02;
+    wobble.fractal_octaves = 2;
+    for z in n:
+        for x in n:
+            var off:float = [float(z), float(SIZE - z), float(x), float(SIZE - x)][side];        # distance from the sea's edge
+            var along:float = [float(x), float(x), float(z), float(z)][side];
+            var inland:float = off - (SIZE * COAST_AT + wobble.get_noise_1d(along) * SIZE * COAST_WOBBLE * 2.0);
+            var sea:float = -0.3 - COAST_SLOPE * clampf(-inland, 0.0, 14.0);
+            var land:float = lerpf(sea, heights[z * n + x], smoothstep(0.0, COAST_BEACH, inland));
+            heights[z * n + x] = land;
+            river_dist[z * n + x] = maxf(inland, 0.0);
+
 func river_distance(c:Vector2i) -> float:
     if river_dist.is_empty():
         return 999.0;
@@ -214,7 +293,16 @@ func generate(world_seed:int) -> void:
             var mask:float = clampf((hills_mask.get_noise_2d(x, z) - HILLS_FROM) * 3.0, 0.0, 1.0);
             h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * HILLS_AMP;
             heights[z * n + x] = h;
-    _carve_river(world_seed);
+    river_dist = PackedFloat32Array();
+    river_path = PackedVector2Array();
+    river_fords = PackedVector2Array();
+    match RIVER_STYLES[river_style]["land"]:
+        &"wetlands":
+            _flood(world_seed);
+        &"coast":
+            _carve_coast(world_seed);
+        &"river":
+            _carve_river(world_seed);
     overlay = PackedByteArray();
     overlay.resize(SIZE * SIZE);
     mark_all_dirty();
@@ -385,6 +473,30 @@ func set_soil_view(on:bool) -> void:
 # there), all else stays a dull brown.
 const WATER_REACH:float = 12.0;       # the "needs_water" radius of the Distillery and the Potter's Workshop
 
+# The slope overlay: how much the ground rises and falls under a house-sized patch (3x3 cells around each cell), the
+# number that decides whether a building fits (World.can_place): green is level, yellow needs some levelling, red is
+# past BUILD_SLOPE (nothing small can go there, and a drag-sized building has double that).
+const BUILD_SLOPE:float = 2.5;        # the most height difference a building's footprint may have
+const SLOPE_EASY :float = 0.6;        # up to this the ground is as good as level
+
+func set_slope_view(on:bool) -> void:
+    if slope_view == on:
+        return;
+    slope_view = on;
+    mark_all_dirty();
+
+# The height range over the 3x3 cells around c.
+func relief(c:Vector2i) -> float:
+    var hr:Vector2 = rect_height_range(Rect2i(c - Vector2i.ONE, Vector2i(3, 3)));
+    return hr.y - hr.x;
+
+static func slope_color(r:float) -> Color:
+    if r <= SLOPE_EASY:
+        return Color(0.25, 0.7, 0.3);
+    if r <= BUILD_SLOPE:       # yellow, turning orange as it nears the limit
+        return Color(0.9, 0.82, 0.25).lerp(Color(0.95, 0.5, 0.15), (r - SLOPE_EASY) / (BUILD_SLOPE - SLOPE_EASY));
+    return Color(0.82, 0.18, 0.15);
+
 func set_water_view(on:bool) -> void:
     if water_view == on:
         return;
@@ -426,6 +538,8 @@ func _corner_normal(x:int, z:int) -> Vector3:
 
 func _cell_color(c:Vector2i) -> Color:
     var col:Color;
+    if slope_view and not is_water(c):
+        return slope_color(relief(c));
     if water_view and water_source.is_valid() and overlay[index(c)] != Overlay.ROAD and not is_water(c):
         return water_color(water_source.call(index(c)));
     if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and overlay[index(c)] != Overlay.CHANNEL and overlay[index(c)] != Overlay.CHANNEL_WET and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:

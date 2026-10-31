@@ -36,7 +36,7 @@ const START_ROCKS_NEAR  :float = 10.0;              # ... in the ring this far f
 const START_ROCKS_FAR   :float = 22.0;
 const START_ROCKS_CLOSE :int = 2;                   # ... and this many of them within START_ROCKS_CLOSE_FAR cells
 const START_ROCKS_CLOSE_FAR:float = 16.0;
-const MAX_BUILD_SLOPE   :float = 2.5;
+const MAX_BUILD_SLOPE   :float = Terrain.BUILD_SLOPE;
 const MAX_WALK_SLOPE    :float = 2.2;
 
 @export var world_seed:int = 0;     # 0 = random each run
@@ -70,6 +70,8 @@ var soil_fertility:PackedFloat32Array;
 var awaiting_start:bool = false;            # a new game before the Town Hall is placed: no colony yet, the clock stopped
 var suggested_start:Vector2i = Vector2i.ZERO;   # where the game would have started the colony (the camera begins there)
 var town_hall   :Building;
+var scenario    :ScenarioRun;          # the scenario this game belongs to, if any
+var start_building:Building;           # what the colony was founded with (the Town Hall, a well or a supply cart: GameRules.Start)
 
 var _entities   :Node3D;
 var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
@@ -101,9 +103,18 @@ func _ready() -> void:
     var loading:bool = not save.is_empty();
     if loading:
         world_seed = save["seed"];
+        var map:Dictionary = save.get("map", {}) as Dictionary;       # older saves: a Large map with the winding river
+        Terrain.set_size(map.get("size", Terrain.DEFAULT_SIZE));
+        Terrain.river_style = map.get("river", Terrain.RiverStyle.WINDING);
+        Climate.current = map.get("climate", Climate.Id.TEMPERATE);
+        scenario = ScenarioRun.from_dict(save.get("scenario", {}) as Dictionary);
+        GameRules.from_dict(save.get("rules", {}) as Dictionary);
     elif world_seed == 0:
         world_seed = new_game_seed if new_game_seed > 0 else randi() % 1000000;
         new_game_seed = 0;
+    if not loading and not backdrop and Scenarios.pending != &"":
+        scenario = ScenarioRun.new(Scenarios.pending);
+    Scenarios.pending = &"";
     rng.seed = world_seed;
     print("Ousted world seed: %d" % world_seed);
 
@@ -172,7 +183,7 @@ func _ready() -> void:
         camera_rig._distance = 75.0;
         camera_rig._target_distance = 75.0;
     else:
-        camera_rig.focus_on(town_hall.position);
+        camera_rig.focus_on((start_building if start_building != null else town_hall).position);
     visuals.setup_weather_fx();
 
     tools = PlayerTools.new();
@@ -189,7 +200,7 @@ func _ready() -> void:
     _apply_season(GameClock.season());
     if awaiting_start:
         tools.begin_start_mode();
-        notify("Choose where to settle: click to place your Town Hall.");
+        notify("Choose where to settle: click to place your %s." % Defs.BUILDINGS[GameRules.start_def()]["name"]);
     else:
         notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
 
@@ -223,6 +234,7 @@ func _spawn_nature() -> void:
     var species:FastNoiseLite = FastNoiseLite.new();
     species.seed = world_seed + 11;
     species.frequency = 0.045;
+    var trees:float = float(Climate.data()["trees"]);       # a dry climate has thin woods, a wet one thick
     for z in Terrain.SIZE:
         for x in Terrain.SIZE:
             var c:Vector2i = Vector2i(x, z);
@@ -233,12 +245,12 @@ func _spawn_nature() -> void:
             var r:float = rng.randf();
             if slope > 1.0 and r < 0.09:
                 add_node(&"ore" if rng.randf() < 0.12 else &"rock", c);       # (the ore share dropped as the rocks grew: iron is unchanged)
-            elif slope < 1.4 and f > 0.15 and r < 0.45:
+            elif slope < 1.4 and f > 0.15 and r < 0.45 * trees:
                 var oak:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of oak among the pines
                 add_node(&"oak" if oak > 0.05 else &"tree", c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
                 add_node(&"bush", c);
-            elif slope < 1.4 and f > -0.35 and f <= 0.15 and r > SPARSE_FROM and r < SPARSE_FROM + (SPARSE_TREES if f > -0.1 else SPARSE_TREES * 0.55):
+            elif slope < 1.4 and f > -0.35 and f <= 0.15 and r > SPARSE_FROM and r < SPARSE_FROM + (SPARSE_TREES if f > -0.1 else SPARSE_TREES * 0.55) * trees:
                 var kind:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);        # a lone tree here and there, thicker towards the groves
                 add_node(&"oak" if kind > 0.05 else &"tree", c);
             elif slope < 1.0 and r < 0.008:
@@ -328,7 +340,7 @@ func near_water(c:Vector2i, r:int = 4) -> bool:
 # fussy about water than crops: dry ground still allows about a third of the pace.
 func tree_growth_rate(rn:ResourceNode) -> float:
     var base:float = 1.0 / rn.def["grow_hours"];
-    var season:float = 0.25 if GameClock.season() == GameClock.Season.WINTER else 1.0;
+    var season:float = 0.25 if Climate.is_dormant() else 1.0;
     var water:float = maxf(wetness, 0.8 if near_water(rn.cell) else 0.0);
     return base * season * (0.35 + 0.65 * water);
 
@@ -809,6 +821,8 @@ func _update_child_labor() -> void:
     child_labor_share = float(working) / kids if kids > 0 and policies.is_on(&"child_labor") else 0.0;
 
 func _on_day(_d:int) -> void:
+    if scenario != null:
+        scenario.on_day(self);
     renderer.update_foliage();
     traders.on_day();
     ledger.on_day(self);
@@ -833,8 +847,8 @@ func _on_day(_d:int) -> void:
 
 func _apply_season(s:int) -> void:
     renderer.update_foliage();
-    terrain.set_season(s);
-    renderer.set_season(s);
+    terrain.set_season(Climate.look(s));
+    renderer.set_season(Climate.look(s));
 
 func _on_season(s:int) -> void:
     _apply_season(s);

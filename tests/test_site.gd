@@ -9,9 +9,13 @@ class_name TestSite extends RefCounted;
 
 const FREE_AREA:Vector2i = Vector2i(26, 14);       # what `near` keeps clear: from 3 cells before the origin, this far on
 
+# Where the colony began: the Town Hall's origin, or the first building's if it started without one.
+static func anchor(world:World) -> Vector2i:
+    return (world.town_hall if world.town_hall != null else world.start_building).origin;
+
 # The origin of a free area (FREE_AREA, or `area`) near Town Hall origin + prefer; the old fixed spot if nothing is free.
 static func near(world:World, prefer:Vector2i, area:Vector2i = FREE_AREA) -> Vector2i:
-    var home:Vector2i = world.town_hall.origin + prefer;
+    var home:Vector2i = TestSite.anchor(world) + prefer;
     for r in range(0, 48, 2):
         for dz in range(-r, r + 1, 2):
             for dx in range(-r, r + 1, 2):
@@ -24,7 +28,7 @@ static func near(world:World, prefer:Vector2i, area:Vector2i = FREE_AREA) -> Vec
 
 # The origin for a building of `size` near Town Hall origin + prefer, with a free cell around it.
 static func spot(world:World, size:Vector2i, prefer:Vector2i) -> Vector2i:
-    var home:Vector2i = world.town_hall.origin + prefer;
+    var home:Vector2i = TestSite.anchor(world) + prefer;
     for r in range(0, 48):
         for dz in range(-r, r + 1):
             for dx in range(-r, r + 1):

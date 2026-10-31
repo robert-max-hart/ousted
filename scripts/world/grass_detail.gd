@@ -8,7 +8,7 @@
 #     sand, steep ground, roads, fields and buildings, take the
 #     season's colour and are sparse and dry in winter. Blocks are
 #     rebuilt (a few a frame) when the terrain under them changes.
-#     DENSITY 0 turns the whole thing off.
+#     The Grass setting (Settings) scales DENSITY; Off draws none.
 # ----------------------------------------------------------------
 class_name GrassDetail extends Node3D;
 
@@ -35,13 +35,10 @@ func _init(w:World) -> void:
     _mat.vertex_color_is_srgb = true;
     _mat.roughness = 1.0;
     _mat.cull_mode = BaseMaterial3D.CULL_DISABLED;
-    _mat.albedo_color = BY_SEASON[GameClock.season()];
+    _mat.albedo_color = BY_SEASON[Climate.look(GameClock.season())];
     _mesh = _make_tuft();
 
 func _ready() -> void:
-    if DENSITY <= 0.0:
-        set_process(false);
-        return;
     _world.terrain.ground_changed.connect(_on_terrain_changed);
     GameClock.season_changed.connect(_on_season);
     var n:int = Terrain.SIZE / BLOCK;
@@ -50,8 +47,12 @@ func _ready() -> void:
             _dirty.append(Vector2i(bx, bz));
 
 func _on_season(s:int) -> void:
-    _mat.albedo_color = BY_SEASON[s];
-    _dirty.clear();       # the winter cover differs, so every block is rebuilt
+    _mat.albedo_color = BY_SEASON[Climate.look(s)];
+    reload();       # the winter cover differs, so every block is rebuilt
+
+# Rebuilds every block (a season change, or the density setting).
+func reload() -> void:
+    _dirty.clear();
     var n:int = Terrain.SIZE / BLOCK;
     for bz in n:
         for bx in n:
@@ -87,7 +88,7 @@ func _make_tuft() -> ArrayMesh:
 
 func _rebuild(b:Vector2i) -> void:
     var t:Terrain = _world.terrain;
-    var winter:bool = GameClock.season() == GameClock.Season.WINTER;
+    var winter:bool = Climate.is_dormant();
     var spots:Array[Vector3] = [];
     var tints:Array[float] = [];
     for z in range(b.y * BLOCK, (b.y + 1) * BLOCK):
@@ -96,7 +97,7 @@ func _rebuild(b:Vector2i) -> void:
             if not _grassy(c):
                 continue;
             var h:int = ((x * 73856093) ^ (z * 19349663)) & 0xffffff;
-            var want:float = DENSITY * (WINTER_SHARE if winter else 1.0);
+            var want:float = DENSITY * Settings.grass_share() * (WINTER_SHARE if winter else 1.0);
             var copies:int = floori(want) + (1 if float(h & 255) / 255.0 < want - floor(want) else 0);
             for k in copies:
                 var hk:int = (h * (k + 3) + k * 40503) & 0xffffff;

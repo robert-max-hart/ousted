@@ -12,10 +12,13 @@ const TREE_BONUS_RANGE  :int = 3;       # trees within this many cells speed spr
 const TREE_BONUS        :float = 0.25;  # each adds this share of the base chance...
 const TREE_BONUS_CAP    :int = 8;       # ...up to this many trees
 
+# The caps in Defs were set for the Large map: other sizes scale them by area.
+static func area_share() -> float:
+    return float(Terrain.SIZE * Terrain.SIZE) / float(Terrain.DEFAULT_SIZE * Terrain.DEFAULT_SIZE);
+
 # Once a day: every mature wild-food node that is not in winter may seed a new one beside it.
 static func spread_daily(world:World) -> void:
-    var season:int = GameClock.season();
-    if season == GameClock.Season.WINTER:
+    if Climate.is_dormant():
         return;
     var totals:Dictionary = {};
     for rn in world.nodes:
@@ -25,7 +28,7 @@ static func spread_daily(world:World) -> void:
         if not rn.is_forageable() or not rn.is_mature() or rn.removed:
             continue;
         var d:Dictionary = rn.def;
-        if totals.get(rn.kind, 0) >= d.get("max_total", 100):
+        if totals.get(rn.kind, 0) >= d.get("max_total", 100) * area_share():
             continue;
         var chance:float = d.get("spread_chance", 0.0);
         if chance <= 0.0 or world.rng.randf() >= chance * (1.0 + TREE_BONUS * mini(trees_near(world, rn.cell), TREE_BONUS_CAP)):

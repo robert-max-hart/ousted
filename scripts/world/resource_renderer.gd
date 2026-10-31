@@ -244,7 +244,7 @@ func set_season(s:int) -> void:
 
 # Oak leaves follow the day of the year: fresh green in spring, orange and red in autumn, gone in winter.
 func update_foliage() -> void:
-    var f:float = GameClock.year_fraction_seasons();
+    var f:float = GameClock.year_fraction_seasons() if Climate.data()["winter"] else 1.3;       # no winter: green all year
     _oak_leaves.visible = f < 3.0;
     var col:Color = OAK_LEAVES[0][1];
     for i in range(1, OAK_LEAVES.size()):

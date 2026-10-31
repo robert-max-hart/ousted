@@ -16,11 +16,26 @@ var _menu       :VBoxContainer;
 var _new_panel  :PanelContainer;
 var _difficulty :StringName = &"normal";
 var _choose_start:CheckBox;
+var _size_pick  :OptionButton;
+var _river_pick :OptionButton;
+var _river_text :Label;
+var _climate_pick:OptionButton;
+var _climate_text:Label;
+var _climate_warn:Label;
+var _new_scroll :ScrollContainer;      # the New Game options (they scroll on a small screen)
+var _rules_box  :VBoxContainer;       # the custom rules, folded away until asked for
+var _start_pick :OptionButton;
+var _settlers_pick:OptionButton;
+var _supplies_pick:OptionButton;
+var _merchants_pick:OptionButton;
+var _droughts_check:CheckBox;
+var _realism_check:CheckBox;
 var _diff_btns  :Dictionary = {};        # difficulty id -> Button
 var _diff_text  :Label;
 var _seed_edit  :LineEdit;
 var _message    :Label;
 var _changes    :PanelContainer;         # the changelist overlay (data/changelist.txt)
+var _ui_root    :Control;               # the menu's layer: modal panels go in here so they draw over the menu
 var _continue_slot:String = "";
 
 func _ready() -> void:
@@ -33,6 +48,10 @@ func _build_backdrop() -> void:
     var season:int = randi() % 4;
     GameClock.total_hours = float((season * GameClock.DAYS_PER_SEASON + 3) * GameClock.HOURS_PER_DAY) + TITLE_HOUR;
     Weather.reset(0.85 if randf() < 0.35 else 0.0);       # now and then it rains (or, in winter, snows) behind the title
+    Terrain.set_size(Terrain.DEFAULT_SIZE);       # the backdrop town is always on a Large map with the usual river
+    Terrain.river_style = Terrain.RiverStyle.WINDING;
+    Climate.current = Climate.Id.TEMPERATE;
+    GameRules.reset();
     World.backdrop = true;
     add_child((load(SaveGame.MAIN_SCENE) as PackedScene).instantiate());
     World.backdrop = false;
@@ -44,6 +63,7 @@ func _build_ui() -> void:
     root.set_anchors_preset(Control.PRESET_FULL_RECT);
     root.theme = _theme();
     layer.add_child(root);
+    _ui_root = root;
 
     # darken the top and bottom a little so the letters and buttons read against any scene
     var shade:GradientTexture2D = GradientTexture2D.new();
@@ -91,6 +111,7 @@ func _build_ui() -> void:
     _menu = VBoxContainer.new();
     _menu.add_theme_constant_override("separation", 10);
     stack.add_child(_menu);
+    Settings.apply_window();
     _continue_slot = "quicksave" if SaveGame.loadable(SaveGame.QUICKSAVE) else "autosave" if SaveGame.loadable(SaveGame.AUTOSAVE) else "";
     var cont:Button = _menu_button("Continue");
     cont.disabled = _continue_slot == "";
@@ -98,6 +119,18 @@ func _build_ui() -> void:
     cont.pressed.connect(_on_continue);
     var new_game:Button = _menu_button("New Game");
     new_game.pressed.connect(_show_new_game);
+    var scenarios:Button = _menu_button("Scenarios");
+    scenarios.tooltip_text = "Preset games with goals to reach";
+    scenarios.pressed.connect(_show_scenarios);
+    var tutorial:Button = _menu_button("Tutorial");
+    tutorial.tooltip_text = "A guided first game on a mild map: build, farm and survive a winter";
+    tutorial.pressed.connect(_on_tutorial);
+    var load_game:Button = _menu_button("Load Game");
+    load_game.tooltip_text = "Pick a saved game";
+    load_game.pressed.connect(_show_load);
+    var settings:Button = _menu_button("Settings");
+    settings.tooltip_text = "Graphics and window options";
+    settings.pressed.connect(func() -> void: _ui_root.add_child(SettingsPanel.new()));
     var changes:Button = _menu_button("Changelist");
     changes.tooltip_text = "What changed in each push to main";
     changes.pressed.connect(func() -> void: _changes.visible = true);
@@ -193,14 +226,23 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     _new_panel.visible = false;
     _new_panel.custom_minimum_size = Vector2(430, 0);
     stack.add_child(_new_panel);
-    var col:VBoxContainer = VBoxContainer.new();
-    col.add_theme_constant_override("separation", 8);
-    _new_panel.add_child(col);
+    var outer:VBoxContainer = VBoxContainer.new();       # heading and buttons stay put, the options between them scroll
+    outer.add_theme_constant_override("separation", 8);
+    _new_panel.add_child(outer);
     var heading:Label = Label.new();
     heading.text = "New Game";
     heading.add_theme_font_size_override("font_size", 24);
     heading.add_theme_color_override("font_color", GOLD);
-    col.add_child(heading);
+    outer.add_child(heading);
+    var scroll:ScrollContainer = ScrollContainer.new();
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    scroll.custom_minimum_size.y = clampf(get_viewport().get_visible_rect().size.y - 340.0, 200.0, 620.0);
+    outer.add_child(scroll);
+    _new_scroll = scroll;
+    var col:VBoxContainer = VBoxContainer.new();
+    col.add_theme_constant_override("separation", 8);
+    col.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    scroll.add_child(col);
     var row:HBoxContainer = HBoxContainer.new();
     row.add_theme_constant_override("separation", 8);
     col.add_child(row);
@@ -219,6 +261,41 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     _diff_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
     _diff_text.custom_minimum_size = Vector2(400, 64);
     col.add_child(_diff_text);
+    _size_pick = OptionButton.new();
+    for i in Terrain.MAP_SIZES.size():
+        _size_pick.add_item("%s (%d x %d)" % [Terrain.MAP_SIZE_NAMES[i], Terrain.MAP_SIZES[i], Terrain.MAP_SIZES[i]]);
+    _size_pick.select(Terrain.MAP_SIZES.find(Terrain.DEFAULT_SIZE));
+    _setup_row(col, "Map size", _size_pick);
+    _river_pick = OptionButton.new();
+    for id in Terrain.RIVER_STYLES:
+        _river_pick.add_item(Terrain.RIVER_STYLES[id]["name"], id);
+    _river_pick.select(_river_pick.get_item_index(Terrain.RiverStyle.WINDING));
+    _river_pick.item_selected.connect(func(_i:int) -> void: _show_river_text());
+    _setup_row(col, "Water", _river_pick);
+    _river_text = Label.new();
+    _river_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _river_text.custom_minimum_size = Vector2(400, 0);
+    _river_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.7));
+    col.add_child(_river_text);
+    _show_river_text();
+    _climate_pick = OptionButton.new();
+    for id in Climate.DEFS:
+        _climate_pick.add_item(Climate.name_of(id), id);
+    _climate_pick.select(_climate_pick.get_item_index(Climate.Id.TEMPERATE));
+    _climate_pick.item_selected.connect(func(_i:int) -> void: _show_climate_text());
+    _setup_row(col, "Climate", _climate_pick);
+    _climate_text = Label.new();
+    _climate_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _climate_text.custom_minimum_size = Vector2(400, 0);
+    _climate_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.7));
+    col.add_child(_climate_text);
+    _climate_warn = Label.new();
+    _climate_warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    _climate_warn.custom_minimum_size = Vector2(400, 0);
+    _climate_warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.4));
+    col.add_child(_climate_warn);
+    _show_climate_text();
+    _build_rules(col);
     var seed_row:HBoxContainer = HBoxContainer.new();
     col.add_child(seed_row);
     var seed_label:Label = Label.new();
@@ -237,7 +314,7 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     col.add_child(_choose_start);
     var buttons:HBoxContainer = HBoxContainer.new();
     buttons.add_theme_constant_override("separation", 8);
-    col.add_child(buttons);
+    outer.add_child(buttons);
     var back:Button = Button.new();
     back.text = "Back";
     back.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
@@ -250,18 +327,86 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     buttons.add_child(start);
     _pick_difficulty(&"normal");
 
+func _setup_row(col:Container, text:String, control:Control) -> void:
+    var row:HBoxContainer = HBoxContainer.new();
+    var l:Label = Label.new();
+    l.text = text;
+    l.custom_minimum_size.x = 90;
+    row.add_child(l);
+    control.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    row.add_child(control);
+    col.add_child(row);
+
+func _show_river_text() -> void:
+    _river_text.text = Terrain.RIVER_STYLES[_river_pick.get_selected_id()]["desc"];
+
+# Realism mode and a folded "Custom rules" block (settlers, supplies, merchants, droughts) on top of the preset.
+@warning_ignore("integer_division")
+func _build_rules(col:Container) -> void:
+    _realism_check = CheckBox.new();
+    _realism_check.text = "Realism mode";
+    _realism_check.tooltip_text = "Slower days (a day lasts 6 real minutes at normal speed) and citizens age at the pace of the calendar: a citizen year is a whole game year, so children take 18 years to grow up.";
+    col.add_child(_realism_check);
+    var toggle:Button = Button.new();
+    toggle.text = "Custom rules...";
+    toggle.toggle_mode = true;
+    toggle.tooltip_text = "Settlers, starting supplies, merchants and droughts";
+    col.add_child(toggle);
+    _rules_box = VBoxContainer.new();
+    _rules_box.add_theme_constant_override("separation", 6);
+    _rules_box.visible = false;
+    col.add_child(_rules_box);
+    toggle.toggled.connect(func(on:bool) -> void: _rules_box.visible = on);
+    _start_pick = OptionButton.new();
+    for i in GameRules.START_NAMES.size():
+        _start_pick.add_item(GameRules.START_NAMES[i]);
+        _start_pick.set_item_tooltip(i, GameRules.START_DESCS[i]);
+    _start_pick.tooltip_text = "What the settlers arrive with besides their supply cart";
+    _start_pick.item_selected.connect(func(_i:int) -> void: _pick_difficulty(_difficulty));
+    _setup_row(_rules_box, "Start with", _start_pick);
+    _settlers_pick = OptionButton.new();
+    for n in GameRules.SETTLERS:
+        _settlers_pick.add_item("%d (%d children)" % [n, n / 4]);
+    _settlers_pick.select(GameRules.SETTLERS.find(12));
+    _setup_row(_rules_box, "Settlers", _settlers_pick);
+    _supplies_pick = OptionButton.new();
+    for i in GameRules.SUPPLY_NAMES.size():
+        _supplies_pick.add_item("%s (%d%%)" % [GameRules.SUPPLY_NAMES[i], roundi(GameRules.SUPPLY_SHARES[i] * 100.0)]);
+    _supplies_pick.select(2);
+    _setup_row(_rules_box, "Supplies", _supplies_pick);
+    _merchants_pick = OptionButton.new();
+    for n in GameRules.MERCHANT_NAMES:
+        _merchants_pick.add_item(n);
+    _merchants_pick.select(2);
+    _setup_row(_rules_box, "Merchants", _merchants_pick);
+    _droughts_check = CheckBox.new();
+    _droughts_check.text = "Droughts";
+    _droughts_check.button_pressed = true;
+    _droughts_check.tooltip_text = "Dry spells with no rain, extra heat and fast-drying ground";
+    _rules_box.add_child(_droughts_check);
+
+func _show_climate_text() -> void:
+    var d:Dictionary = Climate.DEFS[_climate_pick.get_selected_id()];
+    var t:Array = d["temps"];
+    _climate_text.text = "%s\nMean temperature: spring %d, summer %d, autumn %d, winter %d C." % [d["desc"], t[0], t[1], t[2], t[3]];
+    _climate_warn.text = "Warning: %s" % d["warning"] if d.has("warning") else "";
+    _climate_warn.visible = d.has("warning");
+    if d.has("warning") and _new_scroll != null:
+        _new_scroll.ensure_control_visible.call_deferred(_climate_warn);       # so a warning is never left below the fold
+
 func _pick_difficulty(id:StringName) -> void:
     _difficulty = id;
     (_diff_btns[id] as Button).set_pressed_no_signal(true);
     var d:Dictionary = Defs.DIFFICULTIES[id];
     var upgrades:PackedStringArray = [];
-    for up in d["town_hall"]:
+    var start:int = _start_pick.selected if _start_pick != null else GameRules.Start.HALL;
+    for up in (d["town_hall"] if start == GameRules.Start.HALL else []):
         upgrades.append(Defs.BUILDINGS[&"town_hall"]["upgrades"][up]["name"]);
     var seeds:PackedStringArray = [];
     for crop in d["seeds"]:
         seeds.append(Defs.CROPS[crop]["name"]);
     var trees:int = d.get("trees", 0);
-    _diff_text.text = "Town Hall: %s\nSeeds to start: %s%s" % [", ".join(upgrades) if not upgrades.is_empty() else "bare (build storage yourself)", ", ".join(seeds), "\nOrchard saplings: %d, chosen at random" % trees if trees > 0 else ""];
+    _diff_text.text = "%s\nSeeds to start: %s%s" % [("Town Hall: %s" % (", ".join(upgrades) if not upgrades.is_empty() else "bare (build storage yourself)")) if start == GameRules.Start.HALL else GameRules.START_DESCS[start], ", ".join(seeds), "\nOrchard saplings: %d, chosen at random" % trees if trees > 0 else ""];
 
 func _show_new_game() -> void:
     _menu.visible = false;
@@ -278,10 +423,52 @@ func _on_start() -> void:
     var text:String = _seed_edit.text.strip_edges();
     World.new_game_seed = text.to_int() if text.is_valid_int() and text.to_int() > 0 else (hash(text) % 1000000 if text != "" else 0);
     World.choose_start = _choose_start.button_pressed;
+    Terrain.set_size(Terrain.MAP_SIZES[_size_pick.selected]);
+    Terrain.river_style = _river_pick.get_selected_id();
+    Climate.current = _climate_pick.get_selected_id();
+    GameRules.start = _start_pick.selected;
+    GameRules.settlers = GameRules.SETTLERS[_settlers_pick.selected];
+    GameRules.supplies = _supplies_pick.selected;
+    GameRules.merchants = _merchants_pick.selected;
+    GameRules.droughts = _droughts_check.button_pressed;
+    GameRules.realism = _realism_check.button_pressed;
+    _launch();
+
+# The tutorial game: easy preset, a medium map with a winding river, mild weather (no droughts) and few merchants,
+# the player chooses where to settle, and the guide panel is attached to the HUD.
+func _on_tutorial() -> void:
+    Defs.difficulty = &"easy";
+    World.new_game_seed = 0;
+    World.choose_start = true;
+    Terrain.set_size(128);
+    Terrain.river_style = Terrain.RiverStyle.WINDING;
+    Climate.current = Climate.Id.TEMPERATE;
+    GameRules.reset();
+    GameRules.droughts = false;
+    GameRules.merchants = 1;
+    Tutorial.active = true;
+    _launch();
+
+func _show_scenarios() -> void:
+    var list:ScenarioList = ScenarioList.new();
+    _ui_root.add_child(list);
+    list.chosen.connect(func(id:StringName, randomize:bool) -> void:
+        Scenarios.apply(id, randomize);
+        list.queue_free();
+        _launch());
+
+func _launch() -> void:
     GameClock.reset();
     Weather.reset();
     GameClock.locked = false;
     get_tree().change_scene_to_file(SaveGame.MAIN_SCENE);
+
+func _show_load() -> void:
+    var panel:SavePanel = SavePanel.new(false);
+    _ui_root.add_child(panel);
+    panel.load_chosen.connect(func(slot:String) -> void:
+        _message.text = SaveGame.start_from_slot(get_tree(), slot);
+        panel.queue_free());
 
 func _on_continue() -> void:
     _message.text = SaveGame.start_from_slot(get_tree(), _continue_slot);

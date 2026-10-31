@@ -43,6 +43,7 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     hud._soil_toggle.toggled.connect(func(on:bool) -> void:
         if on:
             hud._water_toggle.button_pressed = false;
+            hud._slope_toggle.button_pressed = false;
         World.instance.terrain.set_soil_view(on);
         hud._refresh_info());
     hud._water_toggle = hud._panel_toggle(row, "Water");
@@ -50,7 +51,15 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     hud._water_toggle.toggled.connect(func(on:bool) -> void:
         if on:
             hud._soil_toggle.button_pressed = false;
+            hud._slope_toggle.button_pressed = false;
         World.instance.terrain.set_water_view(on));
+    hud._slope_toggle = hud._panel_toggle(row, "Slope");
+    hud._slope_toggle.tooltip_text = "Show how steep the ground is for building. Green is level, yellow and orange need levelling (the colony does it for you), red is too steep for a building.";
+    hud._slope_toggle.toggled.connect(func(on:bool) -> void:
+        if on:
+            hud._soil_toggle.button_pressed = false;
+            hud._water_toggle.button_pressed = false;
+        World.instance.terrain.set_slope_view(on));
     var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
     for i in labels.size():
         var b:Button = Button.new();
@@ -225,8 +234,11 @@ static func _build_menu(hud:HUD, root:Control) -> void:
     col.add_child(seed_label);
     var items:Array = [
         ["Resume", hud.toggle_menu],
-        ["Save (F5)", func() -> void: SaveGame.save(World.instance)],
-        ["Load (F9)", func() -> void: hud.toggle_menu(); SaveGame.load_slot(World.instance)],
+        ["Quicksave (F5)", func() -> void: SaveGame.save(World.instance)],
+        ["Quickload (F9)", func() -> void: hud.toggle_menu(); SaveGame.load_slot(World.instance)],
+        ["Save game...", func() -> void: _open_save_panel(hud, true)],
+        ["Load game...", func() -> void: _open_save_panel(hud, false)],
+        ["Settings...", func() -> void: hud._menu.add_child(SettingsPanel.new())],
         ["Quit to title", func() -> void: hud.get_tree().change_scene_to_file(hud.TITLE_SCENE)],
         ["Quit game", func() -> void: hud.get_tree().quit()],
     ];
@@ -236,6 +248,21 @@ static func _build_menu(hud:HUD, root:Control) -> void:
         b.focus_mode = Control.FOCUS_NONE;
         b.pressed.connect(item[1]);
         col.add_child(b);
+
+# The slot list over the Esc menu. Saving needs a placed Town Hall (the same rule as the quicksave).
+static func _open_save_panel(hud:HUD, saving:bool) -> void:
+    var world:World = World.instance;
+    if saving and world.awaiting_start:
+        hud.toast("Choose where to settle first.");
+        return;
+    var panel:SavePanel = SavePanel.new(saving);
+    hud._menu.add_child(panel);
+    panel.save_chosen.connect(func(slot:String) -> void:
+        SaveGame.save(world, slot);
+        panel.refresh("Saved as '%s'." % slot));
+    panel.load_chosen.connect(func(slot:String) -> void:
+        hud.toggle_menu();
+        SaveGame.load_slot(world, slot));
 
 # The colony-wide rules as check boxes in a panel of their own, opened by the top bar's Policies button.
 static func _build_policies_panel(hud:HUD, root:Control) -> void:

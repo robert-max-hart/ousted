@@ -21,6 +21,11 @@ func _process(_delta:float) -> void:
     _update_lighting();
     _update_precip();
 
+# Re-reads the player's settings (shadows).
+func apply_settings() -> void:
+    _sun.shadow_enabled = Settings.shadows_on();
+    _moon.shadow_enabled = Settings.shadows_on();
+
 func setup_environment() -> void:
     _sky = ProceduralSkyMaterial.new();
     var sky:Sky = Sky.new();
@@ -38,12 +43,12 @@ func setup_environment() -> void:
     add_child(we);
 
     _sun = DirectionalLight3D.new();
-    _sun.shadow_enabled = true;
+    _sun.shadow_enabled = Settings.shadows_on();
     _sun.shadow_opacity = 0.8;
     _sun.directional_shadow_max_distance = 140.0;
     add_child(_sun);
     _moon = DirectionalLight3D.new();
-    _moon.shadow_enabled = true;
+    _moon.shadow_enabled = Settings.shadows_on();
     _moon.shadow_opacity = 0.6;
     _moon.directional_shadow_max_distance = 140.0;
     _moon.light_color = Color(0.6, 0.72, 1.0);

@@ -147,8 +147,8 @@ func start_relocate(b:Building) -> void:
 # A new game waiting for the player to choose the start: the Town Hall ghost follows the cursor, and cancelling the tool
 # brings it back (there is nothing else to do yet).
 func begin_start_mode() -> void:
-    set_mode(Mode.BUILD, &"town_hall");
-    hint = "Choose where to settle: click to place your Town Hall (R turns it). Level ground near water and some forest does best. Drag the right mouse button to look around.";
+    set_mode(Mode.BUILD, GameRules.start_def());
+    hint = "Choose where to settle: click to place your %s (R turns it). Level ground near water and some forest does best. Drag the right mouse button to look around." % Defs.BUILDINGS[GameRules.start_def()]["name"];
 
 # Starts placing another building like b: the same kind, size and facing.
 func start_copy(b:Building) -> void:
@@ -241,7 +241,7 @@ func _on_press() -> void:
                 error = World.instance.begin_colony(origin);
                 if error == "":
                     set_mode(Mode.SELECT);
-                    select(World.instance.town_hall);
+                    select(World.instance.start_building);
                 return;
             error = World.instance.can_place(build_id, origin, build_size, relocating != null, build_facing);
             if error == "" and relocating != null:

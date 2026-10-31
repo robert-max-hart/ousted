@@ -54,7 +54,7 @@ static func build(world:World, start:Vector2i) -> void:
     for b in placed:
         _lay_road(world, _door(b), _door(world.town_hall));
     var season:int = GameClock.season();
-    world.terrain.set_season(season);
+    world.terrain.set_season(Climate.look(season));
     world.renderer.update_foliage();
     world.renderer.mark_dirty();
     _place_camera(world, start, rng);

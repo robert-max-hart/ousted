@@ -128,8 +128,12 @@ func on_day() -> void:
         return;
     if trading_post() == null or GameClock.day_index() - last_visit_day < MIN_GAP_DAYS:
         return;
-    if world.rng.randf() < VISITS_PER_SEASON / GameClock.DAYS_PER_SEASON:
+    if world.rng.randf() < daily_chance():
         start_visit();
+
+# The chance on any day that a merchant sets off (the New Game rules can make visits rarer or commoner).
+func daily_chance() -> float:
+    return VISITS_PER_SEASON / GameClock.DAYS_PER_SEASON * GameRules.merchant_share();
 
 # A merchant sets off for the Trading Post. Returns false when there is no post or no way in from the edge.
 func start_visit() -> bool:

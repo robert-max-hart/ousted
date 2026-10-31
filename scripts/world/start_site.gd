@@ -23,7 +23,7 @@ static func _find_start_cell(world:World) -> Vector2i:
             var near:Vector2 = world.terrain.rect_height_range(Rect2i(c - Vector2i(8, 8), Vector2i(16, 16)));
             var wide:Vector2 = world.terrain.rect_height_range(Rect2i(c - Vector2i(14, 14), Vector2i(28, 28)).intersection(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE)));
             var score:float = (hr.y - hr.x) * 4.0 + (near.y - near.x) * 3.0 + (wide.y - wide.x) * 1.5 + Vector2(c - center).length() * 0.1;
-            if not world.terrain.river_path.is_empty():       # settle by the river: close, but not on its bank
+            if not world.terrain.river_path.is_empty() or Terrain.river_style == Terrain.RiverStyle.COAST:       # settle by the river (or the sea): close, but not on its bank
                 var rd:float = minf(world.terrain.river_distance(c), 40.0);
                 score += absf(rd - world.START_RIVER_AT) * 0.7 + maxf(0.0, 9.0 - rd);
             if score < best_score:
@@ -64,24 +64,31 @@ static func _top_up(world:World, kind:StringName, start:Vector2i, near:float, fa
         free.remove_at(pick);
         have += 1;
 
-# Founds the colony around a start cell: the Town Hall (already built), its goods and the first settlers.
+# Founds the colony around a start cell: what it starts with (the Town Hall, a well or a supply cart: GameRules.start),
+# its goods and the first settlers.
 static func _found_colony(world:World, start:Vector2i) -> void:
     StartSite._ensure_start_rocks(world, start);
     StartSite._ensure_start_ore(world, start);
-    world.town_hall = world.place_building(&"town_hall", start - Vector2i(2, 2), Vector2i(4, 4), true);
+    var def:StringName = GameRules.start_def();
+    var size:Vector2i = Defs.BUILDINGS[def]["size"];
+    world.start_building = world.place_building(def, start - size / 2, size, true);
+    if def == &"town_hall":
+        world.town_hall = world.start_building;
     StartSite._start_colony_goods(world, start);
     world.seeds.grant_trees(world.rng);
-    Defs.ageing_days_per_year = 4.0;
+    Defs.ageing_days_per_year = GameRules.ageing_days();
     StartSite._spawn_settlers(world, start);
     world.jobs.sync_targets();
 
-# The player's choice of start (see awaiting_start): returns "" once the colony is founded with the Town Hall at origin,
-# else why that spot will not do.
+# The player's choice of start (see awaiting_start): returns "" once the colony is founded with its first building at
+# origin, else why that spot will not do.
 static func begin_colony(world:World, origin:Vector2i) -> String:
     if not world.awaiting_start:
         return "The colony is already founded";
-    var start:Vector2i = origin + Vector2i(2, 2);
-    var why:String = world.can_place(&"town_hall", origin, Vector2i(4, 4));
+    var def:StringName = GameRules.start_def();
+    var size:Vector2i = Defs.BUILDINGS[def]["size"];
+    var start:Vector2i = origin + size / 2;
+    var why:String = world.can_place(def, origin, size);
     if why != "":
         return why;
     StartSite._clear_nodes(world, start, 13);        # the hall's ground and the settlers' first yard are cleared of trees and rocks
@@ -91,7 +98,7 @@ static func begin_colony(world:World, origin:Vector2i) -> String:
     GameClock.set_speed(1);
     world.camera_rig._distance = 40.0;
     world.camera_rig._target_distance = 40.0;
-    world.camera_rig.focus_on(world.town_hall.position);
+    world.camera_rig.focus_on(world.start_building.position);
     world.notify("Your settlers have arrived. Spring has begun.");
     return "";
 
@@ -106,17 +113,32 @@ static func _clear_nodes(world:World, c:Vector2i, radius:int) -> void:
             world.remove_node(rn);
 
 # The starting upgrades of the chosen difficulty, then the starting goods: into the Town Hall's store room as far as it
-# goes, the rest in a supply cart beside it (gone once empty).
+# goes (with a well or nothing there is no store room), the rest in supply carts beside it (gone once empty).
 static func _start_colony_goods(world:World, start:Vector2i) -> void:
-    for id in Defs.DIFFICULTIES[Defs.difficulty]["town_hall"]:
-        world.town_hall.upgrades_done[id] = true;
+    var hall:Building = world.town_hall;
+    if hall != null:
+        for id in Defs.DIFFICULTIES[Defs.difficulty]["town_hall"]:
+            hall.upgrades_done[id] = true;
     var left:Dictionary = {};
     for item in world.START_STOCK:
-        var rest:int = world.START_STOCK[item] - world.town_hall.store(item, world.START_STOCK[item]);
+        var amount:int = roundi(world.START_STOCK[item] * GameRules.supply_share());
+        var rest:int = amount - (hall.store(item, amount) if hall != null else 0);
         if rest > 0:
             left[item] = rest;
     if left.is_empty():
         return;
+    var cart:Building = world.start_building if world.start_building.def_id == &"cart" else StartSite._place_cart(world, start);
+    for item in left:
+        var rest:int = left[item];
+        while rest > 0 and cart != null:
+            rest -= cart.store(item, rest);
+            if rest > 0:
+                cart = StartSite._place_cart(world, start);       # that one is full: another cart takes the rest
+    if cart == null:
+        world.notify("There was no room beside the settlers for all of the starting goods.")
+
+# A supply cart on open ground close to the start, or null if there is no room.
+static func _place_cart(world:World, start:Vector2i) -> Building:
     var size:Vector2i = Defs.BUILDINGS[&"cart"]["size"];
     for r in range(3, 14):
         for dz in range(-r, r + 1):
@@ -125,18 +147,16 @@ static func _start_colony_goods(world:World, start:Vector2i) -> void:
                     continue;
                 var o:Vector2i = start + Vector2i(dx, dz);
                 if world.can_place(&"cart", o, size) == "" and world._rect_free_of_nodes(Rect2i(o, size)):
-                    var cart:Building = world.place_building(&"cart", o, size, true);
-                    for item in left:
-                        cart.store(item, left[item]);
-                    return;
+                    return world.place_building(&"cart", o, size, true);
+    return null;
 
 static func _spawn_settlers(world:World, start:Vector2i) -> void:
     var used:Array[String] = [];
-    for i in world.START_PAWNS:
+    for i in GameRules.settlers:
         var c:Vector2i = world.nav.nearest_walkable(start + Vector2i(world.rng.randi_range(-4, 4), 3 + world.rng.randi_range(0, 2)), 6);
         var p:Pawn = Pawn.new();
         p.setup(world, c, world.rng, used);
-        if i >= world.START_PAWNS - world.START_CHILDREN:
+        if i >= GameRules.settlers - GameRules.children():
             p.age = world.rng.randi_range(6, 14) + world.rng.randf();
         used.append(p.first_name);
         if i < world.START_PROFESSIONS.size():

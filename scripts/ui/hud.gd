@@ -47,6 +47,7 @@ var _dismiss_btn:Button;               # send the merchant on their way early
 var _jobs_panel :PanelContainer;
 var _jobs_toggle:Button;
 var _water_toggle:Button;               # colours the ground by reach of water (where a Distillery or Potter's Workshop may go)
+var _slope_toggle:Button;              # colours the ground by how steep it is for building
 var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
 var _citizens_toggle:Button;
 var _log_toggle :Button;
@@ -104,6 +105,11 @@ func _ready() -> void:
     _build_info_panel(root);
     _build_log(root);
     _build_menu(root);
+    if Tutorial.active:
+        Tutorial.active = false;
+        Tutorial.attach(self, root);
+    elif World.instance.scenario != null:
+        ScenarioPanel.attach(self, root);
     _merchant_label = Label.new();
     _merchant_label.visible = false;
     _merchant_label.mouse_filter = Control.MOUSE_FILTER_STOP;
@@ -707,6 +713,9 @@ func toggle_menu() -> void:
 
 
 # A HUD panel. With an id it can be dragged by the strip along its top edge (see PanelMover).
+func world_camera() -> RTSCamera:
+    return World.instance.camera_rig;
+
 func _panel(root:Control, id:StringName = &"") -> PanelContainer:
     var p:PanelContainer = PanelContainer.new();
     p.mouse_filter = Control.MOUSE_FILTER_STOP;

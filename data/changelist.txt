@@ -3,6 +3,20 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.5.1 | 30 Oct 2026 | Meta, part 1: save slots, settings, new map and game options, a tutorial and scenarios
+- The Esc menu has "Save game..." and "Load game...": save under any name, pick from a list of saves (newest first, with the date and citizen count) and delete old ones. F5 and F9 still quicksave and quickload.
+- The title screen has a "Load Game" button that opens the same list.
+- New Settings screen (title and Esc menu): grass tufts (off, low, normal, dense), shadows, fullscreen and vertical sync. Saved between runs.
+- New Game lets you pick the map size (Small 96, Medium 128, Large 160, Huge 192 cells a side) and the river: none, gentle, winding, wild or wide. Saves remember both; older saves load as a Large map with the winding river.
+- The River choice on New Game is now "Water" and has two new layouts: Wetlands (most of the map is shallow, wadeable water with islands, and a dry rise to start on) and Coast (one side of the map is open ocean with a wandering shoreline).
+- New Game has a Realism mode (days last twice as long in real time, and citizens age at the pace of the calendar: a citizen year is a game year) and a Custom rules block: starting settlers (6 to 20), starting supplies (50% to 200%), merchant visits (none to frequent) and droughts on or off. The New Game panel scrolls on small screens, and its Start button stays in view.
+- New Scenarios button on the title screen: five preset games with goals (Riverside Beginnings, Dry Season, The Wetlands, The Coast, Bare Hands). Each has its own fixed map, so everyone plays the same one, with a check box to draw a random map instead. A goals panel in the game ticks goals off as you reach them, a victory message comes when all are done (you can keep playing), and completed scenarios are marked in the list.
+- The Load Game, Settings and Scenarios windows now draw over the title menu.
+- New Tutorial button on the title screen: a guided first game (easy start, medium map, no droughts) with a panel that walks through 15 steps (look around, settle, time, wood, a house, roads, a field, overlays, jobs, firewood, saving) and moves on by itself as you do each thing. Any step can be skipped and the tutorial ended at any time.
+- Custom rules has a new "Start with" choice: Town Hall (as before), Well (only a well) or Nothing (no buildings at all). Whatever does not fit in the Town Hall, or all of it without one, starts in supply carts, and you place the first building (or the cart) when you choose where to settle. A Town Hall can still be built later.
+- New top bar button "Slope" (beside Soil and Water, only one overlay at a time) colours the ground by how steep it is for building: green is level, yellow and orange need levelling, red is too steep.
+- New Game also picks a climate: Temperate (as before), Arctic (short cool summers, brutal winters), Desert (hot, dry, droughts, thin woods) or Tropical (warm all year with frequent rain, thick woods, fast spoilage). Hot climates show no winter look.
+
 # 0.5.0 | 30 Oct 2026 | Trade is complete: one-tile bridges, a fishing pier and playtest 4 fixes
 - This build closes the trade milestone: merchants and merchant types, barter, luxury goods, seeds and animals for sale, a trade history, rivers, bridges and fishing.
 - Crop fields now cost wood and graveyards cost stone (the cost grows with the length of their fence or wall).

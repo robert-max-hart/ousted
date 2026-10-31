@@ -14,6 +14,7 @@ const AUTOSAVE  :String = "autosave";
 const MAIN_SCENE:String = "res://scenes/main.tscn";
 
 static var autosave_enabled:bool = true;
+static var saves_written:int = 0;          # how many times a game was written this session (the tutorial watches it)
 
 static func path_for(slot:String) -> String:
     return "%s/%s.sav" % [DIR, slot];
@@ -29,8 +30,16 @@ static func write(world:World, slot:String) -> String:
         return "Couldn't write the save file (error %d)." % FileAccess.get_open_error();
     var data:Dictionary = world.serialize();
     data["version"] = VERSION;
+    data["meta"] = {
+        "name": slot,
+        "date": GameClock.date_string(),
+        "pawns": world.pawns.size(),
+        "seed": world.world_seed,
+        "saved_at": Time.get_unix_time_from_system(),
+    };
     f.store_var(data);
     f.close();
+    saves_written += 1;
     return "";
 
 # Returns the saved data, or an empty dictionary (with the reason in `error`).
@@ -60,9 +69,45 @@ static func loadable(slot:String) -> bool:
     var error:Array = [];
     return not read(slot, error).is_empty();
 
+# Slot names become file names, so keep letters, digits, spaces, dashes and underscores.
+static func clean_name(text:String) -> String:
+    var out:String = "";
+    for ch in text.strip_edges():
+        if ch == " " or ch == "-" or ch == "_" or (ch >= "0" and ch <= "9") or (ch.to_lower() != ch.to_upper()):
+            out += ch;
+    return out.substr(0, 32).strip_edges();
+
+# Every save on disk, newest first: {slot, date, pawns, seed, saved_at, ok}. Old saves have no meta.
+static func list_slots() -> Array:
+    var rows:Array = [];
+    var dir:DirAccess = DirAccess.open(DIR);
+    if dir == null:
+        return rows;
+    for file in dir.get_files():
+        if not file.ends_with(".sav"):
+            continue;
+        var slot:String = file.get_basename();
+        var error:Array = [];
+        var data:Dictionary = read(slot, error);
+        var meta:Dictionary = data.get("meta", {}) as Dictionary;
+        rows.append({
+            "slot": slot,
+            "ok": not data.is_empty(),
+            "date": meta.get("date", ""),
+            "pawns": meta.get("pawns", 0),
+            "seed": meta.get("seed", 0),
+            "saved_at": meta.get("saved_at", FileAccess.get_modified_time(path_for(slot))),
+        });
+    rows.sort_custom(func(a:Dictionary, b:Dictionary) -> bool: return a["saved_at"] > b["saved_at"]);
+    return rows;
+
+static func delete(slot:String) -> void:
+    if exists(slot):
+        DirAccess.remove_absolute(path_for(slot));
+
 static func save(world:World, slot:String = QUICKSAVE) -> void:
     if world.awaiting_start:
-        world.hud.toast("Place the Town Hall first.");
+        world.hud.toast("Choose where to settle first.");
         return;
     var err:String = write(world, slot);
     world.notify("Game saved." if err == "" else err);
