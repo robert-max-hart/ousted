@@ -4,18 +4,26 @@
 #     world space so it follows the ground (posts stand at the
 #     corner heights, rails slope between them). Decoration only:
 #     citizens still walk through. One gap on the south side is the
-#     gate. It shows while the building is finished and is rebuilt
-#     when the terrain changes (Building.on_terrain_changed).
-#     Kinds: wood (posts and two rails), stone (a low wall with
-#     piers), rope (short posts and one rope, for stockpiles).
+#     gate, marked by a taller post at each end. It shows while the
+#     building is finished and is rebuilt when the terrain changes
+#     (Building.on_terrain_changed). The pieces are models
+#     (assets/models/structures, made by tools/make_structures.py):
+#     a post, a one-cell rail that is stretched to the slope, and a
+#     gate post.
+#     Kinds: wood (posts and two rails), field (low, for crop fields),
+#     stone (a low wall with piers), rope (short posts and one rope,
+#     for stockpiles).
 # ----------------------------------------------------------------
 class_name Fence extends Node3D;
+
+const DIR:String = "res://assets/models/structures/";
 
 var _b          :Building;
 var _kind       :StringName;
 var _gap        :int;
 var _posts      :MultiMeshInstance3D;
 var _rails      :MultiMeshInstance3D;
+var _gates      :MultiMeshInstance3D;
 var _was_done   :bool = false;
 
 func _init(b:Building, kind:StringName, gap:int = 1) -> void:
@@ -23,36 +31,25 @@ func _init(b:Building, kind:StringName, gap:int = 1) -> void:
     _kind = kind;
     _gap = gap;
     top_level = true;
-    var post_size:Vector3 = Vector3(0.1, 0.9, 0.1);
-    var rail_size:Vector3 = Vector3(1.0, 0.07, 0.05);
     var tex:StringName = &"planks";
     var tint:Color = Color(0.62, 0.5, 0.36);
     match kind:
         &"stone":
-            post_size = Vector3(0.26, 0.62, 0.26);
-            rail_size = Vector3(1.0, 0.42, 0.16);
             tex = &"stone";
             tint = Color(0.62, 0.6, 0.57);
-        &"field":
-            post_size = Vector3(0.08, 0.5, 0.08);
-            rail_size = Vector3(1.0, 0.05, 0.04);
         &"rope":
-            post_size = Vector3(0.1, 0.6, 0.1);
-            rail_size = Vector3(1.0, 0.03, 0.03);
             tint = Color(0.5, 0.4, 0.3);
-    _posts = _layer(post_size, tex, tint);
-    var rail_tex:StringName = tex;
-    var rail_tint:Color = Color(0.74, 0.66, 0.46) if kind == &"rope" else tint;
-    _rails = _layer(rail_size, rail_tex, rail_tint);
+    _posts = _layer(&"post", tex, tint);
+    _gates = _layer(&"gate", tex, tint);
+    _rails = _layer(&"rail", tex, Color(0.74, 0.66, 0.46) if kind == &"rope" else tint);
 
-func _layer(dims:Vector3, tex:StringName, tint:Color) -> MultiMeshInstance3D:
-    var box:BoxMesh = BoxMesh.new();
-    box.size = dims;
+func _layer(part:StringName, tex:StringName, tint:Color) -> MultiMeshInstance3D:
     var mm:MultiMesh = MultiMesh.new();
     mm.transform_format = MultiMesh.TRANSFORM_3D;
-    mm.mesh = box;
+    mm.mesh = load("%sfence_%s_%s.obj" % [DIR, _kind, part]) as Mesh;
     var mat:StandardMaterial3D = SurfaceTextures.material(tex, tint);
     mat.uv1_world_triplanar = true;
+    mat.vertex_color_use_as_albedo = true;           # the models shade their parts (nails, stone courses, caps)
     var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
     mmi.multimesh = mm;
     mmi.material_override = mat;
@@ -69,8 +66,9 @@ func _process(_delta:float) -> void:
 func rebuild() -> void:
     var t:Terrain = _b.world.terrain;
     var r:Rect2i = _b.rect();
-    var post_h:float = (_posts.multimesh.mesh as BoxMesh).size.y;
-    var rail_h:float = (_rails.multimesh.mesh as BoxMesh).size.y;
+    var post_aabb:AABB = _posts.multimesh.mesh.get_aabb();
+    var gate_aabb:AABB = _gates.multimesh.mesh.get_aabb();
+    var rail_h:float = _rails.multimesh.mesh.get_aabb().size.y;
     var gate:int = r.position.x + r.size.x / 2 - _gap / 2;
     # edges as pairs of corner points
     var edges:Array = [];
@@ -85,16 +83,31 @@ func rebuild() -> void:
     for e in edges:
         points[e[0]] = true;
         points[e[1]] = true;
+    var gate_posts:Array[Vector2i] = [];
+    if _kind == &"wood" or _kind == &"stone":
+        gate_posts.append(Vector2i(gate, r.end.y));
+        gate_posts.append(Vector2i(gate + _gap, r.end.y));
     var rails_per:int = 2 if _kind == &"wood" or _kind == &"field" else 1;
     var pm:MultiMesh = _posts.multimesh;
-    pm.instance_count = points.size();
-    var i:int = 0;
+    var gm:MultiMesh = _gates.multimesh;
+    gm.instance_count = 0;
+    var plain:Array[Vector2i] = [];
+    var tall:Array[Vector2i] = [];
     for p in points:
-        pm.set_instance_transform(i, Transform3D(Basis(), Vector3(p.x, t.corner(p.x, p.y) + post_h * 0.5 - 0.05, p.y)));
-        i += 1;
+        if p in gate_posts:
+            tall.append(p);
+        else:
+            plain.append(p);
+    pm.instance_count = plain.size();
+    for i in plain.size():
+        pm.set_instance_transform(i, _post_at(t, plain[i], -post_aabb.position.y));
+    gm.instance_count = tall.size();
+    for i in tall.size():
+        gm.set_instance_transform(i, _post_at(t, tall[i], -gate_aabb.position.y));
     var rm:MultiMesh = _rails.multimesh;
     rm.instance_count = edges.size() * rails_per;
-    i = 0;
+    var post_h:float = post_aabb.size.y;
+    var i:int = 0;
     for e in edges:
         var a:Vector3 = Vector3(e[0].x, t.corner(e[0].x, e[0].y), e[0].y);
         var b:Vector3 = Vector3(e[1].x, t.corner(e[1].x, e[1].y), e[1].y);
@@ -108,3 +121,8 @@ func rebuild() -> void:
         for hgt in heights:
             rm.set_instance_transform(i, Transform3D(basis, mid + Vector3(0, hgt, 0)));
             i += 1;
+
+# A post at a corner of the ground, standing on it (the model's foot is `below` under its origin), turned a little at random so they are not all alike.
+func _post_at(t:Terrain, p:Vector2i, below:float) -> Transform3D:
+    var yaw:float = float(hash(p) & 0xff) / 255.0 * 0.6;
+    return Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, t.corner(p.x, p.y) + below - 0.05, p.y));

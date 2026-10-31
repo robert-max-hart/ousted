@@ -17,6 +17,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     reserved.resize(plot_count());
     var mat:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.72, 0.72, 0.74));
     mat.uv1_world_triplanar = true;
+    mat.vertex_color_use_as_albedo = true;           # the models shade the inscriptions, the mound and the flowers
     for shape in _shapes():
         var mm:MultiMesh = MultiMesh.new();
         mm.transform_format = MultiMesh.TRANSFORM_3D;
@@ -178,31 +179,13 @@ func info_text() -> String:
 func help_text() -> String:
     return "%s\nGraves are freed after %d years.\nCan't be demolished while graves are in use." % [super.help_text(), roundi(Defs.GRAVE_DECAY_YEARS)];
 
-# Headstone meshes, each standing on y = 0 (the ground).
-static func _shapes() -> Array[ArrayMesh]:
-    var mat:StandardMaterial3D = StandardMaterial3D.new();       # parts carry no look of their own: the layer's material replaces it
-    var slab:ArrayMesh = ArrayMesh.new();
-    var box:BoxMesh = BoxMesh.new();
-    box.size = Vector3(0.4, 0.7, 0.12);
-    ResourceRenderer.add_part(slab, box, Transform3D(Basis(), Vector3(0, 0.35, 0)), mat);
-    var rounded:ArrayMesh = ArrayMesh.new();
-    var body:BoxMesh = BoxMesh.new();
-    body.size = Vector3(0.38, 0.5, 0.12);
-    ResourceRenderer.add_part(rounded, body, Transform3D(Basis(), Vector3(0, 0.25, 0)), mat);
-    var top:CylinderMesh = CylinderMesh.new();
-    top.top_radius = 0.19;
-    top.bottom_radius = 0.19;
-    top.height = 0.12;
-    top.radial_segments = 10;
-    ResourceRenderer.add_part(rounded, top, Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0.5, 0)), mat);
-    var cross:ArrayMesh = ArrayMesh.new();
-    var upright:BoxMesh = BoxMesh.new();
-    upright.size = Vector3(0.1, 0.8, 0.1);
-    ResourceRenderer.add_part(cross, upright, Transform3D(Basis(), Vector3(0, 0.4, 0)), mat);
-    var arm:BoxMesh = BoxMesh.new();
-    arm.size = Vector3(0.38, 0.1, 0.1);
-    ResourceRenderer.add_part(cross, arm, Transform3D(Basis(), Vector3(0, 0.55, 0)), mat);
-    return [slab, rounded, cross];
+# Headstone meshes (assets/models/structures, made by tools/make_structures.py), each standing on y = 0 (the ground): a slab, a round-topped
+# stone and a cross, each on a little mound.
+static func _shapes() -> Array[Mesh]:
+    var out:Array[Mesh] = [];
+    for k in 3:
+        out.append(load("%sheadstone_%d.obj" % [Fence.DIR, k]) as Mesh);
+    return out;
 
 func _rebuild_stones() -> void:
     var by_shape:Array = [[], [], []];

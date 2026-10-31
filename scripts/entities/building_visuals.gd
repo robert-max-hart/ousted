@@ -104,28 +104,40 @@ static func _fit_to_footprint(b:Building) -> void:
     b.fit_shift = Vector3(-mid.x * fit, 0.0, -mid.y * fit).rotated(Vector3.UP, b.rotation.y);
     b.position += b.fit_shift;
 
-# A plank deck with a low rail along each long side, standing on posts down to the water.
+# A plank deck with a handrail along each long side and stilts down to the water, tiled from cell-long pieces (assets/models/structures,
+# made by tools/make_structures.py) to the length that was dragged out.
 static func _build_bridge(b:Building, h:float) -> void:
-    var deck:BoxMesh = BoxMesh.new();
-    deck.size = Vector3(b.vsize.x, h, b.vsize.y);
     var top:float = b.DECK_HEIGHT;
-    b._body = b._add_mesh(deck, b._body_mat, Vector3(0, top - h * 0.5, 0));
+    var along_x:bool = b.vsize.x >= b.vsize.y;
+    var length:int = maxi(b.vsize.x, b.vsize.y);
+    var width:float = float(mini(b.vsize.x, b.vsize.y));
+    var turn:Basis = Basis(Vector3.UP, 0.0 if along_x else PI * 0.5);
+    var squeeze:Basis = turn * Basis.from_scale(Vector3(1.0, 1.0, width));         # (the pieces are one cell wide)
+    var dir:Vector3 = Vector3.RIGHT if along_x else Vector3.BACK;
+    var dir_xf:Callable = func(at:float, y:float, wide:bool) -> Transform3D:
+        return Transform3D(squeeze if wide else turn, dir * at + Vector3(0, y, 0));
+    var deck_mesh:Mesh = load("%sbridge_deck.obj" % Fence.DIR) as Mesh;
+    var rail_mesh:Mesh = load("%sbridge_rail.obj" % Fence.DIR) as Mesh;
+    var post_mesh:Mesh = load("%sbridge_post.obj" % Fence.DIR) as Mesh;
+    var stilt_mesh:Mesh = load("%sbridge_stilt.obj" % Fence.DIR) as Mesh;
+    var deck:MeshStamp = MeshStamp.new();
+    var rails:MeshStamp = MeshStamp.new();
+    for k in length:
+        var at:float = -length * 0.5 + k + 0.5;
+        deck.add(deck_mesh, dir_xf.call(at, 0.0, true));
+        rails.add(rail_mesh, dir_xf.call(at, top, true));
+    for j in range(0, length + 1):
+        if j % 2 == 0 or j == length:
+            rails.add(post_mesh, dir_xf.call(-length * 0.5 + j, top, true));
+    for j in range(1, length, 2):
+        rails.add(stilt_mesh, dir_xf.call(-length * 0.5 + j, top - h, true));
+    b._body_mat.vertex_color_use_as_albedo = true;
+    b._body = b._add_mesh(deck.build(b._body_mat), b._body_mat, Vector3(0, top - h * 0.5, 0));
     b._body_y0 = top - h;
     b._body_h = h;
-    var along_x:bool = b.vsize.x >= b.vsize.y;
-    var rail_mat:StandardMaterial3D = b._flat_mat(Color(0.36, 0.26, 0.16));
-    var post:BoxMesh = BoxMesh.new();
-    post.size = Vector3(0.14, 0.5, 0.14);
-    var rail:BoxMesh = BoxMesh.new();
-    rail.size = Vector3(b.vsize.x if along_x else 0.08, 0.07, 0.08 if along_x else b.vsize.y);
-    for side in [-1.0, 1.0]:
-        var off:float = (b.vsize.y if along_x else b.vsize.x) * 0.5 - 0.08;
-        b.add_decor(rail, rail_mat, Vector3(0.0 if along_x else side * off, top + 0.42, side * off if along_x else 0.0));
-        var length:float = b.vsize.x if along_x else b.vsize.y;
-        var n:int = maxi(2, int(length / 2.0) + 1);
-        for k in n:
-            var along:float = lerpf(-length * 0.5 + 0.1, length * 0.5 - 0.1, float(k) / float(n - 1));
-            b.add_decor(post, rail_mat, Vector3(along if along_x else side * off, top + 0.25, side * off if along_x else along));
+    var flat:StandardMaterial3D = b._flat_mat(Color.WHITE);
+    flat.vertex_color_use_as_albedo = true;
+    b.add_decor(rails.build(flat), flat, Vector3.ZERO);
 
 # The shapes of a building with no model files: plain boxes.
 static func _build_boxes_cart(b:Building, h:float) -> void:
