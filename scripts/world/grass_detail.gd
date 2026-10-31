@@ -15,6 +15,8 @@ class_name GrassDetail extends Node3D;
 const BLOCK         :int = 16;
 const DENSITY       :float = 2.4;       # tufts per grassy cell (the knob if it costs too much frame rate)
 const WINTER_SHARE  :float = 0.3;       # share of the tufts that still stick out of the snow
+const GRASS_SWAY    :float = 0.07;      # metres the tips bend in calm weather
+const GRASS_HEIGHT  :float = 0.2;       # (a blade is 0.2 tall)
 const DRAW_DISTANCE :float = 52.0;      # metres from the camera to a block's middle
 const REBUILDS_PER_FRAME:int = 4;
 const BY_SEASON     :Array[Color] = [
@@ -25,17 +27,12 @@ var _world      :World;
 var _blocks     :Dictionary = {};       # block index (Vector2i) -> MultiMeshInstance3D
 var _spots      :Dictionary = {};       # block index -> PackedVector3Array of its tuft positions (the render server keeps them in a buffer that can't be read back)
 var _dirty      :Array[Vector2i] = [];
-var _mat        :StandardMaterial3D;
+var _mat        :ShaderMaterial;
 var _mesh       :ArrayMesh;
 
 func _init(w:World) -> void:
     _world = w;
-    _mat = StandardMaterial3D.new();
-    _mat.vertex_color_use_as_albedo = true;
-    _mat.vertex_color_is_srgb = true;
-    _mat.roughness = 1.0;
-    _mat.cull_mode = BaseMaterial3D.CULL_DISABLED;
-    _mat.albedo_color = BY_SEASON[Climate.look(GameClock.season())];
+    _mat = WindSway.make(BY_SEASON[Climate.look(GameClock.season())], GRASS_SWAY, GRASS_HEIGHT, true);       # blades sway in the wind (WindSway)
     _mesh = _make_tuft();
 
 func _ready() -> void:
@@ -47,7 +44,7 @@ func _ready() -> void:
             _dirty.append(Vector2i(bx, bz));
 
 func _on_season(s:int) -> void:
-    _mat.albedo_color = BY_SEASON[Climate.look(s)];
+    WindSway.set_color(_mat, BY_SEASON[Climate.look(s)]);
     reload();       # the winter cover differs, so every block is rebuilt
 
 # Rebuilds every block (a season change, or the density setting).

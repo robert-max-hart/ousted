@@ -30,22 +30,37 @@ const BUSH_BY_SEASON:Array[Color] = [
     Color(0.3, 0.55, 0.22), Color(0.28, 0.5, 0.2), Color(0.55, 0.42, 0.2), Color(0.45, 0.42, 0.38),
 ];
 
+# How far things bend in the wind: metres at the given height (the mesh's own units) in calm weather.
+const PINE_SWAY :float = 0.12;
+const PINE_HEIGHT:float = 3.2;
+const OAK_SWAY  :float = 0.10;
+const OAK_HEIGHT:float = 2.4;
+const BUSH_SWAY :float = 0.04;
+const BUSH_HEIGHT:float = 0.7;
+const HAZEL_SWAY:float = 0.07;
+const HAZEL_HEIGHT:float = 1.8;
+
 var _layers     :Dictionary = {};   # kind -> MultiMeshInstance3D
 var _markers    :MultiMeshInstance3D;
-var _canopy_mat :StandardMaterial3D;
+var _canopy_mat :ShaderMaterial;
 const PICKED_MUSHROOM:StringName = &"mushroom_picked";       # a render layer, not a resource kind
-var _bush_mat   :StandardMaterial3D;
-var _oak_leaf_mat:StandardMaterial3D;
+var _bush_mat   :ShaderMaterial;
+var _oak_leaf_mat:ShaderMaterial;
 var _berries    :MultiMeshInstance3D;      # berries on the bushes that have fruit, one clump per bush
 var _oak_leaves :MultiMeshInstance3D;      # follows the oak layer's instances, hidden in winter
 var _dirty      :bool = true;
 var _preview_rect:Rect2i = Rect2i();
 var _preview_filter:Callable = Callable();
 func _ready() -> void:
-    _canopy_mat = _make_material(CANOPY_BY_SEASON[0]);
-    _bush_mat = _make_material(BUSH_BY_SEASON[0]);
-    _oak_leaf_mat = _make_material(OAK_LEAVES[0][1]);
-    var trunk_mat:StandardMaterial3D = _make_material(Color(0.4, 0.27, 0.17));
+    # trees, bushes and their trunks sway in the wind (WindSway); a trunk and its crown bend by the same rule, so they stay joined
+    _canopy_mat = WindSway.make(CANOPY_BY_SEASON[0], PINE_SWAY, PINE_HEIGHT);
+    _bush_mat = WindSway.make(BUSH_BY_SEASON[0], BUSH_SWAY, BUSH_HEIGHT);
+    _oak_leaf_mat = WindSway.make(OAK_LEAVES[0][1], OAK_SWAY, OAK_HEIGHT);
+    var trunk_color:Color = Color(0.4, 0.27, 0.17);
+    var trunk_mat:ShaderMaterial = WindSway.make(trunk_color, PINE_SWAY, PINE_HEIGHT);
+    var oak_trunk_mat:ShaderMaterial = WindSway.make(trunk_color, OAK_SWAY, OAK_HEIGHT);
+    var twig_mat:ShaderMaterial = WindSway.make(trunk_color, BUSH_SWAY, BUSH_HEIGHT);
+    var hazel_stem_mat:ShaderMaterial = WindSway.make(trunk_color, HAZEL_SWAY, HAZEL_HEIGHT);
 
     var tree:ArrayMesh = ArrayMesh.new();
     var trunk:CylinderMesh = CylinderMesh.new();
@@ -81,14 +96,14 @@ func _ready() -> void:
     oak_trunk.bottom_radius = 0.22;
     oak_trunk.height = 1.5;
     oak_trunk.radial_segments = 6;
-    add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), trunk_mat);
+    add_part(oak, oak_trunk, Transform3D(Basis(), Vector3(0, 0.75, 0)), oak_trunk_mat);
     var oak_flare:CylinderMesh = CylinderMesh.new();      # buttress roots at the foot
     oak_flare.top_radius = 0.22;
     oak_flare.bottom_radius = 0.4;
     oak_flare.height = 0.3;
     oak_flare.radial_segments = 6;
     oak_flare.rings = 1;
-    add_part(oak, oak_flare, Transform3D(Basis(), Vector3(0, 0.15, 0)), trunk_mat, Color(0.85, 0.85, 0.85));
+    add_part(oak, oak_flare, Transform3D(Basis(), Vector3(0, 0.15, 0)), oak_trunk_mat, Color(0.85, 0.85, 0.85));
     for i in 3:                                  # bare boughs, all that shows in winter
         var bough:CylinderMesh = CylinderMesh.new();
         bough.top_radius = 0.03;
@@ -97,7 +112,7 @@ func _ready() -> void:
         bough.radial_segments = 4;
         var yaw:float = i * TAU / 3.0;
         var lean:Basis = Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, 0.6);
-        add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), trunk_mat);
+        add_part(oak, bough, Transform3D(lean, Vector3(0, 1.3, 0) + lean * Vector3(0, 0.65, 0)), oak_trunk_mat);
     var oak_canopy:ArrayMesh = ArrayMesh.new();
     # a crown of overlapping lobes, the upper ones lighter
     var lobes:Array = [[Vector3(0, 2.6, 0), 0.95, 1.0], [Vector3(0.7, 2.25, 0.2), 0.7, 0.9], [Vector3(-0.65, 2.3, -0.3), 0.72, 0.95],
@@ -147,7 +162,7 @@ func _ready() -> void:
         twig.radial_segments = 3;
         twig.rings = 1;
         var lean:Basis = Basis(Vector3.UP, k * 1.9) * Basis(Vector3.RIGHT, 0.55);
-        add_part(bush, twig, Transform3D(lean, Vector3(0, 0.1, 0) + lean * Vector3(0, 0.12, 0)), trunk_mat, Color(0.8, 0.8, 0.8));
+        add_part(bush, twig, Transform3D(lean, Vector3(0, 0.1, 0) + lean * Vector3(0, 0.12, 0)), twig_mat, Color(0.8, 0.8, 0.8));
 
     var cap_shape:SphereMesh = SphereMesh.new();
     cap_shape.radius = 0.22;
@@ -176,7 +191,7 @@ func _ready() -> void:
         stump.rings = 1;
         add_part(picked, stump, Transform3D(Basis(), at + Vector3(0, 0.02, 0)), stem_mat, Color(0.8, 0.75, 0.65));
     var hazel:ArrayMesh = ArrayMesh.new();
-    var hazel_mat:StandardMaterial3D = _make_material(Color(0.6, 0.58, 0.2));
+    var hazel_mat:ShaderMaterial = WindSway.make(Color(0.6, 0.58, 0.2), HAZEL_SWAY, HAZEL_HEIGHT);
     for k in 5:                                  # several tall stems rising from one stool
         var stem:CylinderMesh = CylinderMesh.new();
         stem.top_radius = 0.025;
@@ -185,7 +200,7 @@ func _ready() -> void:
         stem.radial_segments = 4;
         stem.rings = 1;
         var tilt:Basis = Basis(Vector3.UP, k * 2.1) * Basis(Vector3.RIGHT, 0.28);
-        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.65, 0)), trunk_mat);
+        add_part(hazel, stem, Transform3D(tilt, tilt * Vector3(0, 0.65, 0)), hazel_stem_mat);
     add_lobes(hazel, HAZEL_LOBES, hazel_mat);
 
     var berry_shape:SphereMesh = SphereMesh.new();
@@ -194,7 +209,7 @@ func _ready() -> void:
     berry_shape.radial_segments = 6;
     berry_shape.rings = 3;
     var berries:ArrayMesh = ArrayMesh.new();
-    var berry_mat:StandardMaterial3D = _make_material(Color.WHITE);       # the colour comes from the instance, red or blue
+    var berry_mat:ShaderMaterial = WindSway.make(Color.WHITE, BUSH_SWAY, BUSH_HEIGHT);       # the colour comes from the instance, red or blue
     for k in BUSH_LOBES.size():                  # one berry on the outside of each lobe, and a second on the bigger ones
         var lobe:Array = BUSH_LOBES[k];
         var centre:Vector3 = lobe[0];
@@ -238,8 +253,8 @@ func set_preview(rect:Rect2i, filter:Callable) -> void:
     _dirty = true;
 
 func set_season(s:int) -> void:
-    _canopy_mat.albedo_color = CANOPY_BY_SEASON[s];
-    _bush_mat.albedo_color = BUSH_BY_SEASON[s];
+    WindSway.set_color(_canopy_mat, CANOPY_BY_SEASON[s]);
+    WindSway.set_color(_bush_mat, BUSH_BY_SEASON[s]);
     update_foliage();
 
 # Oak leaves follow the day of the year: fresh green in spring, orange and red in autumn, gone in winter.
@@ -253,7 +268,7 @@ func update_foliage() -> void:
         if f <= b[0]:
             col = (a[1] as Color).lerp(b[1], inverse_lerp(a[0], b[0], f));
             break;
-    _oak_leaf_mat.albedo_color = col;
+    WindSway.set_color(_oak_leaf_mat, col);
 
 func _process(_delta:float) -> void:
     if _dirty:

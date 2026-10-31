@@ -13,13 +13,16 @@ var _moon       :DirectionalLight3D;       # a second light: the moon fades in a
 var _water      :MeshInstance3D;
 var _rain       :CPUParticles3D;
 var _snow       :CPUParticles3D;
+var _water_mat  :ShaderMaterial;
+var _fx_clock:float = 0.0;           # advances with the game's speed (World.fx_speed), so the water stops when paused
 
 func _init(w:World) -> void:
     world = w;
 
-func _process(_delta:float) -> void:
+func _process(delta:float) -> void:
     _update_lighting();
     _update_precip();
+    _update_water(delta);
 
 # Re-reads the player's settings (shadows).
 func apply_settings() -> void:
@@ -55,17 +58,28 @@ func setup_environment() -> void:
     add_child(_moon);
 
     _water = MeshInstance3D.new();
-    var wm:StandardMaterial3D = StandardMaterial3D.new();
-    wm.vertex_color_use_as_albedo = true;
-    wm.vertex_color_is_srgb = true;
-    wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA;
-    wm.roughness = 0.15;
-    wm.metallic = 0.2;
-    _water.material_override = wm;
+    _water_mat = ShaderMaterial.new();
+    _water_mat.shader = load("res://shaders/water.gdshader") as Shader;
+    _water_mat.set_shader_parameter("ripples", WaterTexture.make(world.world_seed));
+    _water.material_override = _water_mat;
     _water.position = Vector3(0.0, Terrain.WATER_LEVEL, 0.0);
     _water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     add_child(_water);
     rebuild_water();
+
+# The shader's clock and strength: waves and ripples pick up a little in rain.
+const WATER_SWELL:float = 0.035;
+const WATER_RIPPLE:float = 0.55;
+
+func _update_water(delta:float) -> void:
+    if _water_mat == null:
+        return;
+    _fx_clock += delta * World.fx_speed();
+    _water_mat.set_shader_parameter("clock", _fx_clock);
+    var rough:float = 1.0 + 0.8 * Weather.intensity;
+    _water_mat.set_shader_parameter("swell", WATER_SWELL * rough);
+    _water_mat.set_shader_parameter("ripple", WATER_RIPPLE * rough);
+    WindSway.update(_fx_clock, rough);        # trees, bushes and grass share the clock; the wind is stronger in rain
 
 # The water surface is a grid matching the terrain corners. Vertex color fades from shallow to deep
 # and from transparent to opaque with depth, so shorelines blend instead of cutting a hard line.
