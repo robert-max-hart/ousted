@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------
 class_name FishingHut extends Building;
 
-const BASE_CATCH    :float = 1.0;       # fish per work-hour when the whole circle is water and no other hut shares it
+const BASE_CATCH    :float = 1.5;       # fish per work-hour when the whole circle is water and no other hut shares it (the catch grows with the square root of the water share: a river hut is not nearly useless)
 const OVERLAP_COST  :float = 0.6;       # share of the catch lost when all of the hut's water is shared with other huts
 
 var _share_key  :String = "";           # what the cached numbers were worked out for
@@ -72,7 +72,7 @@ func overlap() -> float:
 
 # Fish caught per work-hour right now.
 func catch_rate() -> float:
-    return BASE_CATCH * water_share() * (1.0 - OVERLAP_COST * overlap());
+    return BASE_CATCH * sqrt(water_share()) * (1.0 - OVERLAP_COST * overlap());
 
 func info_text() -> String:
     if state != State.COMPLETE:

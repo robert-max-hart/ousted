@@ -18,6 +18,7 @@ var _last_day:int = -1;
 var _min_pop:int = 99;
 var _lowest_food:int = 999999;
 var _done:bool = false;
+var verbose:bool = false;          # a fifth argument turns on a line per citizen in each report
 var fields:int = 0;       # how many fields the colony also starts (the bot builds them; sown with hardy crops)
 
 func _ready() -> void:
@@ -31,6 +32,7 @@ func _ready() -> void:
         Climate.current = args[1].to_int();       # a control run: 0 temperate (the default here is 1, arctic)
     if args.size() > 2:
         fields = args[2].to_int();
+    verbose = args.size() > 4;
     var map_seed:int = args[3].to_int() if args.size() > 3 else 0;       # the map changes every run; pass one to compare runs
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     world.world_seed = map_seed;
@@ -52,6 +54,7 @@ func _build() -> void:
     for i in fields:
         var f:Field = world.place_building(&"field", TestSite.spot(world, fsize, Vector2i(-8, 6 + i * 8)), fsize) as Field;
         f.set_crop(crops[i % crops.size()]);
+    world.jobs.targets[JobManager.Profession.FARMER] = maxi(1, fields);       # a player staffs the fields (the Jobs panel): one farmer each
     world.jobs.targets[JobManager.Profession.FORAGER] = 3;
     world.jobs.targets[JobManager.Profession.WOODCUTTER] = 1;
     if fishing:
@@ -105,3 +108,10 @@ func _report() -> void:
         GameClock.day_index(), GameClock.season_name(), Weather.temperature, world.pawns.size(), hungry, cold, Stock.food_total(),
         Stock.amount(&"fish"), Stock.amount(&"berries"), Stock.amount(&"mushrooms"), Stock.amount(&"hazelnuts"), Stock.amount(&"wheat"),
         Stock.amount(&"wood"), Stock.amount(&"firewood"), jobs]);
+    if verbose:
+        for p in world.pawns:
+            print("      %-8s %-10s H%.2f T%.2f %s" % [p.first_name, p.profession_name(), p.hunger, p.thirst, p.status]);
+    for b in world.buildings:
+        if b is Field:
+            var f:Field = b as Field;
+            print("      field %s: %s" % [f.crop_id, ("built, " + f.info_text().split("\n")[1]) if f.is_complete() else "%d%% built" % roundi(f.progress() * 100.0)]);
