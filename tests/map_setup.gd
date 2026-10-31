@@ -82,7 +82,7 @@ func _ready() -> void:
         var hw:World = (load("res://scenes/main.tscn") as PackedScene).instantiate();
         add_child(hw);
         await get_tree().process_frame;
-        var ore:int = hw.nodes.filter(func(n:ResourceNode) -> bool: return n.kind == &"ore" and Vector2(n.cell - hw.start_building.origin).length() <= World.START_ORE_FAR).size();
+        var ore:int = hw.nodes.filter(func(n:ResourceNode) -> bool: return n.kind == &"ore" and (Vector2(n.cell) - hw.start_building.center_cell()).length() <= World.START_ORE_FAR).size();
         _expect("a %s-hills world starts a colony with iron near it (%d)" % [Terrain.HILLS[hills]["name"], ore], hw.town_hall != null and hw.pawns.size() > 0 and ore >= World.START_ORE_MIN);
         var hills_data:Dictionary = hw.serialize();
         hw.queue_free();

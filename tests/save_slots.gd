@@ -13,6 +13,7 @@ func _ready() -> void:
     var world:World = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     await get_tree().process_frame;
+    _expect("tests use their own saves folder", SaveGame.path_for("x").begins_with(SaveGame.TEST_DIR));
     SaveGame.delete("slot test a");
     SaveGame.delete("slot test b");
     _expect("names are cleaned", SaveGame.clean_name("  a/b*c d.. ") == "abc d");

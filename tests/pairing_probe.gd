@@ -7,13 +7,15 @@
 extends Node;
 
 var world:World;
-var _slot:String = "playtest2";
+var _slot:String = "playtest2";       # one of the player's own saves, so the probe reads the real folder
+
 var _days:int = 6;
 var _start_day:int = 0;
 var _last_day:int = -1;
 
 func _ready() -> void:
     SaveGame.autosave_enabled = false;
+    SaveGame.use_test_dir = false;
     var args:PackedStringArray = OS.get_cmdline_user_args();
     if args.size() > 0:
         _slot = args[0];

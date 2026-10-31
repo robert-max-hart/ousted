@@ -9,22 +9,37 @@ class_name SaveGame extends RefCounted;
 const VERSION   :int = 2;
 const MIN_VERSION:int = 2;        # version 1 saves are from the 128-cell map (the map is 160 now) and cannot be loaded
 const DIR       :String = "user://saves";
+const TEST_DIR  :String = "user://test_saves";        # where a test scene (res://tests/...) reads and writes, so tests never touch the player's saves
 const QUICKSAVE :String = "quicksave";
 const AUTOSAVE  :String = "autosave";
 const MAIN_SCENE:String = "res://scenes/main.tscn";
 
 static var autosave_enabled:bool = true;
+static var use_test_dir:bool = true;        # false makes a test work on the player's real saves (pairing_probe, which loads one)
 static var saves_written:int = 0;          # how many times a game was written this session (the tutorial watches it)
 
+# True when the game was started on a test scene (an argument res://tests/...): decided once, so it holds when a
+# test changes scenes (title_continue starts the main scene).
+static var _started_as_test:int = -1;
+
+# The folder in use: the player's saves, or the test folder for a test run.
+static func dir() -> String:
+    if _started_as_test < 0:
+        _started_as_test = 0;
+        for a in OS.get_cmdline_args():
+            if a.begins_with("res://tests/"):
+                _started_as_test = 1;
+    return TEST_DIR if use_test_dir and _started_as_test == 1 else DIR;
+
 static func path_for(slot:String) -> String:
-    return "%s/%s.sav" % [DIR, slot];
+    return "%s/%s.sav" % [dir(), slot];
 
 static func exists(slot:String) -> bool:
     return FileAccess.file_exists(path_for(slot));
 
 # Returns "" on success, otherwise a reason.
 static func write(world:World, slot:String) -> String:
-    DirAccess.make_dir_recursive_absolute(DIR);
+    DirAccess.make_dir_recursive_absolute(dir());
     var f:FileAccess = FileAccess.open_compressed(path_for(slot), FileAccess.WRITE, FileAccess.COMPRESSION_ZSTD);
     if f == null:
         return "Couldn't write the save file (error %d)." % FileAccess.get_open_error();
@@ -80,10 +95,10 @@ static func clean_name(text:String) -> String:
 # Every save on disk, newest first: {slot, date, pawns, seed, saved_at, ok}. Old saves have no meta.
 static func list_slots() -> Array:
     var rows:Array = [];
-    var dir:DirAccess = DirAccess.open(DIR);
-    if dir == null:
+    var folder:DirAccess = DirAccess.open(dir());
+    if folder == null:
         return rows;
-    for file in dir.get_files():
+    for file in folder.get_files():
         if not file.ends_with(".sav"):
             continue;
         var slot:String = file.get_basename();
