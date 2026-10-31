@@ -15,8 +15,10 @@ uniform float clock = 0.0;
 uniform float swell = 0.035;          // height of the swells in metres (deep water)
 uniform float ripple = 0.55;          // how strongly the ripples tilt the surface
 uniform float roughness_value = 0.16;
-uniform float brightness = 1.3;       // the tint is lifted a little so the water stays a clear blue under the sun
-uniform float glow = 0.12;
+uniform float brightness = 1.0;       // 1 is the vertex tint as it is
+uniform float glow = 0.0;
+uniform float tint_saturation = 0.95; // 1 is the full blue of the vertex tint; less is a greyer, greener water
+uniform float clarity = 0.85;         // scales the opacity: lower shows more of the bed through the water
 uniform vec3 foam_color : source_color = vec3(0.92, 0.96, 0.98);
 uniform sampler2D ripples : repeat_enable, filter_linear_mipmap;      // a seamless noise, made in code
 
@@ -44,15 +46,16 @@ void fragment() {
 	vec3 world_normal = normalize(vec3(tilt.x, 1.0, tilt.y));
 	NORMAL = normalize((VIEW_MATRIX * vec4(world_normal, 0.0)).xyz);       // (NORMAL is in view space)
 
-	// the vertex tint is stored as plain sRGB values, as the old material read it
-	vec3 tint = pow(COLOR.rgb, vec3(2.2));
+	// the vertex tint is used as it is (see terrain.gdshader: the Compatibility renderer does not convert vertex colours)
+	vec3 tint = COLOR.rgb;
+	tint = mix(vec3(dot(tint, vec3(0.299, 0.587, 0.114))), tint, tint_saturation);
 	float shore = 1.0 - smoothstep(0.0, 0.5, depth01);
 	// foam: bits of the shallow band, drifting, brighter right at the edge
 	float f = texture(ripples, p * 0.17 + vec2(clock * 0.02, -clock * 0.015)).b;
 	float foam = shore * smoothstep(0.52, 0.8, f + shore * 0.35) * (0.35 + 0.65 * (1.0 - smoothstep(0.0, 0.18, depth01)));
 	ALBEDO = mix(tint * brightness, foam_color, foam);
 	EMISSION = tint * glow * (1.0 - foam);       // a little self-light keeps the stylised blue in dull weather and at dusk
-	ALPHA = clamp(COLOR.a + foam * 0.5, 0.0, 0.92);
+	ALPHA = clamp(COLOR.a * clarity + foam * 0.5, 0.0, 0.9);
 	ROUGHNESS = mix(roughness_value, 0.6, foam);
 	METALLIC = 0.0;
 	SPECULAR = 0.55;

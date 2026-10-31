@@ -14,6 +14,7 @@ var _water      :MeshInstance3D;
 var _rain       :CPUParticles3D;
 var _snow       :CPUParticles3D;
 var _water_mat  :ShaderMaterial;
+var snow_cover :float = 0.0;            # how much of the ground is under snow, 0 to 1: it builds in snowfall and melts in warm weather
 var _fx_clock:float = 0.0;           # advances with the game's speed (World.fx_speed), so the water stops when paused
 
 func _init(w:World) -> void:
@@ -23,6 +24,7 @@ func _process(delta:float) -> void:
     _update_lighting();
     _update_precip();
     _update_water(delta);
+    _update_snow(delta);
 
 # Re-reads the player's settings (shadows).
 func apply_settings() -> void:
@@ -38,6 +40,9 @@ func setup_environment() -> void:
     _env.sky = sky;
     _env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR;
     _env.tonemap_mode = Environment.TONE_MAPPER_FILMIC;
+    _env.adjustment_enabled = true;                  # a little richer than the filmic curve alone, which read washed out
+    _env.adjustment_saturation = GRADE_SATURATION;
+    _env.adjustment_contrast = GRADE_CONTRAST;
     _env.fog_enabled = true;
     _env.fog_density = 0.0012;
     _env.fog_sky_affect = 0.3;
@@ -62,10 +67,40 @@ func setup_environment() -> void:
     _water_mat.shader = load("res://shaders/water.gdshader") as Shader;
     _water_mat.set_shader_parameter("ripples", WaterTexture.make(world.world_seed));
     _water.material_override = _water_mat;
+    start_snow_cover();
     _water.position = Vector3(0.0, Terrain.WATER_LEVEL, 0.0);
     _water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     add_child(_water);
     rebuild_water();
+
+# Snow on the ground. It builds while it snows (full cover after about 6 hours of heavy snow), melts above freezing
+# (faster when warm, and in rain) and otherwise stays. It follows the game's speed (World.fx_speed). It is not saved: a
+# loaded game starts with the cover its season's temperature suggests.
+const SNOW_BUILD_PER_HOUR:float = 0.18;
+const SNOW_MELT_PER_HOUR :float = 0.01;       # times (temperature + 1)
+
+func start_snow_cover() -> void:
+    snow_cover = clampf(-Weather.mean_temperature() / 8.0, 0.0, 1.0);
+    _apply_snow();
+
+func _update_snow(delta:float) -> void:
+    var hours:float = delta * World.fx_speed() / GameRules.seconds_per_hour();
+    if hours <= 0.0:
+        return;
+    if Weather.is_snowing():
+        snow_cover += SNOW_BUILD_PER_HOUR * Weather.intensity * hours;
+    elif Weather.temperature > 0.5:
+        snow_cover -= SNOW_MELT_PER_HOUR * (Weather.temperature + 1.0) * (1.5 if Weather.intensity > 0.05 else 1.0) * hours;
+    snow_cover = clampf(snow_cover, 0.0, 1.0);
+    _apply_snow();
+
+func _apply_snow() -> void:
+    if world.terrain != null:
+        world.terrain.set_snow(snow_cover);
+
+# The colour grade over the whole picture (tests/palette_shot compares looks).
+const GRADE_SATURATION:float = 1.18;
+const GRADE_CONTRAST  :float = 1.06;
 
 # The shader's clock and strength: waves and ripples pick up a little in rain.
 const WATER_SWELL:float = 0.035;

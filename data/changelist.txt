@@ -3,8 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.6.1-dev | 30 Oct 2026 | M7 begins: moving water and trees and grass that sway in the wind
-- The water is now a shader: gentle swells, ripples that catch the sun and moon, and a broken foam edge along the shore. It is a clearer blue than before, and stops when the game is paused.
+# 0.6.1-dev | 30 Oct 2026 | M7 begins: moving water, swaying trees and grass, textured ground and real snow cover
+- The water is now a shader: gentle swells, ripples that catch the sun and moon, and a broken foam edge along the shore. It is lighter and clearer than before, with the bed showing through, and stops when the game is paused.
+- A richer colour grade over the whole picture (more saturation and contrast), so greens, roofs and shadows are less washed out, especially at golden hour. The hill rock is a little warmer.
+- The ground has a shader: grain that breaks up flat colour, bands on steep rock, and snow cover that builds up while it snows and melts in warm weather, instead of everything turning white on the first day of winter. Snow settles on up-facing ground and the heights first, in patches at first, and lies thinly on roads and fields. Winter ground without snow is dry and brown.
 - Pines, oaks, bushes, hazel and the grass sway in the wind, more at the top than the base, out of step with their neighbours. The wind picks up in rain and the sway stops when the game is paused.
 
 # 0.6.0 | 30 Oct 2026 | Meta is complete: hills, overwrite confirmation and a steadier fishing catch

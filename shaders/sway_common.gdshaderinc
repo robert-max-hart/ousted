@@ -18,7 +18,8 @@ vec3 sway_offset(vec3 base, float h) {
 	return vec3(wind_dir.x, 0.0, wind_dir.y) * (sway * wind * k * (gust + flap));
 }
 
-// albedo times the vertex and instance colour (stored as sRGB, as the standard material read it)
+// albedo times the vertex and instance colour, used as they are (the standard material these replace did not convert them
+// from sRGB in the Compatibility renderer, so converting here made everything darker)
 vec3 sway_colour(vec4 vertex_colour) {
-	return albedo.rgb * pow(vertex_colour.rgb, vec3(2.2));
+	return albedo.rgb * vertex_colour.rgb;
 }

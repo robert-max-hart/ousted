@@ -123,6 +123,7 @@ func _ready() -> void:
     terrain.soil_source = func(i:int) -> float: return soil_fertility[i];
     terrain.water_source = func(i:int) -> float: return water_reach()[i];
     terrain.name = "Terrain";
+    terrain.world_seed_for_textures = world_seed;
     add_child(terrain);
     terrain.generate(world_seed);
     if loading:

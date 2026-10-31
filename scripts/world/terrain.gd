@@ -30,7 +30,7 @@ const MAX_HEIGHT        :float = 40.0;
 const MIN_HEIGHT        :float = -6.0;
 
 const COLOR_SAND        :Color = Color(0.6, 0.54, 0.38);
-const COLOR_ROCK        :Color = Color(0.48, 0.46, 0.43);
+const COLOR_ROCK        :Color = Color(0.47, 0.44, 0.39);
 const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
 const COLOR_GRAVE       :Color = Color(0.24, 0.33, 0.2);        # a graveyard: mossy, mown grass
@@ -38,11 +38,10 @@ const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being d
 const COLOR_ORCHARD     :Color = Color(0.26, 0.4, 0.19);       # an orchard: mown grass between the trees
 const COLOR_CHANNEL     :Color = Color(0.34, 0.27, 0.19);      # a dug channel with no water in it
 const COLOR_CHANNEL_WET :Color = Color(0.2, 0.38, 0.5);        # one connected to water
-const COLOR_SNOW        :Color = Color(0.88, 0.9, 0.94);
 const DETAIL_AMOUNT     :float = 0.055;
 const DETAIL_SATURATION :float = 1.15;
 const GRASS_BY_SEASON   :Array[Color] = [
-    Color(0.22, 0.37, 0.14), Color(0.28, 0.38, 0.12), Color(0.42, 0.34, 0.15), Color(0.78, 0.81, 0.85),
+    Color(0.22, 0.37, 0.14), Color(0.28, 0.38, 0.12), Color(0.42, 0.34, 0.15), Color(0.4, 0.37, 0.25),
 ];
 
 var heights :PackedFloat32Array;
@@ -54,16 +53,18 @@ var slope_view :bool = false;           # colour the ground by how steep it is f
 var water_view :bool = false;           # colour the ground by reach of water (where a building that needs a water source may stand)
 var water_source :Callable;              # cell index -> distance (cells) to the nearest water source, set by World
 var soil_source :Callable;               # cell index -> fertility 0..1, set by World
-var _material:StandardMaterial3D;
+var _material:ShaderMaterial;       # shaders/terrain.gdshader
 var _season :int = 0;
+var world_seed_for_textures:int = 1;      # set by World before the terrain is added (the noise texture follows the map seed)
 var _tint_noise:FastNoiseLite;
 var _detail_noise:FastNoiseLite;
 
 func _ready() -> void:
-    _material = StandardMaterial3D.new();
-    _material.vertex_color_use_as_albedo = true;
-    _material.vertex_color_is_srgb = true;
-    _material.roughness = 1.0;
+    _material = ShaderMaterial.new();
+    _material.shader = load("res://shaders/terrain.gdshader") as Shader;
+    _material.set_shader_parameter("noise_tex", TerrainTexture.make(world_seed_for_textures));
+    _material.set_shader_parameter("snow", 0.0);
+    _material.set_shader_parameter("overlay_view", 0.0);
     for i in CHUNKS * CHUNKS:
         var mi:MeshInstance3D = MeshInstance3D.new();
         mi.material_override = _material;
@@ -478,6 +479,7 @@ func set_soil_view(on:bool) -> void:
     if soil_view == on:
         return;
     soil_view = on;
+    _overlay_changed();
     mark_all_dirty();
 
 # The water overlay: ground within WATER_REACH of a water source shows blue-green (a Distillery or Potter's Workshop works
@@ -494,6 +496,7 @@ func set_slope_view(on:bool) -> void:
     if slope_view == on:
         return;
     slope_view = on;
+    _overlay_changed();
     mark_all_dirty();
 
 # The height range over the 3x3 cells around c.
@@ -512,6 +515,7 @@ func set_water_view(on:bool) -> void:
     if water_view == on:
         return;
     water_view = on;
+    _overlay_changed();
     mark_all_dirty();
 
 static func water_color(d:float) -> Color:
@@ -561,21 +565,21 @@ func _cell_color(c:Vector2i) -> Color:
         Overlay.SITE:
             col = COLOR_SITE;
         Overlay.ORCHARD:
-            col = COLOR_SNOW.lerp(COLOR_ORCHARD, 0.5) if _season == GameClock.Season.WINTER else COLOR_ORCHARD;
+            col = COLOR_ORCHARD;
         Overlay.CHANNEL:
             col = COLOR_CHANNEL;
         Overlay.CHANNEL_WET:
             col = COLOR_CHANNEL_WET;
         Overlay.GRAVE:
-            col = COLOR_SNOW.lerp(COLOR_GRAVE, 0.5) if _season == GameClock.Season.WINTER else COLOR_GRAVE;
+            col = COLOR_GRAVE;
         Overlay.TILLED:
-            col = COLOR_SNOW.lerp(COLOR_TILLED, 0.4) if _season == GameClock.Season.WINTER else COLOR_TILLED;
+            col = COLOR_TILLED;
         _:
             var slope:float = cell_slope(c);
             if cell_height(c) < WATER_LEVEL + 0.35:
                 col = COLOR_SAND;
             elif slope > 1.4:
-                col = COLOR_ROCK.lerp(COLOR_SNOW, 0.5) if _season == GameClock.Season.WINTER else COLOR_ROCK;
+                col = COLOR_ROCK;
             else:
                 col = GRASS_BY_SEASON[_season].lerp(COLOR_ROCK, clampf((slope - 0.8) / 0.6, 0.0, 1.0));
             if overlay[index(c)] == Overlay.ROAD_SITE:
@@ -585,6 +589,33 @@ func _cell_color(c:Vector2i) -> Color:
     if _tint_noise != null:
         v += _tint_noise.get_noise_2d(c.x, c.y) * 0.04;
     return Color(col.r + v, col.g + v, col.b + v);
+
+# The vertex colour's alpha is how well snow lies on the ground (read by shaders/terrain.gdshader): packed roads and
+# ploughed fields hold less, a channel none.
+const SNOW_HOLD_ROAD :float = 0.25;
+const SNOW_HOLD_FIELD:float = 0.5;
+
+func _snow_hold(o:int) -> float:
+    match o:
+        Overlay.CHANNEL, Overlay.CHANNEL_WET:
+            return 0.0;
+        Overlay.ROAD:
+            return SNOW_HOLD_ROAD;
+        Overlay.TILLED, Overlay.SITE:
+            return SNOW_HOLD_FIELD;
+        Overlay.ROAD_SITE:
+            return 0.6;
+        Overlay.GRAVE, Overlay.ORCHARD:
+            return 0.85;
+    return 1.0;
+
+# How much of the ground is under snow, 0 to 1 (the weather sets it: see WorldVisuals).
+func set_snow(cover:float) -> void:
+    _material.set_shader_parameter("snow", clampf(cover, 0.0, 1.0));
+
+# The overlays (soil, water, slope) paint the ground a flat colour: the shader shows it plain then.
+func _overlay_changed() -> void:
+    _material.set_shader_parameter("overlay_view", 1.0 if (soil_view or water_view or slope_view) else 0.0);
 
 # Fine texture sampled per corner (shared by the cells around it, so it stays smooth) plus a little
 # extra saturation to counter the washed-out look. Roads and fields don't use this.
@@ -635,16 +666,17 @@ func _build_chunk(ci:int) -> void:
             if overlay[index(cell)] == Overlay.ROAD:
                 for j in 4:       # packed earth is mottled: each corner a little lighter or darker
                     var speck:float = float((((x * 2 + (j & 1)) * 73856093) ^ ((z * 2 + (j >> 1)) * 19349663)) & 1023) / 1023.0;
-                    colors[v + j] = Color(own.r * (0.95 + speck * 0.1), own.g * (0.95 + speck * 0.1), own.b * (0.96 + speck * 0.08));
+                    colors[v + j] = Color(own.r * (0.95 + speck * 0.1), own.g * (0.95 + speck * 0.1), own.b * (0.96 + speck * 0.08), SNOW_HOLD_ROAD);
             elif overlay[index(cell)] == Overlay.TILLED or overlay[index(cell)] == Overlay.SITE:
                 for j in 4:       # ploughed ground: a ridge along each row's top edge and a furrow along its bottom, with some mottling
                     var crumb:float = float((((x * 2 + (j & 1)) * 83492791) ^ ((z * 2 + (j >> 1)) * 2654435761)) & 1023) / 1023.0;
                     var row:float = 1.0 if overlay[index(cell)] == Overlay.SITE else (1.1 if j < 2 else 0.86);
                     var shade:float = row * (0.94 + crumb * 0.12);
-                    colors[v + j] = Color(own.r * shade, own.g * shade, own.b * shade);
+                    colors[v + j] = Color(own.r * shade, own.g * shade, own.b * shade, SNOW_HOLD_FIELD);
             elif overlay[index(cell)] != Overlay.NONE:
+                var hold:float = _snow_hold(overlay[index(cell)]);
                 for j in 4:
-                    colors[v + j] = own;
+                    colors[v + j] = Color(own.r, own.g, own.b, hold);
             else:
                 # corner j touches the cells on its (dx, dz) side; average the natural ones
                 for j in 4:
