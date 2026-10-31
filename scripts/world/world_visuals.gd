@@ -30,6 +30,12 @@ func _process(delta:float) -> void:
 func apply_settings() -> void:
     _sun.shadow_enabled = Settings.shadows_on();
     _moon.shadow_enabled = Settings.shadows_on();
+    WindSway.enabled = Settings.sway_on();
+    WindSway.grass_enabled = Settings.grass_sway_on();
+    if _water_mat != null:
+        _water_mat.set_shader_parameter("detail", float(Settings.water));
+    if world.terrain != null:
+        world.terrain.apply_settings();
 
 func setup_environment() -> void:
     _sky = ProceduralSkyMaterial.new();
@@ -67,6 +73,7 @@ func setup_environment() -> void:
     _water_mat.shader = load("res://shaders/water.gdshader") as Shader;
     _water_mat.set_shader_parameter("ripples", WaterTexture.make(world.world_seed));
     _water.material_override = _water_mat;
+    apply_settings();
     start_snow_cover();
     _water.position = Vector3(0.0, Terrain.WATER_LEVEL, 0.0);
     _water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;

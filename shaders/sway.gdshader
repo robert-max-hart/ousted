@@ -4,8 +4,10 @@ render_mode cull_back;
 #include "res://shaders/sway_common.gdshaderinc"
 
 void vertex() {
-	vec3 d = sway_offset(MODEL_MATRIX[3].xyz, max(VERTEX.y, 0.0));
-	VERTEX += inverse(mat3(MODEL_MATRIX)) * d;       // the push is in world space; the vertex is in the mesh's own
+	if (sway_on > 0.5) {       // off in the settings: the mesh stands still and costs nothing here
+		vec3 d = sway_offset(MODEL_MATRIX[3].xyz, max(VERTEX.y, 0.0));
+		VERTEX += inverse(mat3(MODEL_MATRIX)) * d;       // the push is in world space; the vertex is in the mesh's own
+	}
 }
 
 void fragment() {

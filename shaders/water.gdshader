@@ -12,6 +12,7 @@ shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, specular_schlick_ggx;
 
 uniform float clock = 0.0;
+uniform float detail = 2.0;           // from Settings: 0 flat tint, 1 swells and one ripple layer, 2 everything
 uniform float swell = 0.035;          // height of the swells in metres (deep water)
 uniform float ripple = 0.55;          // how strongly the ripples tilt the surface
 uniform float roughness_value = 0.16;
@@ -34,25 +35,35 @@ void vertex() {
 	world_pos = wp;
 	depth01 = clamp(COLOR.a / 0.78, 0.0, 1.0);
 	// no swell at the shore (so the ground never pokes through), full swell in deep water
-	VERTEX.y += swell_height(wp.xz, clock) * swell * smoothstep(0.1, 0.8, depth01);
+	if (detail > 0.5) {
+		VERTEX.y += swell_height(wp.xz, clock) * swell * smoothstep(0.1, 0.8, depth01);
+	}
 }
 
 void fragment() {
 	vec2 p = world_pos.xz;
 	// two ripple layers drifting in different directions
-	vec2 n1 = texture(ripples, p * 0.09 + vec2(clock * 0.012, clock * 0.007)).rg * 2.0 - 1.0;
-	vec2 n2 = texture(ripples, p * 0.23 + vec2(-clock * 0.016, clock * 0.011)).rg * 2.0 - 1.0;
-	vec2 tilt = (n1 * 0.6 + n2 * 0.4) * ripple;
-	vec3 world_normal = normalize(vec3(tilt.x, 1.0, tilt.y));
-	NORMAL = normalize((VIEW_MATRIX * vec4(world_normal, 0.0)).xyz);       // (NORMAL is in view space)
+	if (detail > 0.5) {
+		vec2 n1 = texture(ripples, p * 0.09 + vec2(clock * 0.012, clock * 0.007)).rg * 2.0 - 1.0;
+		vec2 tilt = n1 * ripple;
+		if (detail > 1.5) {
+			vec2 n2 = texture(ripples, p * 0.23 + vec2(-clock * 0.016, clock * 0.011)).rg * 2.0 - 1.0;
+			tilt = (n1 * 0.6 + n2 * 0.4) * ripple;
+		}
+		vec3 world_normal = normalize(vec3(tilt.x, 1.0, tilt.y));
+		NORMAL = normalize((VIEW_MATRIX * vec4(world_normal, 0.0)).xyz);       // (NORMAL is in view space)
+	}
 
 	// the vertex tint is used as it is (see terrain.gdshader: the Compatibility renderer does not convert vertex colours)
 	vec3 tint = COLOR.rgb;
 	tint = mix(vec3(dot(tint, vec3(0.299, 0.587, 0.114))), tint, tint_saturation);
 	float shore = 1.0 - smoothstep(0.0, 0.5, depth01);
 	// foam: bits of the shallow band, drifting, brighter right at the edge
-	float f = texture(ripples, p * 0.17 + vec2(clock * 0.02, -clock * 0.015)).b;
-	float foam = shore * smoothstep(0.52, 0.8, f + shore * 0.35) * (0.35 + 0.65 * (1.0 - smoothstep(0.0, 0.18, depth01)));
+	float foam = 0.0;
+	if (detail > 1.5) {
+		float f = texture(ripples, p * 0.17 + vec2(clock * 0.02, -clock * 0.015)).b;
+		foam = shore * smoothstep(0.52, 0.8, f + shore * 0.35) * (0.35 + 0.65 * (1.0 - smoothstep(0.0, 0.18, depth01)));
+	}
 	ALBEDO = mix(tint * brightness, foam_color, foam);
 	EMISSION = tint * glow * (1.0 - foam);       // a little self-light keeps the stylised blue in dull weather and at dusk
 	ALPHA = clamp(COLOR.a * clarity + foam * 0.5, 0.0, 0.9);

@@ -8,15 +8,18 @@
 class_name WindSway extends RefCounted;
 
 static var _materials:Array[ShaderMaterial] = [];
+static var enabled:bool = true;         # from Settings.sway: off leaves trees, bushes and hazel standing still
+static var grass_enabled:bool = true;   # from Settings.grass_sway: the same for the grass tufts
 
 # A swaying material: `color` is the albedo (times the vertex and instance colours), `sway` the metres it bends at
-# `height_ref` (in the mesh's own units) in calm weather, `double_sided` for thin blades.
+# `height_ref` (in the mesh's own units) in calm weather, `double_sided` for thin blades (the grass: its own setting).
 static func make(color:Color, sway:float, height_ref:float, double_sided:bool = false) -> ShaderMaterial:
     var m:ShaderMaterial = ShaderMaterial.new();
     m.shader = load("res://shaders/sway_double.gdshader" if double_sided else "res://shaders/sway.gdshader") as Shader;
     m.set_shader_parameter("albedo", color);
     m.set_shader_parameter("sway", sway);
     m.set_shader_parameter("height_ref", height_ref);
+    m.set_meta(&"grass", double_sided);       # grass has its own switch
     _materials.append(m);
     return m;
 
@@ -33,6 +36,7 @@ static func update(clock:float, wind:float) -> void:
         else:
             m.set_shader_parameter("clock", clock);
             m.set_shader_parameter("wind", wind);
+            m.set_shader_parameter("sway_on", 1.0 if (grass_enabled if m.get_meta(&"grass", false) else enabled) else 0.0);
         i -= 1;
 
 static func count() -> int:

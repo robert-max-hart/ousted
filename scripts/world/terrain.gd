@@ -65,6 +65,7 @@ func _ready() -> void:
     _material.set_shader_parameter("noise_tex", TerrainTexture.make(world_seed_for_textures));
     _material.set_shader_parameter("snow", 0.0);
     _material.set_shader_parameter("overlay_view", 0.0);
+    apply_settings();
     for i in CHUNKS * CHUNKS:
         var mi:MeshInstance3D = MeshInstance3D.new();
         mi.material_override = _material;
@@ -612,6 +613,13 @@ func _snow_hold(o:int) -> float:
 # How much of the ground is under snow, 0 to 1 (the weather sets it: see WorldVisuals).
 func set_snow(cover:float) -> void:
     _material.set_shader_parameter("snow", clampf(cover, 0.0, 1.0));
+
+# Ground grain, strata and the ragged snow edge follow the player's settings.
+func apply_settings() -> void:
+    if _material == null:
+        return;
+    _material.set_shader_parameter("ground_detail", 1.0 if Settings.ground_on() else 0.0);
+    _material.set_shader_parameter("snow_detail", 1.0 if Settings.snow_shading_on() else 0.0);
 
 # The overlays (soil, water, slope) paint the ground a flat colour: the shader shows it plain then.
 func _overlay_changed() -> void:

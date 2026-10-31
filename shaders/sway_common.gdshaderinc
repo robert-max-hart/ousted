@@ -3,6 +3,7 @@
 // blade tips move most), and its phase comes from where the instance stands, so neighbours do not move in step.
 uniform vec4 albedo : source_color = vec4(1.0);
 uniform float clock = 0.0;            // advanced by the script with the game's speed: the sway pauses with the game
+uniform float sway_on = 1.0;          // 0 when the player turned wind sway off (Settings)
 uniform float wind = 1.0;             // how hard it blows now: 1 in calm weather, more in rain
 uniform vec2 wind_dir = vec2(0.8, 0.6);
 uniform float sway = 0.1;             // metres of sway at height_ref in calm weather

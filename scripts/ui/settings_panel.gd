@@ -45,6 +45,17 @@ func _init() -> void:
     grass.select(Settings.grass);
     grass.item_selected.connect(func(i:int) -> void: Settings.set_value("grass", i));
     _row(col, "Grass tufts", grass, "Fewer tufts help the frame rate. Takes a moment to redraw.");
+    var water:OptionButton = OptionButton.new();
+    water.focus_mode = Control.FOCUS_NONE;
+    for n in Settings.WATER_NAMES:
+        water.add_item(n);
+    water.select(Settings.water);
+    water.item_selected.connect(func(i:int) -> void: Settings.set_value("water", i));
+    _row(col, "Water detail", water, "Simple is a flat tint. Medium adds swells and ripples; Full adds a second ripple layer and shore foam.");
+    _check(col, "Tree sway", Settings.sway, "sway", "Trees, bushes and hazel bend in the wind. Off helps weak graphics cards.");
+    _check(col, "Grass sway", Settings.grass_sway, "grass_sway", "The grass tufts bend in the wind. Off helps weak graphics cards.");
+    _check(col, "Ground detail", Settings.ground, "ground", "Grain on the ground and bands on steep slopes. Off shows the plain ground colour.");
+    _check(col, "Snow edge detail", Settings.snow_edge, "snow_edge", "Ragged, patchy snow edges. Off makes snow an even cover.");
     _check(col, "Shadows", Settings.shadows, "shadows", "Sun and moon shadows. Off helps weak graphics cards.");
     _check(col, "Fullscreen", Settings.fullscreen, "fullscreen", "");
     _check(col, "Vertical sync", Settings.vsync, "vsync", "Stops tearing; turn off if the game feels laggy.");
