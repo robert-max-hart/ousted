@@ -26,7 +26,7 @@ func _ready() -> void:
 
     # --- windows
     var h:Building = world.place_building(&"house", _free(&"house", Vector2i(3, 3), th.origin + Vector2i(8, 0)), Vector2i(3, 3), true);
-    _expect("a house has a door and two windows", h._door != null and h._windows.size() == 2);
+    _expect("a house has a door and its lit window panes (one mesh for the four of them)", h._door != null and h._windows.size() == 1 and h._window_mat != null);
     for p in world.pawns.duplicate():
         world.families.move_home(p, null);
     h.update_windows();

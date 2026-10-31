@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://b6r4auugb8l0n"
+path="res://.godot/imported/building_school_door.obj-53a1fc4cc6aa00f1c7f5348835f3b6fd.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_school_door.obj-53a1fc4cc6aa00f1c7f5348835f3b6fd.mesh"]
+
+source_file="res://assets/models/buildings/building_school_door.obj"
+dest_files=["res://.godot/imported/building_school_door.obj-53a1fc4cc6aa00f1c7f5348835f3b6fd.mesh", "res://.godot/imported/building_school_door.obj-53a1fc4cc6aa00f1c7f5348835f3b6fd.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

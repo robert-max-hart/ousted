@@ -51,9 +51,9 @@ class Mesh:
         for i in range(segs):
             a0, a1 = 2 * math.pi * i / segs, 2 * math.pi * (i + 1) / segs
             if axis == "y":
-                self.quad(p(a0, -h), p(a0, h), p(a1, h), p(a1, -h), col)
-                self.tri(p(a0, h), (cx, cy + h, cz), p(a1, h), cap)
-                self.tri(p(a1, -h), (cx, cy - h, cz), p(a0, -h), cap)
+                self.quad(p(a1, -h), p(a1, h), p(a0, h), p(a0, -h), col)
+                self.tri(p(a1, h), (cx, cy + h, cz), p(a0, h), cap)
+                self.tri(p(a0, -h), (cx, cy - h, cz), p(a1, -h), cap)
             else:
                 self.quad(p(a0, -h), p(a1, -h), p(a1, h), p(a0, h), col)
                 self.tri(p(a1, h), (cx + h, cy, cz), p(a0, h), cap)
@@ -65,7 +65,7 @@ class Mesh:
         def p(a, r, y):
             return (cx + math.cos(a) * r, y, cz + math.sin(a) * r * squash)
         for i in range(segs):
-            a0, a1 = 2 * math.pi * i / segs, 2 * math.pi * (i + 1) / segs
+            a0, a1 = 2 * math.pi * (i + 1) / segs, 2 * math.pi * i / segs       # (this way round the faces are clockwise from outside, as Mesh wants)
             self.quad(p(a0, r0, y0), p(a0, r1, y1), p(a1, r1, y1), p(a1, r0, y0), col)
             if top:
                 self.tri(p(a0, r1, y1), (cx, y1, cz), p(a1, r1, y1), cap_col)
@@ -91,8 +91,8 @@ class Mesh:
             c, sn = math.cos(t) * r, math.sin(t) * r
             return (p[0] + ax * c + bx * sn, p[1] + ay * c + by * sn, p[2] + az * c + bz * sn)
         for i in range(segs):
-            self.quad(ring(p0, r0, i), ring(p1, r1, i), ring(p1, r1, i + 1), ring(p0, r0, i + 1), col)
-            self.tri(ring(p1, r1, i), p1, ring(p1, r1, i + 1), cap_col)
+            self.quad(ring(p0, r0, i + 1), ring(p1, r1, i + 1), ring(p1, r1, i), ring(p0, r0, i), col)
+            self.tri(ring(p1, r1, i + 1), p1, ring(p1, r1, i), cap_col)
 
     def ribbon(self, path, widths, col, cols=None, up=(0.0, 1.0, 0.0)):
         """A flat strip along a path of 3D points, `widths` wide at each point, visible from both sides (a leaf, a frond, a blade)."""

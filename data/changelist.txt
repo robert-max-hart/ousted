@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.8-dev | 31 Oct 2026 | New buildings: houses with timber frames, chimneys and shutters, a Town Hall with a clock tower, and more
+- The houses and workshops have been remodelled: the wooden house has a timber frame, shutters, a stone footing, a brick chimney and a step at the door; the shack is bare planks; the forager's hut has a deep thatched roof; the woodcutter's is a log cabin with the log ends showing at the corners; the blacksmith, distillery and potter are stone with lighter corner stones; the school is a long plaster building with a row of windows; the tailor has an awning and a sign.
+- The Town Hall is a stone hall with columns and steps at the door and a clock tower with a clock face on each side. The Granary's silos have iron bands, a ladder and a door, and the well has a roof on posts with a windlass and a bucket.
+- The Mine has a stone shed, a timber headframe with a winding wheel, a tunnel mouth in a rocky mound with rails and an ore cart, and heaps of ore and stone. The Trading Post is a striped-tent market stall with a counter and scales, wares, crates, barrels and sacks, and a hanging sign. The Fishing Hut has its pier on stilts, and the Supply Cart has sacks, side rails and spoked wheels.
+- The props around the workshops are modelled too: the forge's furnace, chimney and glowing hearth, the school's bell tower, the woodcutter's log pile and block, the tailor's loom, the still's copper pot, the potter's kiln, the apiary's hives, the forager's drying rack and baskets.
+- A building under construction rises as before, now from the same walls it will have when it is finished.
+
 # 0.6.7 | 31 Oct 2026 | Crops that look like crops, growing through the season
 - Every crop is a proper plant now, and changes as it grows: wheat and barley come up as grass, grow into tall stalks and ripen into heavy golden ears (barley with its spiky awns and drooping heads); beans flower and hang pods; potatoes flower, then yellow and flop; radishes show red roots breaking out of the soil; lettuce and cabbage fill out into heads; pumpkins spread their vines and swell into big orange fruit.
 - Frozen fields turn pale and withered plots stand brown, as before, but each plant class now withers in its own way. Pests still brown the plants.

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://3hujc5m5h7ak"
+path="res://.godot/imported/building_well_roof.obj-db4d3c3631e1401d5e674386bbb745d0.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_well_roof.obj-db4d3c3631e1401d5e674386bbb745d0.mesh"]
+
+source_file="res://assets/models/buildings/building_well_roof.obj"
+dest_files=["res://.godot/imported/building_well_roof.obj-db4d3c3631e1401d5e674386bbb745d0.mesh", "res://.godot/imported/building_well_roof.obj-db4d3c3631e1401d5e674386bbb745d0.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
