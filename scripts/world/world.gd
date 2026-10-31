@@ -107,6 +107,7 @@ func _ready() -> void:
         Terrain.set_size(map.get("size", Terrain.DEFAULT_SIZE));
         Terrain.river_style = map.get("river", Terrain.RiverStyle.WINDING);
         Climate.current = map.get("climate", Climate.Id.TEMPERATE);
+        Terrain.hills_level = map.get("hills", Terrain.Hills.NORMAL);
         scenario = ScenarioRun.from_dict(save.get("scenario", {}) as Dictionary);
         GameRules.from_dict(save.get("rules", {}) as Dictionary);
     elif world_seed == 0:

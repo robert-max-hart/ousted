@@ -44,6 +44,7 @@ func _ready() -> void:
     _expect("Wide has more water than Winding", water[Terrain.RiverStyle.WIDE] > water[Terrain.RiverStyle.WINDING]);
     _expect("None has the least water", water[Terrain.RiverStyle.NONE] < water[Terrain.RiverStyle.GENTLE]);
     _check_wetlands_and_coast(seeds);
+    _check_hills(seeds);
 
     Terrain.set_size(96);
     Terrain.river_style = Terrain.RiverStyle.WILD;
@@ -74,6 +75,27 @@ func _ready() -> void:
     await get_tree().create_timer(3.0).timeout;
     _expect("a Medium world with no river starts a colony", dry.town_hall != null and dry.pawns.size() > 0 and dry.terrain.river_path.is_empty());
     dry.queue_free();
+    for hills in [Terrain.Hills.FLAT, Terrain.Hills.MANY]:
+        Terrain.set_size(128);
+        Terrain.river_style = Terrain.RiverStyle.WINDING;
+        Terrain.hills_level = hills;
+        var hw:World = (load("res://scenes/main.tscn") as PackedScene).instantiate();
+        add_child(hw);
+        await get_tree().process_frame;
+        var ore:int = hw.nodes.filter(func(n:ResourceNode) -> bool: return n.kind == &"ore" and Vector2(n.cell - hw.start_building.origin).length() <= World.START_ORE_FAR).size();
+        _expect("a %s-hills world starts a colony with iron near it (%d)" % [Terrain.HILLS[hills]["name"], ore], hw.town_hall != null and hw.pawns.size() > 0 and ore >= World.START_ORE_MIN);
+        var hills_data:Dictionary = hw.serialize();
+        hw.queue_free();
+        await get_tree().process_frame;
+        Terrain.hills_level = Terrain.Hills.NORMAL;
+        World.pending_load = hills_data;
+        var hl:World = (load("res://scenes/main.tscn") as PackedScene).instantiate();
+        add_child(hl);
+        await get_tree().process_frame;
+        _expect("a %s-hills save loads with its hills" % Terrain.HILLS[hills]["name"], Terrain.hills_level == hills);
+        hl.queue_free();
+        await get_tree().process_frame;
+    Terrain.hills_level = Terrain.Hills.NORMAL;
     for style in [Terrain.RiverStyle.WETLANDS, Terrain.RiverStyle.COAST]:
         Terrain.set_size(128);
         Terrain.river_style = style;
@@ -138,6 +160,32 @@ func _check_wetlands_and_coast(seeds:Array[int]) -> void:
         _expect("coast seed %d: exactly one edge is open sea" % s, open_edges == 1);
         _expect("coast seed %d: the opposite edge is mostly land" % s, opposite < 0.5);
         t.free();
+
+# More hills means more steep ground, level by level; flat has hardly any.
+func _check_hills(seeds:Array[int]) -> void:
+    Terrain.river_style = Terrain.RiverStyle.WINDING;
+    var steep_share:Dictionary = {};
+    for level in Terrain.HILLS:
+        Terrain.hills_level = level;
+        var steep:int = 0;
+        var land:int = 0;
+        for s in seeds:
+            var t:Terrain = Terrain.new();
+            t.generate(s);
+            for z in Terrain.SIZE:
+                for x in Terrain.SIZE:
+                    var c:Vector2i = Vector2i(x, z);
+                    if t.cell_height(c) < Terrain.WATER_LEVEL + 0.4:
+                        continue;
+                    land += 1;
+                    if t.cell_slope(c) > 1.0:
+                        steep += 1;
+            t.free();
+        steep_share[level] = float(steep) / maxf(1.0, land);
+        print("%s hills: %.1f%% of the land is steep" % [Terrain.HILLS[level]["name"], steep_share[level] * 100.0]);
+    Terrain.hills_level = Terrain.Hills.NORMAL;
+    _expect("flat is almost all gentle ground", steep_share[Terrain.Hills.FLAT] < 0.03);
+    _expect("steep ground grows with the setting", steep_share[Terrain.Hills.FLAT] < steep_share[Terrain.Hills.FEW] and steep_share[Terrain.Hills.FEW] < steep_share[Terrain.Hills.NORMAL] and steep_share[Terrain.Hills.NORMAL] < steep_share[Terrain.Hills.MANY]);
 
 func _expect(what:String, ok:bool) -> void:
     print("%s: %s" % ["PASS" if ok else "FAIL", what]);

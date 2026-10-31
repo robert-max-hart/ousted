@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.5.2-dev | 30 Oct 2026 | Hills option, a steadier fishing catch and a probe runner
+- New Game has a "Hills" choice (Flat, Few, Normal, Many): how many hill regions the map has and how high they rise. Flat has almost no steep ground, so stone and iron are scarce beyond the start; Many is hilly and rich in both but has little level ground. Saves remember it.
+- Fishing huts catch more on a river: the catch grows with the square root of the water share instead of the share itself.
+
 # 0.5.1 | 30 Oct 2026 | Meta, part 1: save slots, settings, new map and game options, a tutorial and scenarios
 - The Esc menu has "Save game..." and "Load game...": save under any name, pick from a list of saves (newest first, with the date and citizen count) and delete old ones. F5 and F9 still quicksave and quickload.
 - The title screen has a "Load Game" button that opens the same list.

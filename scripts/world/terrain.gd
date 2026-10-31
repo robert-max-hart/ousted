@@ -87,8 +87,17 @@ const BASE_OFFSET    :float = 1.4;      # lifts the base so most of it is dry la
 const BASE_OCTAVES   :int = 3;          # more octaves, more small bumps
 const BASE_FREQ      :float = 0.010;
 const HILLS_FREQ     :float = 0.008;    # how big the hill regions are
-const HILLS_FROM     :float = 0.19;     # hill mask noise above this raises hills (higher: fewer hill regions)
-const HILLS_AMP      :float = 15.0;     # how high the ridges stand
+# How hilly the map is (the New Game screen's "Hills"): `from` is the hill mask noise above which hills rise (higher:
+# fewer hill regions), `amp` how high the ridges stand. Normal is what the map always was. Rocks and iron ore appear on
+# steep ground, so a flat map has little of either beyond the guaranteed few at the start.
+enum Hills { FLAT, FEW, NORMAL, MANY };       # (new ids go last: saves keep the numbers)
+const HILLS:Dictionary = {
+    Hills.FLAT:   {"name": "Flat",   "from": 0.45, "amp": 5.0,  "desc": "Almost no hills, only gentle rises. Plenty of room to build, but little stone or iron beyond the start."},
+    Hills.FEW:    {"name": "Few",    "from": 0.30, "amp": 11.0, "desc": "A few small hill regions in a mostly level land."},
+    Hills.NORMAL: {"name": "Normal", "from": 0.19, "amp": 15.0, "desc": "Hill regions here and there, with level land between."},
+    Hills.MANY:   {"name": "Many",   "from": 0.05, "amp": 18.0, "desc": "Hills across much of the map: rich in stone and iron, but little level ground."},
+};
+static var hills_level:int = Hills.NORMAL;
 
 # A winding river from one edge of the map to the opposite one: it follows low ground where it can, widens downstream, and has
 # a few shallow fords where citizens can wade across. tests/river_probe prints what it makes for a set of seeds.
@@ -286,12 +295,14 @@ func generate(world_seed:int) -> void:
     ridges.fractal_octaves = 3;
 
     var n:int = SIZE + 1;
+    var hills_from:float = float(HILLS[hills_level]["from"]);
+    var hills_amp:float = float(HILLS[hills_level]["amp"]);
     heights.resize(n * n);
     for z in n:
         for x in n:
             var h:float = base.get_noise_2d(x, z) * BASE_AMP + BASE_OFFSET;
-            var mask:float = clampf((hills_mask.get_noise_2d(x, z) - HILLS_FROM) * 3.0, 0.0, 1.0);
-            h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * HILLS_AMP;
+            var mask:float = clampf((hills_mask.get_noise_2d(x, z) - hills_from) * 3.0, 0.0, 1.0);
+            h += mask * (ridges.get_noise_2d(x, z) * 0.5 + 0.5) * hills_amp;
             heights[z * n + x] = h;
     river_dist = PackedFloat32Array();
     river_path = PackedVector2Array();

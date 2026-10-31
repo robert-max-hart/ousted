@@ -19,6 +19,7 @@ var _choose_start:CheckBox;
 var _size_pick  :OptionButton;
 var _river_pick :OptionButton;
 var _river_text :Label;
+var _hills_pick :OptionButton;
 var _climate_pick:OptionButton;
 var _climate_text:Label;
 var _climate_warn:Label;
@@ -51,6 +52,7 @@ func _build_backdrop() -> void:
     Terrain.set_size(Terrain.DEFAULT_SIZE);       # the backdrop town is always on a Large map with the usual river
     Terrain.river_style = Terrain.RiverStyle.WINDING;
     Climate.current = Climate.Id.TEMPERATE;
+    Terrain.hills_level = Terrain.Hills.NORMAL;
     GameRules.reset();
     World.backdrop = true;
     add_child((load(SaveGame.MAIN_SCENE) as PackedScene).instantiate());
@@ -278,6 +280,13 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     _river_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.7));
     col.add_child(_river_text);
     _show_river_text();
+    _hills_pick = OptionButton.new();
+    for id in Terrain.HILLS:
+        _hills_pick.add_item(Terrain.HILLS[id]["name"], id);
+        _hills_pick.set_item_tooltip(_hills_pick.get_item_count() - 1, Terrain.HILLS[id]["desc"]);
+    _hills_pick.select(_hills_pick.get_item_index(Terrain.Hills.NORMAL));
+    _hills_pick.tooltip_text = "How hilly the map is. Hills hold the stone and iron; level ground is where you build.";
+    _setup_row(col, "Hills", _hills_pick);
     _climate_pick = OptionButton.new();
     for id in Climate.DEFS:
         _climate_pick.add_item(Climate.name_of(id), id);
@@ -425,6 +434,7 @@ func _on_start() -> void:
     World.choose_start = _choose_start.button_pressed;
     Terrain.set_size(Terrain.MAP_SIZES[_size_pick.selected]);
     Terrain.river_style = _river_pick.get_selected_id();
+    Terrain.hills_level = _hills_pick.get_selected_id();
     Climate.current = _climate_pick.get_selected_id();
     GameRules.start = _start_pick.selected;
     GameRules.settlers = GameRules.SETTLERS[_settlers_pick.selected];

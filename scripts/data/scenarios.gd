@@ -5,7 +5,7 @@
 #     plays the same map; the title screen can randomize it instead.
 #     Which ones were completed is kept in user://scenarios.cfg.
 #
-#     setup: size (a Terrain.MAP_SIZES entry), water (Terrain.RiverStyle), climate (Climate.Id), start
+#     setup: size (a Terrain.MAP_SIZES entry), water (Terrain.RiverStyle), [hills] (Terrain.Hills, normal if missing), climate (Climate.Id), start
 #     (GameRules.Start), difficulty (a Defs.DIFFICULTIES id), settlers, supplies and merchants (indices into the
 #     GameRules lists), droughts. goals: {type, count, [id], [item]}, see ScenarioRun.
 # ----------------------------------------------------------------
@@ -94,6 +94,7 @@ static func apply(id:StringName, randomize:bool) -> void:
     Defs.difficulty = setup["difficulty"];
     Terrain.set_size(setup["size"]);
     Terrain.river_style = setup["water"];
+    Terrain.hills_level = setup.get("hills", Terrain.Hills.NORMAL);
     Climate.current = setup["climate"];
     GameRules.reset();
     GameRules.start = setup["start"];
