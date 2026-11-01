@@ -13,7 +13,7 @@
 # ----------------------------------------------------------------
 class_name PawnRig extends Node3D;
 
-enum Mode { IDLE, WALK, WORK, SLEEP }
+enum Mode { IDLE, WALK, WORK, SLEEP, SIT, EAT, DRINK }
 
 const DIR      :String = "res://assets/models/citizens/";
 const HIP      :float = 0.55;
@@ -21,6 +21,9 @@ const NECK     :float = 0.46;
 const SHOULDER_Y:float = 0.37;
 const WORK_RATE:float = 7.0;          # radians a second of the work swing (Pawn._strike listens to the same clock)
 const WALK_RATE:float = 9.0;
+const STRIDE_PER_METRE:float = 4.6;   # radians of the leg cycle per metre walked (a full cycle is two steps, about 1.4 m): feet keep up with the ground
+const MOOD_HAPPY:float = 0.7;         # at or over this the face smiles, under MOOD_SAD it frowns
+const MOOD_SAD:float = 0.4;
 
 # Joint angles at the bottom (strike) and top of a work swing, and how far the body leans, per sound id.
 const SWINGS:Dictionary = {
@@ -43,6 +46,8 @@ static var _meshes:Dictionary = {};
 var _mat      :ShaderMaterial;
 var _upper    :Node3D;            # everything above the hips: leans to work
 var _head     :Node3D;
+var _mouth    :MeshInstance3D;
+var _mouth_kind:StringName = &"";
 var _arm_l    :Node3D;
 var _arm_r    :Node3D;
 var _leg_l    :Node3D;
@@ -93,6 +98,8 @@ func build(is_male:bool, rng:RandomNumberGenerator) -> void:
     _arm_l = _joint(_upper, "arm_l", Vector3(-sx, SHOULDER_Y, 0.0));
     _arm_r = _joint(_upper, "arm_r", Vector3(sx, SHOULDER_Y, 0.0));
     _head = _joint(_upper, "head_%d" % style, Vector3(0, NECK, 0.0));
+    _mouth = _mesh_on(_head, "mouth_neutral");
+    _mouth_kind = &"neutral";
     _prop = MeshInstance3D.new();
     _prop.material_override = _mat;
     _prop.position = Vector3(0, -0.5, 0.0);
@@ -123,6 +130,14 @@ func _mesh_on(parent:Node3D, part_name:String) -> MeshInstance3D:
 
 # --------------------------------
 # Look: size by age, grey elders, clothes
+
+# The face follows the mood: a smile when happy, a frown when unhappy (babies have no mood: pass 0.55).
+func set_mood(mood:float) -> void:
+    var kind:StringName = &"happy" if mood >= MOOD_HAPPY else &"sad" if mood < MOOD_SAD else &"neutral";
+    if kind == _mouth_kind:
+        return;
+    _mouth_kind = kind;
+    _mouth.mesh = part("mouth_%s" % kind);
 
 # Babies and children are smaller and grow; elders stoop and go grey.
 func set_stage(age:float, baby:bool, adult:bool, elder:bool) -> void:
@@ -158,12 +173,13 @@ func set_carry(item:StringName, amount:int) -> void:
 
 # One frame of animation. `t` is the animation clock (it runs at the game speed), `k` how quickly joints settle (0 to 1),
 # `work` is the sound id of the work being done (&"" for none, see Pawn._work_sound) and `carrying` whether goods are held.
-func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool) -> void:
+func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:float = -1.0) -> void:
     var ang:Dictionary = {"ll": 0.0, "lr": 0.0, "al": 0.0, "ar": 0.0, "lean": 0.0, "z": 0.05, "head": 0.0, "head_y": 0.0, "y": 0.0};
     var lie:float = 0.0;
     var prop:StringName = &"";
     var stoop:float = 0.14 if _elder else 0.0;
-    var swing:float = sin(t * WALK_RATE);
+    var swing:float = sin(t * WALK_RATE if stride < 0.0 else stride);       # (the stride is the distance walked, in radians of the cycle)
+    var sit:float = 0.0;
     match mode:
         Mode.WALK:
             ang["ll"] = swing * 0.7;
@@ -196,6 +212,32 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool) -> void:
             lie = 1.0;
             ang["al"] = -0.15;
             ang["ar"] = 0.1;
+        Mode.SIT, Mode.EAT:
+            # sitting on the ground, legs out in front, hands on the knees; eating brings a hand to the mouth now and then
+            sit = 1.0;
+            ang["ll"] = -1.5;
+            ang["lr"] = -1.42;
+            ang["lean"] = 0.08 + stoop;
+            ang["al"] = -0.65;
+            ang["ar"] = -0.6;
+            ang["head_y"] = 0.3 * sin(t * 0.5) * (0.5 + 0.5 * sin(t * 0.19));
+            if mode == Mode.EAT:
+                var bite:float = (sin(t * 4.2) + 1.0) * 0.5;
+                ang["ar"] = lerpf(-0.5, -2.05, bite);
+                ang["al"] = -0.55;
+                ang["head"] = 0.08 * bite;
+                ang["head_y"] = 0.0;
+            else:
+                ang["lean"] += 0.01 * sin(t * 1.6);
+        Mode.DRINK:
+            # bent over, cupped hands scooped up to the mouth
+            var scoop:float = (sin(t * 3.4) + 1.0) * 0.5;
+            ang["lean"] = lerpf(0.75, 0.5, scoop) + stoop;
+            ang["al"] = lerpf(-1.2, -1.95, scoop);
+            ang["ar"] = lerpf(-1.25, -1.9, scoop);
+            ang["ll"] = 0.12;
+            ang["lr"] = -0.1;
+            ang["head"] = lerpf(0.15, 0.0, scoop);
         _:
             var breath:float = sin(t * 1.6);
             ang["lean"] = stoop + 0.01 * breath;
@@ -217,7 +259,8 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool) -> void:
     _head.rotation.x = lerpf(_head.rotation.x, ang["head"] - ang["lean"] * 0.5, k);
     _head.rotation.y = lerpf(_head.rotation.y, ang["head_y"], k * 0.5);
     rotation.x = lerpf(rotation.x, -PI * 0.5 * lie, 0.15);
-    position.y = lerpf(position.y, 0.22 + 0.01 * sin(t * 2.0) if lie > 0.0 else 0.0, 0.15);
+    var low:float = 0.22 + 0.01 * sin(t * 2.0) if lie > 0.0 else (-(HIP - 0.07) if sit > 0.0 else 0.0);       # (sitting: the hips come down to the ground)
+    position.y = lerpf(position.y, low, 0.15);
 
 func _set_prop(id:StringName) -> void:
     if id == _prop_id:

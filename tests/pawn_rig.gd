@@ -75,6 +75,35 @@ func _ready() -> void:
     _expect("carried wood shows as logs", rig._carry.visible and rig._carry.mesh == PileGoods.mesh_for(&"log"));
     rig.set_carry(&"", 0);
     _expect("and hides again", not rig._carry.visible);
+    # the stride follows the distance given, not the clock
+    rig.pose(PawnRig.Mode.WALK, 0.0, 1.0, &"", false, 0.5);
+    var a:float = rig._leg_l.rotation.x;
+    rig.pose(PawnRig.Mode.WALK, 99.0, 1.0, &"", false, 0.5);
+    _expect("a walk with a given stride ignores the clock", is_equal_approx(a, rig._leg_l.rotation.x));
+    # sitting: legs out in front, hips down; eating lifts a hand to the mouth
+    for i in 40:
+        rig.pose(PawnRig.Mode.SIT, 1.0, 1.0, &"", false);
+    _expect("sitting puts the legs out in front", rig._leg_l.rotation.x < -1.2 and rig._leg_r.rotation.x < -1.2);
+    _expect("and the hips on the ground", rig.position.y < -0.35);
+    var lowest:float = 0.0;
+    var highest:float = -9.0;
+    for i in 60:
+        rig.pose(PawnRig.Mode.EAT, i * 0.1, 1.0, &"", false);
+        lowest = maxf(lowest, rig._arm_r.rotation.x);
+        highest = maxf(highest, -rig._arm_r.rotation.x);
+    _expect("eating raises a hand to the mouth and lowers it again", highest > 1.8 and lowest > -1.0 and rig.position.y < -0.35);
+    for i in 40:
+        rig.pose(PawnRig.Mode.IDLE, 0.0, 1.0, &"", false);
+    _expect("standing up lifts the hips again", rig.position.y > -0.05);
+    rig.pose(PawnRig.Mode.DRINK, 0.3, 1.0, &"", false);
+    _expect("drinking bends over", rig._upper.rotation.x > 0.4);
+    # the face follows the mood
+    rig.set_mood(0.9);
+    var happy:Mesh = rig._mouth.mesh;
+    rig.set_mood(0.2);
+    var sad:Mesh = rig._mouth.mesh;
+    rig.set_mood(0.55);
+    _expect("three different mouths for happy, sad and in between", happy != sad and rig._mouth.mesh != happy and rig._mouth.mesh != sad);
     print("PAWN RIG %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

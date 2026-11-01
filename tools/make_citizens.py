@@ -37,6 +37,8 @@ BOOT = (0.24, 0.17, 0.12)
 BELT = (0.3, 0.2, 0.12)
 BUCKLE = (0.7, 0.62, 0.3)
 EYE = (0.09, 0.08, 0.08)
+WHITE_EYE = (0.92, 0.92, 0.9)
+LIP = (0.58, 0.3, 0.28)
 WOOD = (0.5, 0.36, 0.22)
 STEEL = (0.62, 0.64, 0.68)
 DARK_STEEL = (0.42, 0.44, 0.48)
@@ -78,9 +80,12 @@ def head(style):
     m.ball(0.148, cy - 0.005, 0, 0.022, 0.04, 0.03, skin(0.9), segs=6, rings=4)
     m.ball(0, cy - 0.02, 0.15, 0.028, 0.03, 0.03, skin(0.9), segs=6, rings=4)       # the nose
     for sx in (-1, 1):
-        m.ball(sx * 0.055, cy + 0.02, 0.138, 0.014, 0.018, 0.01, EYE, segs=6, rings=4)
+        m.ball(sx * 0.055, cy + 0.02, 0.134, 0.024, 0.026, 0.013, WHITE_EYE, segs=7, rings=4)   # the white of the eye
+        m.ball(sx * 0.055, cy + 0.018, 0.142, 0.013, 0.017, 0.008, EYE, segs=6, rings=4)         # the pupil
         m.box(sx * 0.055, cy + 0.06, 0.141, 0.04, 0.007, 0.008, hair(0.75))            # brows
-    m.box(0, cy - 0.075, 0.139, 0.05, 0.008, 0.01, (0.55, 0.3, 0.28))               # the mouth
+        if style in (1, 2):                                                             # lashes
+            m.box(sx * 0.055, cy + 0.043, 0.143, 0.046, 0.005, 0.006, EYE)
+    # (the mouth is a part of its own, mouth_happy / mouth_neutral / mouth_sad, swapped with the citizen's mood)
     if style == 0:          # short hair: a cap that stops above the ears, a little fringe
         m.ball(0, cy + 0.045, -0.005, 0.158, 0.13, 0.16, hair(1.0), segs=12, rings=6)
         m.box(0, cy + 0.1, 0.125, 0.2, 0.05, 0.05, hair(0.95))
@@ -102,6 +107,20 @@ def head(style):
         m.box(0, cy + 0.1, 0.125, 0.2, 0.05, 0.05, hair(0.95))
         m.ball(0, cy - 0.1, 0.07, 0.115, 0.1, 0.09, hair(0.9), segs=10, rings=5)
         m.box(0, cy - 0.065, 0.14, 0.09, 0.025, 0.02, hair(0.8))
+    return m
+
+def mouth(kind):
+    """The mouth, at its place on the face (the head's own origin is the neck): a flat line, a smile or a frown."""
+    m = Mesh()
+    cy = 0.18
+    n = 5
+    for i in range(n):
+        t = (i - (n - 1) / 2) / ((n - 1) / 2)                                           # -1 to 1 across the mouth
+        bend = {"happy": 0.016, "neutral": 0.0, "sad": -0.014}[kind]       # the ends rise in a smile and fall in a frown
+        y = cy - 0.078 + bend * t * t
+        m.box(t * 0.026, y, 0.14, 0.014, 0.008, 0.01, LIP)
+    if kind == "happy":
+        m.box(0, cy - 0.082, 0.1405, 0.04, 0.006, 0.008, (0.95, 0.93, 0.9))              # a hint of teeth
     return m
 
 def arm(side):
@@ -170,6 +189,7 @@ def basket():
 for name, mesh in (("torso_m", torso(False)), ("torso_f", torso(True)),
                    ("head_0", head(0)), ("head_1", head(1)), ("head_2", head(2)), ("head_3", head(3)), ("head_4", head(4)),
                    ("arm_l", arm(-1)), ("arm_r", arm(1)), ("leg_l", leg(-1)), ("leg_r", leg(1)),
+                   ("mouth_happy", mouth("happy")), ("mouth_neutral", mouth("neutral")), ("mouth_sad", mouth("sad")),
                    ("axe", axe()), ("hammer", hammer()), ("pick", pick()), ("hoe", hoe()), ("basket", basket())):
     mesh.write(name, OUT)
 print("wrote", len([f for f in os.listdir(OUT) if f.endswith(".obj")]), "parts")

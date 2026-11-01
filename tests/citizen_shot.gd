@@ -11,6 +11,7 @@ var world:World;
 var _out:String = "user://";
 var _frame:int = 0;
 var _o:Vector2i;
+var _poses_now:Array = [];
 
 func _ready() -> void:
     SaveGame.autosave_enabled = false;
@@ -51,6 +52,23 @@ func _poses() -> Array:
         [PawnRig.Mode.SLEEP, &"", false, 30.0],
     ];
 
+# The resting and eating poses and the three faces: [mode, work, carrying, age, mood].
+func _poses2() -> Array:
+    return [
+        [PawnRig.Mode.SIT, &"", false, 28.0, 0.55],
+        [PawnRig.Mode.EAT, &"", false, 28.0, 0.55],
+        [PawnRig.Mode.EAT, &"", false, 30.0, 0.55],
+        [PawnRig.Mode.DRINK, &"", false, 28.0, 0.55],
+        [PawnRig.Mode.DRINK, &"", false, 30.0, 0.55],
+        [PawnRig.Mode.SIT, &"", false, 70.0, 0.55],
+        [PawnRig.Mode.SIT, &"", false, 11.0, 0.55],
+        [PawnRig.Mode.IDLE, &"", false, 28.0, 0.9],
+        [PawnRig.Mode.IDLE, &"", false, 30.0, 0.9],
+        [PawnRig.Mode.IDLE, &"", false, 28.0, 0.55],
+        [PawnRig.Mode.IDLE, &"", false, 30.0, 0.2],
+        [PawnRig.Mode.IDLE, &"", false, 28.0, 0.2],
+    ];
+
 func _process(_delta:float) -> void:
     _frame += 1;
     if _frame == 5:
@@ -69,11 +87,30 @@ func _process(_delta:float) -> void:
             world.camera_rig._target_distance = 6.0;
         90:
             _shot("citizens_close");
+            _poses_now = _poses2();
+            _arrange(0.0);
+            world.camera_rig.focus_on(Vector3(_o.x + 6.0, 0, _o.y + 2.0));
+            world.camera_rig._distance = 9.0;
+            world.camera_rig._target_distance = 9.0;
+        110:
+            _shot("citizens_rest_a");
+            _arrange(0.35);
+        125:
+            _shot("citizens_rest_b");
+            _arrange(0.6);
+        140:
+            _shot("citizens_rest_c");
+            world.camera_rig.focus_on(Vector3(_o.x + 6.0, 0.8, _o.y + 5.0));
+            world.camera_rig._distance = 3.4;
+            world.camera_rig._target_distance = 3.4;
+            world.camera_rig._pitch = deg_to_rad(-10.0);
+        160:
+            _shot("citizens_faces");
             get_tree().quit();
 
 # Puts a citizen in each pose, in two rows, at animation time t (the work swing is at a different point of its cycle for each t).
 func _arrange(t:float) -> void:
-    var poses:Array = _poses();
+    var poses:Array = _poses() if _poses_now.is_empty() else _poses_now;
     for i in poses.size():
         if i >= world.pawns.size():
             break;
@@ -84,11 +121,12 @@ func _arrange(t:float) -> void:
         p.carry_item = &"wood" if d[2] else &"";
         p._update_carry_visual();
         p._rig.set_stage(p.age, p.is_baby(), p.is_adult(), p.age >= 60.0);
+        p._rig.set_mood(d[4] if d.size() > 4 else 0.55);
         var col:int = i % 6;
         var row:int = i / 6;
         p.position = world.terrain.cell_center(_o + Vector2i(col * 2, row * 3));
         p.rotation.y = 0.0;
-        p.rotation.y = PI * 0.5 if i % 2 == 0 else -PI * 0.5;          # side on, to the left or the right
+        p.rotation.y = (PI * 0.5 if i % 2 == 0 else -PI * 0.5) if _poses_now.is_empty() or i < 7 else 0.0;          # side on, to the left or the right (the faces look at the camera)
         for k in 30:
             p._rig.pose(d[0], t, 1.0, d[1], d[2]);
 

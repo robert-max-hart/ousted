@@ -78,6 +78,11 @@ var _idle_mark      :Sprite3D;                # a small icon over a citizen with
 var _anim_t         :float = 0.0;
 var _work_now       :bool = false;            # what the last frame did, for the animation
 var _move_now       :bool = false;
+var _eat_now        :StringName = &"";        # &"eat" or &"drink" while doing that (sitting to eat, bending to drink)
+var _still_t        :float = 0.0;             # seconds an idle citizen has stood still: after a while they sit down
+var _stride         :float = 0.0;             # the walk cycle, in radians: it advances with the distance walked, so the feet keep up with the ground
+var _last_pos       :Vector3 = Vector3.ZERO;
+const SIT_AFTER     :float = 4.0;
 var _inside_work    :Building = null;         # a workplace this citizen is working inside of (out of sight), see Defs "indoor_work"
 
 func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[String] = []) -> void:
@@ -544,6 +549,7 @@ func _run_task(move_dt:float, dh:float) -> void:
             _enter_workplace();
             var working:bool = not NON_WORK_KINDS.has(task.kind);
             _work_now = working and is_laboring() and task.kind != &"teach";
+            _eat_now = task.kind if (task.kind == &"eat" or task.kind == &"drink") else &"";
             var speed:float = (1.0 + tool_bonus()) * work_efficiency() if working else 1.0;
             if working:
                 _wear_tool(dh);
@@ -674,23 +680,37 @@ func _animate(delta:float) -> void:
     _anim_t += delta * speed;
     var work:bool = _work_now and speed > 0.0;
     var move:bool = _move_now and speed > 0.0;
+    var eating:StringName = _eat_now;
     _work_now = false;
     _move_now = false;
+    _eat_now = &"";
     _idle_mark.visible = is_idle();
     _rig.set_stage(age, is_baby(), is_adult(), age >= Defs.OLD_AGE_EFFICIENCY[0][0]);
+    _rig.set_mood(0.55 if is_baby() else mood);
+    var moved:float = Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length();
+    _last_pos = position;
+    if moved < 1.5:          # (a jump, such as stepping out of a workplace, is not a stride)
+        _stride += moved * PawnRig.STRIDE_PER_METRE * minf(1.0, 3.0 / maxf(1.0, GameClock.speed())) / maxf(0.5, _rig.scale.x);
     var carrying:bool = carry_amount > 0;
     if sleeping and not indoors:         # out in the open (homeless): lie down, with a slow breath
         _rig.pose(PawnRig.Mode.SLEEP, _anim_t, 0.2, &"", false);
     elif work:
+        _still_t = 0.0;
         var phase:float = fposmod(_anim_t * PawnRig.WORK_RATE, TAU);
         if _last_phase < 1.5 * PI and phase >= 1.5 * PI:          # the tool comes down
             _strike();
         _last_phase = phase;
         _rig.pose(PawnRig.Mode.WORK, _anim_t, 0.6, _work_sound(), carrying);
+    elif eating != &"" and not move:
+        _still_t = 0.0;
+        _rig.pose(PawnRig.Mode.EAT if eating == &"eat" else PawnRig.Mode.DRINK, _anim_t, 0.3, &"", false);
     elif move:
-        _rig.pose(PawnRig.Mode.WALK, _anim_t, 0.5, &"", carrying);
+        _still_t = 0.0;
+        _rig.pose(PawnRig.Mode.WALK, _anim_t, 0.5, &"", carrying, _stride);
     else:
-        _rig.pose(PawnRig.Mode.IDLE, _anim_t, 0.25, &"", carrying);
+        _still_t += delta * speed;
+        var rest:bool = _still_t > SIT_AFTER and is_idle() and not carrying;          # nothing to do for a while: sit down
+        _rig.pose(PawnRig.Mode.SIT if rest else PawnRig.Mode.IDLE, _anim_t, 0.25, &"", carrying);
 
 # The sound of one swing of the tool at what this citizen is working on (see Sfx).
 func _strike() -> void:
