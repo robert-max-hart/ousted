@@ -172,6 +172,7 @@ func order_complete() -> bool:
 
 # Every sold unit is here: the merchant takes them and hands over the purchases.
 func settle() -> void:
+    Sfx.at(&"coins", global_position + Vector3(0, 0.8, 0), 0.04, -3.0, 50.0);
     var stock:Dictionary = world.traders.visit.get("stock", {});
     for item in order["buy"]:
         stock[item] = stock.get(item, 0) - order["buy"][item];

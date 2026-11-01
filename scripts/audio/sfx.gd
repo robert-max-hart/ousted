@@ -28,6 +28,7 @@ static var _flat    :Array[AudioStreamPlayer] = [];
 static var _world   :Array[AudioStreamPlayer3D] = [];
 static var _last_ms :Dictionary = {};
 static var _hooked  :bool = false;
+static var _focused :bool = true;
 
 # --------------------------------
 # Buses and volumes
@@ -44,7 +45,7 @@ static func ensure_buses() -> void:
 # Sets the bus volumes from Settings (0 to 100 each; 0 mutes).
 static func apply_volumes() -> void:
     ensure_buses();
-    _set_bus(&"Master", Settings.volume_master);
+    _set_bus(&"Master", 0 if (not _focused and Settings.mute_unfocused) else Settings.volume_master);       # (a window that lost focus is silent, if the player wants)
     _set_bus(BUS_SFX, Settings.volume_sfx);
     _set_bus(BUS_AMBIENT, Settings.volume_ambient);
     _set_bus(BUS_MUSIC, Settings.volume_music);
@@ -72,17 +73,19 @@ static func ui(id:StringName) -> bool:
     for p in _flat:
         if not p.playing:
             p.stream = s;
+            p.volume_db = 0.0;
             p.pitch_scale = 1.0;
             p.play();
             return true;
     return false;
 
-# A sound at a place in the world. Returns whether it started.
-static func at(id:StringName, position:Vector3, pitch_jitter:float = 0.06) -> bool:
-    if not _ready_to_play() or Settings.volume_sfx <= 0 or _too_soon(id, GAP_WORLD_MS):
+# A sound at a place in the world. `volume_db` makes it softer, `reach` is how far from the camera (plus the camera's height, so a zoomed-out view
+# hears more of the map) it can be heard, and `gap_ms` the least time between two plays of the same id. Returns whether it started.
+static func at(id:StringName, position:Vector3, pitch_jitter:float = 0.06, volume_db:float = 0.0, reach:float = HEARD_WITHIN, gap_ms:int = GAP_WORLD_MS) -> bool:
+    if not _ready_to_play() or Settings.volume_sfx <= 0 or _too_soon(id, gap_ms):
         return false;
     var cam:Camera3D = _holder.get_viewport().get_camera_3d();
-    if cam == null or cam.global_position.distance_to(position) > HEARD_WITHIN + cam.global_position.y:
+    if cam == null or cam.global_position.distance_to(position) > reach + cam.global_position.y:
         return false;
     var speed:float = GameClock.speed();
     if speed > 2.5 and randf() > 2.5 / speed:          # at 5x and 10x only a share of the strikes sound
@@ -94,6 +97,7 @@ static func at(id:StringName, position:Vector3, pitch_jitter:float = 0.06) -> bo
         if not p.playing:
             p.stream = s;
             p.global_position = position;
+            p.volume_db = volume_db;
             p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter);
             p.play();
             return true;
@@ -101,6 +105,7 @@ static func at(id:StringName, position:Vector3, pitch_jitter:float = 0.06) -> bo
 
 # Every button anywhere in the tree clicks when pressed (and so does one made later).
 static func hook_buttons(tree:SceneTree) -> void:
+    _ready_to_play();          # (also starts the holder that hears the window lose focus)
     if _hooked:
         return;
     _hooked = true;
@@ -108,6 +113,11 @@ static func hook_buttons(tree:SceneTree) -> void:
         if n is BaseButton and not n.has_meta(&"sfx_hooked"):
             n.set_meta(&"sfx_hooked", true);
             (n as BaseButton).pressed.connect(func() -> void: Sfx.ui(&"click")));
+
+# The window gained or lost focus (SfxHolder tells us): with Settings.mute_unfocused the game goes quiet while another window is in front.
+static func on_focus(focused:bool) -> void:
+    _focused = focused;
+    apply_volumes();
 
 # --------------------------------
 # Internals
@@ -119,7 +129,7 @@ static func _ready_to_play() -> bool:
             return false;
         ensure_buses();
         apply_volumes();
-        _holder = Node.new();
+        _holder = SfxHolder.new();
         _holder.name = "Sfx";
         _flat.clear();
         _world.clear();

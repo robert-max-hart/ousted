@@ -421,6 +421,8 @@ func _on_drought(on:bool) -> void:
     if is_backdrop:
         return;
     notify("A drought begins: no rain, and the ground dries fast. Fields away from water need watering." if on else "The drought has broken.");
+    if on:
+        Sfx.ui(&"drought");
 
 func _update_wetness() -> void:
     wetness += 0.03 * Weather.intensity;
@@ -823,7 +825,11 @@ func _on_terrain_changed(r:Rect2i) -> void:
 # --------------------------------
 # Time
 
-func _on_hour(_h:int) -> void:
+func _on_hour(h:int) -> void:
+    if h == int(Defs.SCHOOL_START) or h == int(Defs.SCHOOL_END):
+        for b in buildings:
+            if b.is_complete() and b.def.has("school_capacity"):
+                Sfx.at(&"bell", b.global_position + Vector3(0, 2.0, 0), 0.0, -4.0, 55.0);      # the school bell, at the start and the end of lessons
     jobs.reconcile();
     families.on_hour();
     for b in buildings.duplicate():

@@ -37,6 +37,7 @@ func _init() -> void:
     _volume(col, "Master volume", Settings.volume_master, "volume_master", "");
     _volume(col, "Effects volume", Settings.volume_sfx, "volume_sfx", "Work sounds, clicks and the chimes for events.");
     _volume(col, "Ambience volume", Settings.volume_ambient, "volume_ambient", "Wind, rain, water, birds and crickets.");
+    _check(col, "Mute when the window loses focus", Settings.mute_unfocused, "mute_unfocused", "The game goes quiet while another window is in front, and comes back when you return.");
     var grass:OptionButton = OptionButton.new();
     grass.focus_mode = Control.FOCUS_NONE;
     for n in Settings.GRASS_NAMES:

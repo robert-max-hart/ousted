@@ -14,6 +14,9 @@ const COLLECT_AT      :int = 4;        # units ready before a farmer is sent
 const READY_CAP       :int = 60;       # what piles up uncollected (the rest is lost)
 const SLAUGHTER_PER_DAY:int = 2;       # most animals slaughtered a day when over the "keep at most" level
 const EXTRA_COLLECT_AT:int = 2;        # meat or leather ready before a farmer is sent
+const CALL_EVERY      :Dictionary = {&"chicken": Vector2(7.0, 18.0), &"sheep": Vector2(16.0, 40.0), &"cow": Vector2(22.0, 55.0)};     # real seconds between calls from the herd
+const CALL_SOUND      :Dictionary = {&"chicken": &"cluck", &"sheep": &"baa", &"cow": &"moo"};
+const CALL_DB         :Dictionary = {&"chicken": -9.0, &"sheep": -7.0, &"cow": -5.0};
 const SPEED           :Dictionary = {&"chicken": 0.55, &"sheep": 0.38, &"cow": 0.3};      # metres a second at 1x
 const GRAZE_FOR       :Vector2 = Vector2(3.0, 9.0);       # seconds an animal stands with its head down before wandering on
 const YOUNG_OFFSET    :Dictionary = {&"chicken": 0.45, &"sheep": 0.8, &"cow": 1.15};       # how far from its mother a young one stands
@@ -43,6 +46,7 @@ var _wait       :PackedFloat32Array = PackedFloat32Array();
 var _yaw        :PackedFloat32Array = PackedFloat32Array();
 var _walk       :PackedFloat32Array = PackedFloat32Array();
 var _graze      :PackedFloat32Array = PackedFloat32Array();
+var _call_in    :float = 6.0;                  # seconds until the herd next calls
 var _vis_rng    :RandomNumberGenerator = RandomNumberGenerator.new();      # (not the world's: the herd's looks must not change a game's random numbers)
 var _drawn      :int = -1;
 
@@ -309,6 +313,9 @@ func _process(delta:float) -> void:
         young_ages.pop_back();
     var dt:float = delta * minf(World.fx_speed(), 3.0);
     _t += dt;
+    _call_in -= dt;
+    if _call_in <= 0.0:
+        _call();
     var r:Rect2 = Rect2(rect()).grow(-0.9);
     _sync_herd(r);
     var adults:int = animals - young_count();
@@ -353,6 +360,17 @@ func _process(delta:float) -> void:
             mm.set_instance_transform(i, xf);
             mm.set_instance_color(i, Color.WHITE if (part == &"legs" and kind != &"cow") else coat);       # (a cow has legs of her own colour)
             mm.set_instance_custom_data(i, timing);
+
+# One of the animals calls (a cluck, a baa, a moo), now and then, by day and only when someone is near enough to hear.
+func _call() -> void:
+    var span:Vector2 = CALL_EVERY[kind];
+    _call_in = _vis_rng.randf_range(span.x, span.y);
+    var hour:int = int(GameClock.total_hours) % GameClock.HOURS_PER_DAY;
+    if hour < 6 or hour >= 21 or animals <= 0 or _pos.is_empty():
+        return;
+    var who:int = _vis_rng.randi() % mini(animals, _pos.size());
+    var at:Vector3 = Vector3(_pos[who].x, world.terrain.height_at(_pos[who].x, _pos[who].y) + 0.4, _pos[who].y);
+    Sfx.at(CALL_SOUND[kind], at, 0.12, CALL_DB[kind], 34.0, 600);
 
 func _random_spot(r:Rect2) -> Vector2:
     return Vector2(r.position.x + _vis_rng.randf() * maxf(r.size.x, 0.1), r.position.y + _vis_rng.randf() * maxf(r.size.y, 0.1));

@@ -14,7 +14,8 @@ func _ready() -> void:
     Weather.drought_enabled = false;
     Settings.ensure_loaded();
     var keep:Array = [Settings.volume_master, Settings.volume_sfx, Settings.volume_ambient];
-    for id in [&"chop", &"hammer", &"pick", &"dig", &"rustle", &"anvil", &"click", &"place", &"error", &"demolish", &"done", &"birth", &"death", &"merchant", &"season", &"treefall"]:
+    for id in [&"chop", &"hammer", &"pick", &"dig", &"rustle", &"anvil", &"click", &"place", &"error", &"demolish", &"done", &"birth", &"death", &"merchant", &"season", &"treefall",
+            &"step_grass", &"step_road", &"step_wade", &"step_deck", &"cluck", &"baa", &"moo", &"drink", &"eat", &"bell", &"coins", &"splash", &"merchant_leave", &"drought"]:
         _expect("a sound file for %s" % id, Sfx.has(id));
     for id in [&"wind", &"rain", &"water", &"birds", &"crickets"]:
         _expect("an ambient loop for %s" % id, ResourceLoader.exists("res://assets/audio/ambient/%s.wav" % id));
@@ -76,6 +77,38 @@ func _ready() -> void:
             _expect("and at a rock picks", p._work_sound() == &"pick");
             break;
     p.task = null;
+
+    # footsteps follow the ground
+    var walker:Pawn = world.pawns[0];
+    var spot:Vector2i = TestSite.near(world, Vector2i(-8, 8), Vector2i(1, 1));
+    walker.position = world.terrain.cell_center(spot);
+    _expect("grass underfoot sounds like grass", walker.step_sound() == &"step_grass");
+    world.terrain.set_overlay(spot, Terrain.Overlay.ROAD);
+    _expect("a road like a road", walker.step_sound() == &"step_road");
+    world.terrain.set_overlay(spot, Terrain.Overlay.NONE);
+    var wet:Vector2i = Vector2i(-1, -1);
+    for z in range(0, Terrain.SIZE, 3):
+        for x in range(0, Terrain.SIZE, 3):
+            if wet.x < 0 and world.terrain.is_water(Vector2i(x, z)) and world.terrain.is_shallow(Vector2i(x, z)) and not world.is_bridge(Vector2i(x, z)):
+                wet = Vector2i(x, z);
+    if wet.x >= 0:
+        walker.position = world.terrain.cell_center(wet);
+        _expect("wading through shallows splashes", walker.step_sound() == &"step_wade");
+    # the herd calls in the daytime and not at night (the call is timed from the herd's own clock, so we only check the choice of sound)
+    for kind in [&"chicken", &"sheep", &"cow"]:
+        _expect("a %s herd has a call" % kind, Sfx.has(Pasture.CALL_SOUND[kind]));
+    # the game goes quiet when the window is behind another, if the player wants
+    Settings.set_value("volume_master", 80);
+    Settings.set_value("mute_unfocused", true);
+    Sfx.on_focus(false);
+    _expect("losing focus mutes the Master bus", AudioServer.is_bus_mute(0));
+    Sfx.on_focus(true);
+    _expect("and getting it back brings the sound back", not AudioServer.is_bus_mute(0));
+    Settings.set_value("mute_unfocused", false);
+    Sfx.on_focus(false);
+    _expect("with the setting off the game keeps playing", not AudioServer.is_bus_mute(0));
+    Sfx.on_focus(true);
+    Settings.set_value("mute_unfocused", true);
 
     Settings.set_value("volume_master", keep[0]);
     Settings.set_value("volume_sfx", keep[1]);

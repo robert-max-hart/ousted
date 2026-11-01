@@ -81,6 +81,7 @@ func fisherman_task(p:Pawn) -> Task:
             while progress >= 1.0 and pw.carry_amount < Pawn.CARRY_CAP:
                 progress -= 1.0;
                 pw.add_carry(&"fish", 1);
+                Sfx.at(&"splash", pw.global_position, 0.1, -6.0, 30.0);
             hut.dig_progress[&"fish"] = progress;
             return pw.carry_amount >= Pawn.CARRY_CAP;
         t.work(cast, "Fishing");

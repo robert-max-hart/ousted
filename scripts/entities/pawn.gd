@@ -82,6 +82,12 @@ var _eat_now        :StringName = &"";        # &"eat" or &"drink" while doing t
 var _still_t        :float = 0.0;             # seconds an idle citizen has stood still: after a while they sit down
 var _stride         :float = 0.0;             # the walk cycle, in radians: it advances with the distance walked, so the feet keep up with the ground
 var _last_pos       :Vector3 = Vector3.ZERO;
+var _steps          :int = 0;                 # whole steps taken (a foot lands every half turn of the walk cycle), for the footsteps
+var _bites          :int = 0;                 # bites taken at this meal, for the eating sounds
+var _meal_kind      :StringName = &"";
+const STEP_REACH    :float = 16.0;            # metres (plus the camera's height) a footstep is heard from
+const STEP_DB       :float = -13.0;
+const STEP_GAP_MS   :int = 140;
 const SIT_AFTER     :float = 4.0;
 var _inside_work    :Building = null;         # a workplace this citizen is working inside of (out of sight), see Defs "indoor_work"
 
@@ -691,6 +697,10 @@ func _animate(delta:float) -> void:
     _last_pos = position;
     if moved < 1.5:          # (a jump, such as stepping out of a workplace, is not a stride)
         _stride += moved * PawnRig.STRIDE_PER_METRE * minf(1.0, 3.0 / maxf(1.0, GameClock.speed())) / maxf(0.5, _rig.scale.x);
+        var step_now:int = int(_stride / PI);
+        if step_now != _steps:
+            _steps = step_now;
+            _footstep();
     var carrying:bool = carry_amount > 0;
     if sleeping and not indoors:         # out in the open (homeless): lie down, with a slow breath
         _rig.pose(PawnRig.Mode.SLEEP, _anim_t, 0.2, &"", false);
@@ -703,14 +713,47 @@ func _animate(delta:float) -> void:
         _rig.pose(PawnRig.Mode.WORK, _anim_t, 0.6, _work_sound(), carrying);
     elif eating != &"" and not move:
         _still_t = 0.0;
+        _meal_sounds(eating);
         _rig.pose(PawnRig.Mode.EAT if eating == &"eat" else PawnRig.Mode.DRINK, _anim_t, 0.3, &"", false);
     elif move:
         _still_t = 0.0;
+        _meal_kind = &"";
         _rig.pose(PawnRig.Mode.WALK, _anim_t, 0.5, &"", carrying, _stride);
     else:
+        _meal_kind = &"";
         _still_t += delta * speed;
         var rest:bool = _still_t > SIT_AFTER and is_idle() and not carrying;          # nothing to do for a while: sit down
         _rig.pose(PawnRig.Mode.SIT if rest else PawnRig.Mode.IDLE, _anim_t, 0.25, &"", carrying);
+
+# A foot lands: the sound of the ground underfoot (a bridge or pier deck, wading through shallow water, a road, or grass), soft, and only near the camera.
+func _footstep() -> void:
+    if indoors or sleeping:
+        return;
+    Sfx.at(step_sound(), global_position, 0.1, STEP_DB, STEP_REACH, STEP_GAP_MS);
+
+# The sound id of the ground this citizen stands on.
+func step_sound() -> StringName:
+    var c:Vector2i = cell();
+    if world.is_bridge(c):
+        return &"step_deck";
+    if world.terrain.is_water(c):
+        return &"step_wade";
+    if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD:
+        return &"step_road";
+    return &"step_grass";
+
+# Drinking splashes once, eating crunches a bite at a time (the hand comes up every 1.5 s or so, see PawnRig).
+func _meal_sounds(kind:StringName) -> void:
+    if kind != _meal_kind:
+        _meal_kind = kind;
+        _bites = int(_anim_t * 4.2 / TAU);
+        if kind == &"drink":
+            Sfx.at(&"drink", global_position, 0.08, -8.0, 24.0);
+        return;
+    var bite:int = int(_anim_t * 4.2 / TAU);
+    if kind == &"eat" and bite != _bites:
+        _bites = bite;
+        Sfx.at(&"eat", global_position, 0.1, -10.0, 20.0, 400);
 
 # The sound of one swing of the tool at what this citizen is working on (see Sfx).
 func _strike() -> void:

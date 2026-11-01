@@ -166,6 +166,7 @@ func depart() -> void:
     if post is TradingPost:
         (post as TradingPost).lapse();
     world.ledger.record_visit(type_name(), visit.get("deals", 0));
+    Sfx.ui(&"merchant_leave");
     var back:Array[Vector2i] = _route_from(merchant.cell(), _entry);
     if back.is_empty():
         _clear();         # no way out is as good as gone

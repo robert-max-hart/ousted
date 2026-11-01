@@ -3,6 +3,12 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.20 | 31 Oct 2026 | Footsteps, animals and more sounds
+- Citizens' footsteps now sound on the ground they walk on: grass, roads, wooden bridges and piers, and splashing through shallow water. They are soft and only heard close to the camera.
+- Chickens cluck, sheep baa and cows moo from their pastures during the day. Citizens splash at the well when they drink and crunch when they eat.
+- The school bell rings at the start and end of lessons, coins chink when a trade goes through, a splash marks each fish caught, a merchant leaving has a farewell chime, and a drought starts with a low rumble.
+- Settings has a new "Mute when the window loses focus" option (on by default): the game goes quiet while another window is in front.
+
 # 0.6.19 | 31 Oct 2026 | Snow on fences, headstones, awnings and branches
 - Snow now settles on fence posts and rails, the wall round a graveyard and its headstones, bridge rails, the market awning and the merchant's cart, and on the branches of trees.
 

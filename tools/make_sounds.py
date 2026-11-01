@@ -294,5 +294,72 @@ write("ambient/crickets.wav", crickets())
 
 write("sfx/treefall.wav", fade_edges(treefall(0)))        # (last, so adding or changing it never shifts the random numbers the others use)
 
+# --------------------------------
+# Added later (written after the sounds above, so a change here never shifts the random numbers they use):
+# footsteps, animal calls, small event sounds. All quiet: the game plays most of them softly and only near the camera.
+
+def step_grass(i):
+    pitch = rng.uniform(0.85, 1.2)
+    return normalise(mix(env_exp(bandpass(noise(0.1), 250, 1400), 0.05, 0.004), gain(env_exp(sine(95 * pitch, 0.08), 0.04), 0.5)), 0.35)
+
+def step_road(i):
+    pitch = rng.uniform(0.9, 1.2)
+    return normalise(mix(env_exp(highpass(noise(0.07), 1800), 0.02, 0.001), gain(env_exp(sine(150 * pitch, 0.09), 0.04), 0.7)), 0.4)
+
+def step_wade(i):
+    splash = env_exp(bandpass(noise(0.28), 500, 3200), 0.13, 0.01)
+    plop = delay(env_exp(sine(rng.uniform(260, 380), 0.1), 0.05), 0.04)
+    return normalise(mix(splash, gain(plop, 0.5)), 0.4)
+
+def step_deck(i):
+    pitch = rng.uniform(0.9, 1.15)
+    return normalise(mix(env_exp(sine(200 * pitch, 0.12), 0.06), gain(env_exp(sine(470 * pitch, 0.08), 0.04), 0.5), gain(env_exp(highpass(noise(0.04), 2000), 0.012), 0.4)), 0.4)
+
+for name, fn, count in (("step_grass", step_grass, 3), ("step_road", step_road, 3), ("step_wade", step_wade, 3), ("step_deck", step_deck, 2)):
+    for i in range(1, count + 1):
+        write("sfx/%s_%d.wav" % (name, i), fade_edges(fn(i)))
+
+def voice(f_of_t, sec, harmonics, vib_rate=0.0, vib_depth=0.0, attack=0.05):
+    """A harmonic voice: a gliding pitch with a vibrato, partials by weight, a smooth envelope (an animal call)."""
+    n = n_samples(sec)
+    out, ph = [], 0.0
+    for k in range(n):
+        t = k / RATE
+        f = f_of_t(t / sec) * (1.0 + vib_depth * math.sin(2 * math.pi * vib_rate * t))
+        ph += 2.0 * math.pi * f / RATE
+        v = sum(a * math.sin((h + 1) * ph) for h, a in enumerate(harmonics))
+        e = min(1.0, t / attack) * math.sin(math.pi * (k / n)) ** 0.6
+        out.append(v * e)
+    return out
+
+def cluck(i):
+    parts = []
+    for k in range(2 + i % 2):
+        f0 = rng.uniform(620, 820)
+        parts.append(delay(gain(voice(lambda u, f0=f0: f0 * (1.25 - 0.4 * u), 0.07, (1.0, 0.6, 0.3), 0.0, 0.0, 0.01), 1.0), k * 0.1))
+    return normalise(mix(*parts), 0.5)
+
+def baa(i):
+    base = rng.uniform(330, 420)
+    x = voice(lambda u: base * (1.0 + 0.12 * math.sin(math.pi * u)), 0.85, (1.0, 0.8, 0.9, 0.7, 0.4, 0.25), 26.0, 0.035, 0.08)
+    return normalise(bandpass(x, 300, 3000), 0.5)
+
+def moo(i):
+    base = rng.uniform(105, 135)
+    x = voice(lambda u: base * (1.25 - 0.35 * u), 1.5, (1.0, 0.9, 0.7, 0.5, 0.35, 0.2), 4.5, 0.02, 0.25)
+    return normalise(lowpass(x, 1100), 0.55)
+
+for name, fn, count in (("cluck", cluck, 3), ("baa", baa, 2), ("moo", moo, 2)):
+    for i in range(1, count + 1):
+        write("sfx/%s_%d.wav" % (name, i), fade_edges(fn(i), 0.01))
+
+write("sfx/drink.wav", fade_edges(normalise(mix(env_exp(bandpass(noise(0.3), 400, 1800), 0.12, 0.02), delay(env_exp(bandpass(noise(0.25), 500, 2200), 0.1, 0.02), 0.22), gain(delay(env_exp(sine(420, 0.1), 0.05), 0.08), 0.4)), 0.4)))
+write("sfx/eat.wav", fade_edges(normalise(mix(*[delay(env_exp(bandpass(noise(0.06), 800, 3200), 0.03, 0.002), k * 0.1) for k in range(3)]), 0.3)))
+write("sfx/bell.wav", fade_edges(normalise(mix(*[delay(bell(1250, 1.4, ((1.0, 1.0), (2.0, 0.45), (2.8, 0.3), (4.1, 0.15))), k * 0.55) for k in range(4)]), 0.5)))
+write("sfx/coins.wav", fade_edges(normalise(mix(*[delay(bell(rng.choice((2400, 3000, 3600)), 0.35, ((1.0, 1.0), (2.3, 0.4))), k * 0.07 + rng.uniform(0, 0.03)) for k in range(5)]), 0.45)))
+write("sfx/splash.wav", fade_edges(normalise(mix(env_exp(bandpass(noise(0.4), 400, 3200), 0.2, 0.01), gain(delay(env_exp(sine(180, 0.25), 0.12), 0.05), 0.6)), 0.5)))
+write("sfx/merchant_leave.wav", fade_edges(normalise(mix(bell(784, 1.0, ((1.0, 1.0), (2.1, 0.4))), delay(bell(659.3, 1.0, ((1.0, 1.0), (2.1, 0.4))), 0.24), delay(bell(523.3, 1.2, ((1.0, 1.0), (2.1, 0.4))), 0.5)), 0.45)))
+write("sfx/drought.wav", fade_edges(normalise(mix([v * math.sin(math.pi * k / n_samples(2.8)) for k, v in enumerate(lowpass(noise(2.8), 320))], gain([math.sin(math.pi * k / n_samples(2.8)) * v for k, v in enumerate(sine(66, 2.8))], 0.5)), 0.5), 0.05))
+
 total = sum(1 for _, _, fs in os.walk(ROOT) for f in fs if f.endswith(".wav"))
 print("wrote", total, "sound files to", os.path.normpath(ROOT))

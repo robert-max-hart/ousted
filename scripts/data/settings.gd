@@ -31,6 +31,7 @@ static var ground     :bool = true;       # ground grain and rock strata
 static var snow_edge  :bool = true;       # ragged, patchy snow edges
 static var wispy_clouds:bool = true;     # dithered, broken-up edges on the cloud bank round the map
 static var shadows    :bool = true;
+static var mute_unfocused:bool = true;     # silence while the window is behind another
 static var volume_master :int = 80;      # 0 to 100
 static var volume_sfx    :int = 80;
 static var volume_ambient:int = 60;
@@ -61,6 +62,7 @@ static func ensure_loaded() -> void:
     ground = bool(cfg.get_value("graphics", "ground", ground));
     snow_edge = bool(cfg.get_value("graphics", "snow_edge", snow_edge));
     wispy_clouds = bool(cfg.get_value("graphics", "wispy_clouds", wispy_clouds));
+    mute_unfocused = bool(cfg.get_value("audio", "mute_unfocused", mute_unfocused));
     fullscreen = bool(cfg.get_value("window", "fullscreen", fullscreen));
     vsync = bool(cfg.get_value("window", "vsync", vsync));
 
@@ -80,6 +82,7 @@ static func save() -> void:
     cfg.set_value("graphics", "ground", ground);
     cfg.set_value("graphics", "snow_edge", snow_edge);
     cfg.set_value("graphics", "wispy_clouds", wispy_clouds);
+    cfg.set_value("audio", "mute_unfocused", mute_unfocused);
     cfg.set_value("window", "fullscreen", fullscreen);
     cfg.set_value("window", "vsync", vsync);
     cfg.save(PATH);
@@ -125,7 +128,7 @@ static func snow_shading_on() -> bool:
     ensure_loaded();
     return snow_edge;
 
-# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "wispy_clouds", "fullscreen" or "vsync"), saves and applies it.
+# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "wispy_clouds", "mute_unfocused", "fullscreen" or "vsync"), saves and applies it.
 static func set_value(key:String, value:Variant) -> void:
     ensure_loaded();
     match key:
@@ -143,6 +146,7 @@ static func set_value(key:String, value:Variant) -> void:
         "ground": ground = bool(value);
         "snow_edge": snow_edge = bool(value);
         "wispy_clouds": wispy_clouds = bool(value);
+        "mute_unfocused": mute_unfocused = bool(value);
         "fullscreen": fullscreen = bool(value);
         "vsync": vsync = bool(value);
         _: return;
