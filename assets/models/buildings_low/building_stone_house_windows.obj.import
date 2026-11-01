@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://da306eklq8y7o"
+path="res://.godot/imported/building_stone_house_windows.obj-9cff1edc8a4afb4a0da191c25f29e375.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_stone_house_windows.obj-9cff1edc8a4afb4a0da191c25f29e375.mesh"]
+
+source_file="res://assets/models/buildings_low/building_stone_house_windows.obj"
+dest_files=["res://.godot/imported/building_stone_house_windows.obj-9cff1edc8a4afb4a0da191c25f29e375.mesh", "res://.godot/imported/building_stone_house_windows.obj-9cff1edc8a4afb4a0da191c25f29e375.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

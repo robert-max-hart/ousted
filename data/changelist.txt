@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.7 | 2 Nov 2026 | Fixes
+- Fixed: with the model detail set to Reduced, the new wild foods (lingonberries, prickly pears, dates, bananas and coconuts) failed to draw and the Stone House and Root Cellar had no model. Their reduced models now exist.
+
 # 0.7.6 | 2 Nov 2026 | Overheating
 - Overheating. In hot weather (above 28 C: the desert and tropics every summer day, a heat wave anywhere) citizens build up heat outdoors, faster the hotter it is, in warm clothes, when thirsty and for babies and the old. Heat makes them thirstier, slows their work (down to half), sours their mood and, at the extreme, hurts their health: heatstroke can kill.
 - Shade cools: indoors, beside a tree, by open water or near a well. A citizen who is too hot goes to the nearest shade and rests until they are cool. In the worst of the midday heat (38 C and above, 11:00 to 17:00) everyone with a home rests indoors; a new Policies rule, "Work through the heat", turns that off. The inspector shows a Coolness bar.
