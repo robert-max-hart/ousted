@@ -45,6 +45,7 @@ static var droughts :int = 2;            # index into EVENT_SHARES: how often dr
 static var storms   :int = 2;            # ... and thunderstorms
 static var heat     :int = 2;            # heat waves (indices into EVENT_SHARES)
 static var cold     :int = 2;            # cold snaps
+static var fires    :int = 2;            # wildfires: how often they start and how fast they spread
 static var pests    :int = 2;            # crop pest outbreaks
 static var rain     :int = 2;            # index into RAIN_SHARES
 static var realism  :bool = false;
@@ -60,6 +61,7 @@ static func reset() -> void:
     heat = 2;
     cold = 2;
     pests = 2;
+    fires = 2;
     rain = 2;
     realism = false;
 
@@ -92,6 +94,9 @@ static func heat_share() -> float:
 static func cold_share() -> float:
     return EVENT_SHARES[cold];
 
+static func fire_share() -> float:
+    return EVENT_SHARES[fires];
+
 static func pest_share() -> float:
     return EVENT_SHARES[pests];
 
@@ -105,7 +110,7 @@ static func ageing_days() -> float:
     return REALISM_AGEING_DAYS if realism else AGEING_DAYS;
 
 static func to_dict() -> Dictionary:
-    return {"start": start, "settlers": settlers, "supplies": supplies, "merchants": merchants, "illness": illness, "droughts": droughts, "storms": storms, "heat": heat, "cold": cold, "pests": pests, "rain": rain, "realism": realism};
+    return {"start": start, "settlers": settlers, "supplies": supplies, "merchants": merchants, "illness": illness, "droughts": droughts, "storms": storms, "heat": heat, "cold": cold, "pests": pests, "fires": fires, "rain": rain, "realism": realism};
 
 # A save without rules (made before this existed) gets the usual ones.
 static func from_dict(d:Dictionary) -> void:
@@ -120,5 +125,6 @@ static func from_dict(d:Dictionary) -> void:
     heat = clampi(int(d.get("heat", 2)), 0, EVENT_SHARES.size() - 1);
     cold = clampi(int(d.get("cold", 2)), 0, EVENT_SHARES.size() - 1);
     pests = clampi(int(d.get("pests", 2)), 0, EVENT_SHARES.size() - 1);
+    fires = clampi(int(d.get("fires", 2)), 0, EVENT_SHARES.size() - 1);
     rain = clampi(int(d.get("rain", 2)), 0, RAIN_SHARES.size() - 1);
     realism = bool(d.get("realism", false));

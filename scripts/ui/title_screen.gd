@@ -364,6 +364,7 @@ func _build_events(col:Container) -> void:
     _event_slider(col, &"heat", "Heat waves", GameRules.EVENT_NAMES, GameRules.heat, "Days a good deal hotter than the season: food spoils faster, the ground dries out. Most in the desert, fewest in the north.");
     _event_slider(col, &"cold", "Cold snaps", GameRules.EVENT_NAMES, GameRules.cold, "Days a good deal colder than the season: heating burns more fuel, and frost may catch young crops. Never in the tropics.");
     _event_slider(col, &"pests", "Pests", GameRules.EVENT_NAMES, GameRules.pests, "How often pests get into growing crops (farmers pick them off; a scarecrow helps)");
+    _event_slider(col, &"fires", "Wildfires", GameRules.EVENT_NAMES, GameRules.fires, "How often fires start (lightning, and drought or heat wave days) and how fast they spread through trees, crops and wooden buildings. At None fires never start or spread; campfires still warm the homeless.");
     _event_slider(col, &"illness", "Illness", GameRules.ILLNESS_NAMES, GameRules.illness, "How often sickness starts and how readily it spreads");
     _event_slider(col, &"merchants", "Merchants", GameRules.MERCHANT_NAMES, GameRules.merchants, "How often traders come to the Trading Post");
 
@@ -482,6 +483,7 @@ func _on_start() -> void:
     GameRules.heat = int((_event_sliders[&"heat"] as HSlider).value);
     GameRules.cold = int((_event_sliders[&"cold"] as HSlider).value);
     GameRules.pests = int((_event_sliders[&"pests"] as HSlider).value);
+    GameRules.fires = int((_event_sliders[&"fires"] as HSlider).value);
     GameRules.realism = _realism_check.button_pressed;
     _launch();
 
@@ -499,6 +501,7 @@ func _on_tutorial() -> void:
     GameRules.storms = 0;
     GameRules.heat = 0;
     GameRules.cold = 0;
+    GameRules.fires = 0;
     GameRules.merchants = 1;
     Tutorial.active = true;
     _launch();

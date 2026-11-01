@@ -18,8 +18,9 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
-const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern"];
-const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul"];
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"flee", &"fire", &"camp"];
+const FIRE_KINDS        :Array[StringName] = [&"flee", &"fire"];
+const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul", &"flee", &"fire"];
 
 const MALE_NAMES        :Array[String] = ["Aldric", "Bram", "Cedric", "Dunstan", "Edwin", "Godric", "Hal", "Osric", "Rowan", "Wystan", "Alden", "Tobin"];
 const FEMALE_NAMES      :Array[String] = ["Aelwen", "Bryony", "Cerys", "Edith", "Elfreda", "Hilda", "Isolde", "Maud", "Rowena", "Wren", "Tamsin", "Agnes"];
@@ -48,6 +49,8 @@ var treat_ready :float = 0.0;              # game hour from which they may want 
 var tavern_day  :int = -1;                 # the day they last went to the tavern
 var tavern_until:float = 0.0;              # game hour the lift from the evening out wears off
 var illness     :float = 0.0;              # how sick: 0 is well, 1 is gravely ill (see Illness)
+var bucket      :bool = false;             # carrying a bucket of water to a fire (not saved)
+var burned_until:float = 0.0;              # game hour until which a death counts as burns (Fires)
 var immune_until:float = 0.0;              # game hour until which they cannot catch it again
 var care_until  :float = 0.0;              # game hour a healer's visit runs out
 var care_quality:float = 0.0;              # 1 when the healer had herbs, 0 when they only sat with them
@@ -314,6 +317,7 @@ func _update_needs(dh:float) -> void:
     var temp:float = Weather.temperature;
     var chill:float = 1.0 - cold_resist();
     _wear_clothing(dh);
+    var by_fire:bool = not indoors and world.fires != null and world.fires.camp_near(cell(), Fires.CAMP_WARM_RADIUS);
     if indoors and (shelter == null or not World.alive(shelter) or shelter.is_heated()):
         warmth = minf(1.0, warmth + dh * 0.25);
     elif indoors and shelter.def.get("shack", false):
@@ -323,6 +327,8 @@ func _update_needs(dh:float) -> void:
         warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.004 * chill);
     elif indoors:
         warmth = minf(1.0, warmth + dh * 0.1);
+    elif by_fire:
+        warmth = minf(1.0, warmth + dh * 0.25);       # sitting at a campfire is as good as a heated house
     elif temp < 8.0:
         warmth = maxf(0.0, warmth - dh * (8.0 - temp) * 0.006 * chill);
     else:
@@ -354,6 +360,8 @@ func tavern_due() -> bool:
     return false;
 
 func _should_interrupt() -> bool:
+    if world.fires != null and world.fires.wild_burning() and not FIRE_KINDS.has(task.kind) and world.fire_tasks.wants(self):
+        return true;          # a fire close by: run, or go and fight it (FireTasks)
     if carry_amount == 0 and tavern_due() and task.kind != &"tavern":
         return true;          # the tavern opens: whoever is about their work comes along (once a day, see NeedsTasks.tavern_task)
     if Weather.is_storming() and not world.policies.is_on(&"storm_work") and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind) and world.shelter_for(self) != null:
@@ -379,6 +387,8 @@ func _death_cause() -> String:
         return "starvation";
     if warmth < COLD_DAMAGE_BELOW:
         return "exposure";
+    if GameClock.total_hours < burned_until:
+        return "burns";
     if illness > 0.0:
         return "illness";
     return "poor health";

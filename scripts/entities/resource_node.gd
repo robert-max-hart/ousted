@@ -18,6 +18,7 @@ var designated  :bool = false;      # player marked for harvest/clearing
 var clearing    :bool = false;      # in the way of a building or road: removed once cleared, even a bush that regrows
 var reserved_by :Object = null;     # pawn currently working it
 var removed     :bool = false;
+var burning     :bool = false;      # on fire (Fires; drawn dark, not saved: the fires are)
 var growth      :float = 1.0;       # 0..1; trees are saplings until this reaches 1
 # visual variation
 var offset      :Vector2;

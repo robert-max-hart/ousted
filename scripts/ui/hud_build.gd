@@ -34,6 +34,7 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     HudBuild._stock_entry(hud, &"idle", "Citizens with nothing to do");
     HudBuild._stock_entry(hud, &"homeless", "Citizens with no home");
     HudBuild._stock_entry(hud, &"ill", "Citizens who are ill");
+    HudBuild._stock_entry(hud, &"fire", "Cells on fire: a wildfire is burning");
     # panel toggles: each button opens and closes its panel
     hud._jobs_toggle = hud._panel_toggle(row, "Jobs");
     hud._citizens_toggle = hud._panel_toggle(row, "Citizens");

@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.5 | 2 Nov 2026 | Fires
+- Fire. Cold citizens with no warm place to go light a campfire (using a firewood or a log from storage), on bare ground away from anything that burns, and sit by it: it warms like a heated house and burns down after eight hours.
+- Wildfires. Lightning in dry weather (and, in a drought or heat wave, now and then a spark of its own) can set a tree, shrub, crop, pasture or building alight, and very rarely a hearth or forge in a wooden building gets away from its owners. Fire spreads cell by cell through trees, bushes, crops and dry grass, quicker in a drought, slower on damp ground, and not at all in snow or across roads and water: a road is a firebreak. Heavy rain puts fires out within a few hours (a drizzle does little) and wets the ground so it does not catch again at once. Burnt trees are gone, burnt crops are dead, a pasture loses some of its animals, and the ground is left scorched and fades back over ten days. Wooden buildings burn down (and what they held); stone ones come through scorched, builders mend the damage and it mends slowly by itself.
+- Citizens run from the flames (and walk round them), and able adults (up to eight) fetch water from a well or the shore and put the fire out a bucket at a time, which also soaks the ground so it will not catch again for a while. Caught early a fire is easily put out; a big drought fire will take half a forest even so. A citizen next to a fire can very rarely be burned, and one standing in the flames more often.
+- Fires have flames, rising smoke, a warm glow at night, a crackle you hear when the camera is near, a hand bell when one breaks out, and a flame count in the top bar.
+- New Map events slider on the New Game screen: Wildfires (None to Extreme) for how often fires start and how fast they spread. At None nothing starts or spreads.
+
 # 0.7.4 | 2 Nov 2026 | Snow slows travel
 - Snow on the ground now slows everyone on foot: at full cover citizens walk at 60% on open ground and at 90% of the usual speed on roads and bridges (a road is a bigger help in winter). The top bar says when there is snow on the ground. The depth is saved with the game.
 

@@ -66,7 +66,7 @@ static func has(id:StringName) -> bool:
     return texture(id) != null;
 
 # The stock icons: the top bar's figures and the idle mark.
-const STOCK_IDS:Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron", &"food", &"pop", &"idle", &"homeless", &"ill"];
+const STOCK_IDS:Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron", &"food", &"pop", &"idle", &"homeless", &"ill", &"fire"];
 
 # Every button glyph that ships (the icon sheet test draws these).
 const IDS:Array[StringName] = [

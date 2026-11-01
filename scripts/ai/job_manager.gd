@@ -39,6 +39,10 @@ func choose_task(p:Pawn) -> Task:
     var t:Task = null;
     if p.is_baby():
         return needs.stay_home_task(p);     # a carer brings a baby what it needs
+    if world.fires.wild_burning():
+        t = world.fire_tasks.flee_task(p);
+        if t != null:
+            return t;
     if not p.needs_blocked():
         var wants:bool = false;
         if p.thirst < 0.45:
@@ -54,6 +58,11 @@ func choose_task(p:Pawn) -> Task:
             return t;
         if wants:
             p.block_needs(1.5);
+
+    if world.fires.wild_burning():
+        t = world.fire_tasks.fight_task(p);
+        if t != null:
+            return t;
 
     var night:bool = GameClock.is_night();
     if p.carry_amount > 0:
@@ -132,7 +141,7 @@ func choose_task(p:Pawn) -> Task:
 func _job_order(prof:int) -> Array[Callable]:
     match prof:
         Profession.BUILDER:
-            return [_build_task, _road_task, _haul_task, _fuel_task, _collect_task, _clear_task];
+            return [_build_task, _repair_task, _road_task, _haul_task, _fuel_task, _collect_task, _clear_task];
         Profession.FARMER:
             return [_farm_task, _herd_task, _haul_task, _fuel_task, _collect_task, _clear_task];
         Profession.WOODCUTTER:
@@ -151,7 +160,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _tree_order_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _tree_order_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _repair_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -514,6 +523,34 @@ func _build_task(p:Pawn) -> Task:
     t.on_end = func(_pw:Pawn) -> void:
         if World.alive(b):
             b.builders -= 1;
+    return t;
+
+# Mends the nearest building that fire has worn down (no materials: it is labor).
+func _repair_task(p:Pawn) -> Task:
+    var best:Building = null;
+    var best_d:float = INF;
+    for b in world.buildings:
+        if not b.needs_repair() or b.repairers >= 2 or p.has_failed(b):
+            continue;
+        var d:float = b.position.distance_squared_to(p.position);
+        if d < best_d:
+            best = b;
+            best_d = d;
+    if best == null:
+        return null;
+    var b:Building = best;
+    b.repairers += 1;
+    var t:Task = Task.new(&"build", "Repairing %s" % b.display_name());
+    t.job = Profession.BUILDER;
+    t.target = b;
+    t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name());
+    t.work(func(_pw:Pawn, dh:float) -> bool:
+        if not World.alive(b) or b.burning:
+            return true;
+        return b.repair_work(dh));
+    t.on_end = func(_pw:Pawn) -> void:
+        if World.alive(b):
+            b.repairers = maxi(0, b.repairers - 1);
     return t;
 
 # Lays a staked road cell (World.road_work): the nearest one nobody is working on.

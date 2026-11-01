@@ -127,11 +127,12 @@ func _ready() -> void:
     Weather.reset();
     GameRules.from_dict({});
     _expect("an older save gets normal events", GameRules.heat == 2 and GameRules.cold == 2 and GameRules.pests == 2 and GameRules.rain == 2);
-    GameRules.heat = 1; GameRules.cold = 3; GameRules.pests = 0; GameRules.rain = 4;
+    _expect("older saves have normal wildfires", GameRules.fires == 2 and is_equal_approx(GameRules.fire_share(), 1.0));
+    GameRules.heat = 1; GameRules.cold = 3; GameRules.pests = 0; GameRules.rain = 4; GameRules.fires = 4;
     var rules:Dictionary = GameRules.to_dict();
     GameRules.reset();
     GameRules.from_dict(rules);
-    _expect("the new levels are saved", GameRules.heat == 1 and GameRules.cold == 3 and GameRules.pests == 0 and GameRules.rain == 4);
+    _expect("the new levels are saved", GameRules.heat == 1 and GameRules.cold == 3 and GameRules.pests == 0 and GameRules.rain == 4 and GameRules.fires == 4);
     GameRules.reset();
 
     # a small, lean, realistic colony

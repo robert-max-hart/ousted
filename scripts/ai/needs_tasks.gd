@@ -131,6 +131,10 @@ func dress_task(p:Pawn) -> Task:
 
 func warm_task(p:Pawn) -> Task:
     var b:Building = world.warm_shelter_for(p);
+    if b == null or not b.is_heated():
+        var camp:Task = campfire_task(p);          # no warm place to go to: a fire outside, if there is a fire or wood to make one
+        if camp != null:
+            return camp;
     if b == null:
         return null;
     var t:Task = Task.new(&"warm", "Seeking warmth", false);
@@ -237,3 +241,86 @@ func care_task(p:Pawn) -> Task:
         if World.alive(baby) and baby.carer == p:
             baby.carer = null;
     return t;
+
+# --------------------------------
+# Campfires
+
+const CAMP_NEAR     :int = 14;         # cells: a campfire this close is where they go
+const CAMP_SITE_R   :Vector2i = Vector2i(2, 7);
+
+# Cold, with nowhere warm: sit by a campfire that is burning, or fetch firewood (or a log) and light one on a bare spot with nothing
+# flammable beside it, near home, and sit by it until warm.
+func campfire_task(p:Pawn) -> Task:
+    var fires:Fires = world.fires;
+    var warmed:Callable = func(pw:Pawn, _dh:float) -> bool:
+        return pw.warmth >= 0.9 or not fires.camp_near(pw.cell(), Fires.CAMP_WARM_RADIUS + 1.0);
+    var camp:Vector2i = fires.nearest_camp(p.cell(), CAMP_NEAR);
+    if camp != Fires.NO_CELL:
+        var t:Task = Task.new(&"camp", "Warming by the fire", false);
+        t.move_cell(_beside(camp));
+        t.work(warmed, "Warming by the fire");
+        return t;
+    var item:StringName = &"firewood" if Stock.amount(&"firewood") > 0 else (&"wood" if Stock.amount(&"wood") > 0 else &"");
+    if item == &"" or fires.camp_count() >= Fires.MAX_CAMPS:
+        return null;
+    var s:Building = world.nearest_storage_with(item, p.position);
+    if s == null or s.reserve_out(item, 1) == 0:
+        return null;
+    var anchor:Vector2i = p.cell();
+    if world.alive(p.home):
+        anchor = Vector2i(p.home.center_cell());
+    var site:Vector2i = _camp_site(anchor);
+    if site == Fires.NO_CELL:
+        s.release_out(item, 1);
+        return null;
+    var st:Dictionary = {"taken": false};
+    var t2:Task = Task.new(&"camp", "Fetching firewood", false);
+    t2.target = s;
+    t2.move_rect(s.rect(), s.is_walkable());
+    t2.act(func(_pw:Pawn) -> bool:
+        s.take_reserved(item, 1);
+        st["taken"] = true;
+        return true);
+    t2.move_cell(site);
+    t2.act(func(_pw:Pawn) -> bool:
+        fires.light_campfire(site);
+        return true);
+    t2.work(warmed, "Warming by the fire");
+    t2.on_cancel = func(_pw:Pawn) -> void:
+        if not st["taken"] and World.alive(s):
+            s.release_out(item, 1);
+    return t2;
+
+# A walkable cell next to the campfire.
+func _beside(camp:Vector2i) -> Vector2i:
+    for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1)]:
+        if world.nav.is_walkable(camp + d):
+            return camp + d;
+    return camp;
+
+# A bare walkable cell within a few cells of the anchor with the fewest flammable cells round it.
+func _camp_site(anchor:Vector2i) -> Vector2i:
+    var best:Vector2i = Fires.NO_CELL;
+    var best_score:float = INF;
+    for dz in range(-CAMP_SITE_R.y, CAMP_SITE_R.y + 1):
+        for dx in range(-CAMP_SITE_R.y, CAMP_SITE_R.y + 1):
+            var d:int = maxi(absi(dx), absi(dz));
+            if d < CAMP_SITE_R.x or d > CAMP_SITE_R.y:
+                continue;
+            var c:Vector2i = anchor + Vector2i(dx, dz);
+            if not world.terrain.in_bounds(c) or not world.nav.is_walkable(c) or world.terrain.is_water(c):
+                continue;
+            var i:int = world.idx(c);
+            if world.node_at[i] != null or world.occupant[i] != null or world.terrain.get_overlay(c) != Terrain.Overlay.NONE or world.fires.is_burning(c):
+                continue;
+            var fuel_near:float = 0.0;
+            for nz in range(-1, 2):
+                for nx in range(-1, 2):
+                    var fl:Dictionary = world.fires.flammability(c + Vector2i(nx, nz));
+                    if not fl.is_empty() and fl["catch"] > Fires.GRASS_CATCH:
+                        fuel_near += fl["catch"];
+            var score:float = fuel_near * 10.0 + d;
+            if score < best_score:
+                best_score = score;
+                best = c;
+    return best;

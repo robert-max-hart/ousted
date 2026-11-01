@@ -369,8 +369,12 @@ func _on_lightning(strength:float) -> void:
     _flash = strength;
     var at:Vector3 = _fx_host.global_position;
     var spot:Vector2 = Vector2(at.x, at.z) + Vector2(randf_range(-BOLT_REACH, BOLT_REACH), randf_range(-BOLT_REACH, BOLT_REACH));
+    if randf() < 0.5 and world.terrain != null:         # (half the strikes land anywhere on the map, the rest where the player is looking)
+        spot = Vector2(randf_range(2.0, Terrain.SIZE - 2.0), randf_range(2.0, Terrain.SIZE - 2.0));
     var ground:float = world.terrain.height_at(spot.x, spot.y) if world.terrain != null else 0.0;
     _show_bolt(Vector3(spot.x, ground, spot.y));
+    if not world.is_backdrop and world.fires != null:
+        world.fires.strike(Vector2i(floori(spot.x), floori(spot.y)));
     get_tree().create_timer(0.12).timeout.connect(func() -> void: _flash = maxf(_flash, strength * 0.7));
     var distance:float = at.distance_to(Vector3(spot.x, ground, spot.y));
     var delay:float = clampf(distance / 90.0, 0.2, 1.6);           # (the speed of sound, much sped up)

@@ -13,7 +13,7 @@ const DIR      :String = "res://assets/audio/ambient/";
 const FADE_PER_SEC:float = 0.5;          # how fast a level moves toward its target
 const LOOK_EVERY:float = 0.5;            # seconds between looks at the camera's surroundings
 const WATER_SEEN_RADIUS:int = 14;        # cells round the point the camera looks at
-const LOUDNESS:Dictionary = {&"wind": 0.55, &"rain": 0.75, &"water": 0.8, &"birds": 0.7, &"crickets": 0.55};
+const LOUDNESS:Dictionary = {&"wind": 0.55, &"rain": 0.75, &"water": 0.8, &"birds": 0.7, &"crickets": 0.55, &"fire": 0.7};
 
 var world:World;
 var levels :Dictionary = {};       # id -> current level 0..1
@@ -82,7 +82,31 @@ func _update_targets() -> void:
     targets[&"rain"] = clampf(rain * (1.0 + 0.25 * Weather.storm_level), 0.0, 1.0);
     targets[&"water"] = clampf(_look_at_water() * 3.0, 0.0, 1.0) * (1.0 - 0.5 * rain);
     targets[&"birds"] = (calm * warm) if (day and not Climate.is_dormant()) else 0.0;
+    targets[&"fire"] = _fire_level();
     targets[&"crickets"] = (calm * clampf((Weather.temperature - 9.0) / 6.0, 0.0, 1.0)) if (night and not Climate.is_dormant()) else 0.0;
+
+# How loud the crackle of fire is: by how close the camera's view is to a burning cell (a campfire is quiet, a blaze is loud).
+func _fire_level() -> float:
+    if world.fires == null or not world.fires.active():
+        return 0.0;
+    var cam:Camera3D = get_viewport().get_camera_3d();
+    if cam == null:
+        return 0.0;
+    var forward:Vector3 = -cam.global_transform.basis.z;
+    var ground:Vector3 = cam.global_position;
+    if forward.y < -0.05:
+        ground = cam.global_position + forward * (cam.global_position.y / -forward.y);
+    var focus:Vector2 = Vector2(ground.x, ground.z);
+    var best:float = 0.0;
+    var wild:int = 0;
+    for c in world.fires.cells:
+        var fc:Fires.FireCell = world.fires.cells[c];
+        var d:float = focus.distance_to(Vector2(c) + Vector2(0.5, 0.5)) + cam.global_position.y * 0.4;
+        var near:float = clampf(1.0 - d / 45.0, 0.0, 1.0) * (0.35 if fc.kind == Fires.Kind.CAMP else 1.0);
+        best = maxf(best, near);
+        if fc.kind == Fires.Kind.WILD and near > 0.0:
+            wild += 1;
+    return clampf(best * (1.0 + minf(wild, 20) * 0.03), 0.0, 1.0);
 
 # The share of water in the ground round the point the camera looks at, scaled down as the view rises.
 func _look_at_water() -> float:

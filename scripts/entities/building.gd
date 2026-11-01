@@ -30,6 +30,8 @@ var work_done   :float = 0.0;
 var builders    :int = 0;
 var residents   :Array[Pawn] = [];
 var removed     :bool = false;
+var health      :float = 1.0;       # 0 to 1: fire wears it down (it burns down at 0) and it mends a little each day
+var burning     :bool = false;      # on fire (Fires; the flames are saved there)
 var world       :World;
 
 # Storage buildings only
@@ -693,7 +695,28 @@ func on_hour() -> void:
     update_smoke();
 
 func on_day() -> void:
-    pass;
+    if health < 1.0 and not burning:
+        health = minf(1.0, health + FIRE_REPAIR_PER_DAY);       # the people who use it patch it up
+        _update_visual();
+
+const FIRE_REPAIR_PER_DAY:float = 0.05;
+const REPAIR_BELOW       :float = 0.85;       # builders mend a building once it is below this health
+const REPAIR_PER_HOUR    :float = 0.12;       # health a builder restores in an hour of work (no materials needed)
+var repairers   :int = 0;
+
+func needs_repair() -> bool:
+    return state == State.COMPLETE and not burning and health < REPAIR_BELOW;
+
+# An hour of repair work: returns true once the building is whole.
+func repair_work(hours:float) -> bool:
+    health = minf(1.0, health + hours * REPAIR_PER_HOUR);
+    _update_visual();
+    return health >= 0.999;
+
+# Fire wears the building down by this much (Fires calls it each hour it burns).
+func fire_hit(damage:float) -> void:
+    health = maxf(0.0, health - damage);
+    _update_visual();
 
 func on_terrain_changed() -> void:
     if _fence != null:
@@ -785,11 +808,12 @@ func to_dict() -> Dictionary:
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
         "expansion": expansion.duplicate(true), "cost_mult": cost_mult, "priority": priority, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
-        "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1,
+        "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1, "health": health,
     };
 
 func restore_dict(d:Dictionary) -> void:
     state = d["state"];
+    health = d.get("health", 1.0);
     delivered = d["delivered"];
     work_done = d["work_done"];
     stored = d["stored"];
@@ -824,6 +848,10 @@ func help_text() -> String:
 
 func info_text() -> String:
     var s:String = "";
+    if burning:
+        s += "ON FIRE! (%d%% left)\n" % roundi(health * 100.0);
+    elif health < 0.999 and state == State.COMPLETE:
+        s += "Fire damage: %d%% left (it mends slowly)\n" % roundi(health * 100.0);
     if state == State.CONSTRUCTION:
         s += "Under construction (%d%%)\n" % roundi(progress() * 100.0);
         s += "Priority: %s\n" % PRIORITY_NAMES[priority];
@@ -923,6 +951,8 @@ func _update_visual() -> void:
     var building:bool = state == State.CONSTRUCTION;
     _body_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if building else BaseMaterial3D.TRANSPARENCY_DISABLED;
     var col:Color = def.get("color", Color.GRAY);
+    if health < 1.0:
+        col = col.lerp(Color(0.16, 0.13, 0.12), (1.0 - health) * 0.75);       # scorched
     col.a = 0.45 if building else 1.0;
     _body_mat.albedo_color = col;
     var sy:float = lerpf(0.15, 1.0, progress()) if building else 1.0;

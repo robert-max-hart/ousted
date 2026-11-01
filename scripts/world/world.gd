@@ -50,6 +50,9 @@ var ledger      :Ledger = Ledger.new();
 var traders     :Traders;                  # merchant visits (needs a Trading Post)
 var families    :Families;
 var illness     :Illness;
+var fires       :Fires;
+var fire_tasks  :FireTasks;
+var fire_view   :FireRenderer;
 var bodies      :Array[Body] = [];
 var child_labor_share:float = 0.0;   # share of the children working right now (0 when the policy forbids it)
 var _next_body_id:int = 1;
@@ -218,6 +221,11 @@ func _ready() -> void:
     jobs = JobManager.new(self);
     families = Families.new(self);
     illness = Illness.new(self);
+    fires = Fires.new(self);
+    fire_tasks = FireTasks.new(self);
+    fire_view = FireRenderer.new(self);
+    fire_view.name = "Fires";
+    add_child(fire_view);
     policies.changed.connect(jobs.on_policy_changed);
 
     await _step(0.5, "Restoring your colony" if loading else "Planting the forests");
@@ -819,6 +827,8 @@ func _refresh_nav(c:Vector2i) -> void:
             weight = 1.6;
     if terrain.overlay[i] == Terrain.Overlay.ROAD:
         weight = 0.6;
+    if fires != null and fires.is_wild_cell(c):
+        weight += Fires.NAV_WEIGHT;       # citizens go round flames
     nav.set_cell(c, solid, weight);
 
 # Cells a pawn can stand on to work a rect: the ring around it, plus the
@@ -868,6 +878,7 @@ func _on_hour(h:int) -> void:
     jobs.reconcile();
     families.on_hour();
     illness.on_hour();
+    fires.on_hour();
     for b in buildings:
         if b.def.get("tavern", false):
             b.update_windows();
@@ -941,6 +952,7 @@ func _on_day(_d:int) -> void:
         b.on_day();
     families.on_day();
     illness.on_day();
+    fires.on_day();
     if _spoiled_today >= 5:
         notify(_spoilage_report());
     _spoiled_today = 0;

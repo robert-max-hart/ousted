@@ -20,6 +20,7 @@ import math, os, random, struct, wave
 RATE = 22050
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "audio")
 rng = random.Random(1234)
+trng = random.Random(9001)          # for the sounds at the end of the script (thunder, fire)
 
 
 # --------------------------------
@@ -171,25 +172,6 @@ def treefall(i):
     thump = delay(mix(env_exp(sine(55, 0.7), 0.4, 0.01), gain(env_exp(sine(110, 0.5), 0.25, 0.01), 0.7), gain(env_exp(lowpass(noise(0.5), 700), 0.3, 0.01), 0.9)), 1.2)
     leaves = delay(env_exp(bandpass(noise(0.6), 2500, 7000), 0.3, 0.05), 1.05)
     return normalise(mix(shaped, gain(crack, 0.8), thump, gain(leaves, 0.5)), 0.8)
-
-def thunder(i):
-    """A crack, then a long rolling rumble that swells and dies away (about 4 s; two takes differ in length and rolls)."""
-    sec = 3.6 + 0.8 * i
-    n = n_samples(sec)
-    rumble = lowpass(noise(sec), 220 + 40 * i)
-    rolls = [rng.uniform(0.3, 1.8) for _ in range(3)]
-    shaped = []
-    for k, x in enumerate(rumble):
-        t = k / RATE
-        env = min(1.0, t / 0.25) * math.exp(-t * (0.7 + 0.1 * i))
-        swell = 0.55 + 0.45 * math.sin(t * 5.0 + rolls[0]) * math.sin(t * 2.3 + rolls[1])
-        shaped.append(x * env * swell * 3.0)
-    crack = env_exp(highpass(noise(0.3), 700), 0.06, 0.001)
-    boom = env_exp(lowpass(noise(1.2), 160), 0.5, 0.02)
-    return normalise(mix(shaped, gain(crack, 0.5), gain(boom, 1.2)), 0.85)
-
-for i in (1, 2):
-    write("sfx/thunder_%d.wav" % i, fade_edges(thunder(i)))
 
 for name, fn, count in (("chop", chop, 3), ("hammer", hammer, 3), ("pick", pick, 3), ("dig", dig, 2), ("rustle", rustle, 2), ("anvil", anvil, 2)):
     for i in range(1, count + 1):
@@ -379,6 +361,57 @@ write("sfx/coins.wav", fade_edges(normalise(mix(*[delay(bell(rng.choice((2400, 3
 write("sfx/splash.wav", fade_edges(normalise(mix(env_exp(bandpass(noise(0.4), 400, 3200), 0.2, 0.01), gain(delay(env_exp(sine(180, 0.25), 0.12), 0.05), 0.6)), 0.5)))
 write("sfx/merchant_leave.wav", fade_edges(normalise(mix(bell(784, 1.0, ((1.0, 1.0), (2.1, 0.4))), delay(bell(659.3, 1.0, ((1.0, 1.0), (2.1, 0.4))), 0.24), delay(bell(523.3, 1.2, ((1.0, 1.0), (2.1, 0.4))), 0.5)), 0.45)))
 write("sfx/drought.wav", fade_edges(normalise(mix([v * math.sin(math.pi * k / n_samples(2.8)) for k, v in enumerate(lowpass(noise(2.8), 320))], gain([math.sin(math.pi * k / n_samples(2.8)) * v for k, v in enumerate(sine(66, 2.8))], 0.5)), 0.5), 0.05))
+
+
+# --------------------------------
+# Fire sounds. These and the thunder use their own random generator and sit at the end of the script, so adding them never changes the
+# older files (the main generator's numbers are used in order).
+
+def fire_crackle():
+    """A seamless loop of burning wood: a low roar with pops and snaps of different sizes, 6 seconds."""
+    sec = 6.0
+    n = n_samples(sec)
+    roar = lowpass([trng.uniform(-1.0, 1.0) for _ in range(n)], 420)
+    swell = [0.45 + 0.2 * math.sin(2 * math.pi * k / n * 3 + 1.0) + 0.1 * math.sin(2 * math.pi * k / n * 7) for k in range(n)]
+    out = [r * w * 0.5 for r, w in zip(roar, swell)]
+    for _ in range(70):
+        at = trng.uniform(0, sec - 0.2)
+        size = trng.uniform(0.2, 1.0)
+        pop = env_exp(highpass([trng.uniform(-1.0, 1.0) for _ in range(n_samples(0.05))], 900 + 1500 * size), 0.012 + 0.02 * size, 0.0005)
+        for i, v in enumerate(pop):
+            k = n_samples(at) + i
+            if k < n:
+                out[k] += v * size * 0.8
+    return loop_seamless(normalise(out, 0.6) + silence(1.0), 1.0)
+
+def fire_alarm():
+    """A hand bell struck fast: the call that a fire has broken out. About 2.4 s."""
+    parts = []
+    for k in range(9):
+        parts.append(delay(bell(1560 if k % 2 == 0 else 1480, 0.7, ((1.0, 1.0), (2.0, 0.5), (2.9, 0.3), (4.2, 0.15))), k * 0.24))
+    return normalise(mix(*parts), 0.6)
+
+def thunder(i):
+    """A crack, then a long rolling rumble that swells and dies away (about 4 s; two takes differ in length and rolls)."""
+    sec = 3.6 + 0.8 * i
+    n = n_samples(sec)
+    rumble = lowpass([trng.uniform(-1.0, 1.0) for _ in range(n)], 220 + 40 * i)
+    rolls = [trng.uniform(0.3, 1.8) for _ in range(3)]
+    shaped = []
+    for k, x in enumerate(rumble):
+        t = k / RATE
+        env = min(1.0, t / 0.25) * math.exp(-t * (0.7 + 0.1 * i))
+        swell = 0.55 + 0.45 * math.sin(t * 5.0 + rolls[0]) * math.sin(t * 2.3 + rolls[1])
+        shaped.append(x * env * swell * 3.0)
+    crack = env_exp(highpass([trng.uniform(-1.0, 1.0) for _ in range(n_samples(0.3))], 700), 0.06, 0.001)
+    boom = env_exp(lowpass([trng.uniform(-1.0, 1.0) for _ in range(n_samples(1.2))], 160), 0.5, 0.02)
+    return normalise(mix(shaped, gain(crack, 0.5), gain(boom, 1.2)), 0.85)
+
+for i in (1, 2):
+    write("sfx/thunder_%d.wav" % i, fade_edges(thunder(i)))
+
+write("ambient/fire.wav", fire_crackle())
+write("sfx/fire_alarm.wav", fade_edges(fire_alarm()))
 
 total = sum(1 for _, _, fs in os.walk(ROOT) for f in fs if f.endswith(".wav"))
 print("wrote", total, "sound files to", os.path.normpath(ROOT))

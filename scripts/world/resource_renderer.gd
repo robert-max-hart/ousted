@@ -343,7 +343,9 @@ func _rebuild() -> void:
                     var ratio:float = float(rn.amount) / rn.max_amount;
                     s *= 0.7 + 0.3 * ratio;
                     tint = Color(1.0, lerpf(0.8, 1.0, 1.0 - ratio), lerpf(0.8, 1.0, 1.0 - ratio));
-                if rn.designated:
+                if rn.burning:
+                    tint = Color(0.3, 0.22, 0.2);            # charred
+                elif rn.designated:
                     tint = DESIGNATED_TINT;
                 elif _preview_rect.has_point(rn.cell) and _preview_filter.is_valid() and _preview_filter.call(rn):
                     tint = PREVIEW_TINT;

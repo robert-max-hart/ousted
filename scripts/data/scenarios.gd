@@ -106,6 +106,7 @@ static func apply(id:StringName, randomize:bool) -> void:
     GameRules.heat = setup.get("heat", 2);
     GameRules.cold = setup.get("cold", 2);
     GameRules.pests = setup.get("pests", 2);
+    GameRules.fires = setup.get("fires", 2);
     GameRules.rain = setup.get("rain", 2);
     World.choose_start = true;
     World.new_game_seed = 0 if randomize else s["seed"];

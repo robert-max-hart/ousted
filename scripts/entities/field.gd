@@ -144,6 +144,11 @@ func plot_count() -> int:
 func plot_cell(i:int) -> Vector2i:
     return origin + Vector2i(i % size.x, i / size.x);
 
+# The plot a cell of the field is (the inverse of plot_cell).
+func plot_index(c:Vector2i) -> int:
+    var d:Vector2i = c - origin;
+    return clampi(d.y, 0, size.y - 1) * size.x + clampi(d.x, 0, size.x - 1);
+
 func crop() -> Dictionary:
     return Defs.CROPS[crop_id];
 
