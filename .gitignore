@@ -4,3 +4,9 @@
 
 # Python
 __pycache__/
+
+# Playtest notes and old saves: local only (see playtests/README.md, which is the one tracked file in that folder)
+/playtests/*
+!/playtests/README.md
+/playtest*.txt
+/*.sav
