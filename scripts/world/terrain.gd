@@ -72,12 +72,18 @@ func _ready() -> void:
         add_child(mi);
         _chunks.append(mi);
 
+var chunks_per_frame:int = 0;           # 0: every changed chunk at once; the loading screen spreads the first build over frames
+
 func _process(_delta:float) -> void:
     if _dirty.is_empty():
         return;
-    for ci in _dirty:
+    var built:int = 0;
+    for ci in _dirty.keys():
         _build_chunk(ci);
-    _dirty.clear();
+        _dirty.erase(ci);
+        built += 1;
+        if chunks_per_frame > 0 and built >= chunks_per_frame:
+            break;
 
 # --------------------------------
 # Generation
@@ -552,6 +558,34 @@ func _mark_dirty_rect(r:Rect2i) -> void:
 func _corner_normal(x:int, z:int) -> Vector3:
     return Vector3(corner(x - 1, z) - corner(x + 1, z), 2.0, corner(x, z - 1) - corner(x, z + 1)).normalized();
 
+# The land's colour for this climate and season (a desert is tan and a rock is sandstone), cached per climate.
+var _look_climate:int = -1;
+var _ground_cols:Array = [];
+var _rock_col:Color = COLOR_ROCK;
+var _sand_col:Color = COLOR_SAND;
+
+func _refresh_climate_colours() -> void:
+    _look_climate = Climate.current;
+    var d:Dictionary = Climate.data();
+    _ground_cols = d.get("ground", GRASS_BY_SEASON);
+    _rock_col = d.get("rock", COLOR_ROCK);
+    _sand_col = d.get("sand", COLOR_SAND);
+
+func _ground_colour() -> Color:
+    if _look_climate != Climate.current:
+        _refresh_climate_colours();
+    return _ground_cols[_season];
+
+func _sand_colour() -> Color:
+    if _look_climate != Climate.current:
+        _refresh_climate_colours();
+    return _sand_col;
+
+func _rock_colour() -> Color:
+    if _look_climate != Climate.current:
+        _refresh_climate_colours();
+    return _rock_col;
+
 func _cell_color(c:Vector2i) -> Color:
     var col:Color;
     if slope_view and not is_water(c):
@@ -578,11 +612,11 @@ func _cell_color(c:Vector2i) -> Color:
         _:
             var slope:float = cell_slope(c);
             if cell_height(c) < WATER_LEVEL + 0.35:
-                col = COLOR_SAND;
+                col = _sand_colour();
             elif slope > 1.4:
-                col = COLOR_ROCK;
+                col = _rock_colour();
             else:
-                col = GRASS_BY_SEASON[_season].lerp(COLOR_ROCK, clampf((slope - 0.8) / 0.6, 0.0, 1.0));
+                col = _ground_colour().lerp(_rock_colour(), clampf((slope - 0.8) / 0.6, 0.0, 1.0));
             if overlay[index(c)] == Overlay.ROAD_SITE:
                 col = col.lerp(COLOR_ROAD, 0.4);       # a staked road: worn ground with crisp edges, but flat: no mottling or pebbles like a finished road
     # soft, low-frequency patches plus a faint per-cell speckle so the grid doesn't look flat
@@ -595,6 +629,7 @@ func _cell_color(c:Vector2i) -> Color:
 # ploughed fields hold less, a channel none.
 const SNOW_HOLD_ROAD :float = 0.25;
 const SNOW_HOLD_FIELD:float = 0.5;
+const SNOW_SHORE     :float = 0.3;      # metres above the water over which snow fades in: none lies on the bed or at the waterline
 
 func _snow_hold(o:int) -> float:
     match o:
@@ -698,6 +733,12 @@ func _build_chunk(ci:int) -> void:
                             sum += cell_cols[li + o.y * span + o.x];
                             n += 1;
                     colors[v + j] = _detail(sum / float(n), x + (1 if (j == 1 or j == 2) else 0), z + (1 if (j == 2 or j == 3) else 0));
+            for j in 4:       # no snow under or at the water: it fades out over the shore
+                var wet:float = smoothstep(WATER_LEVEL, WATER_LEVEL + SNOW_SHORE, verts[v + j].y);
+                if wet < 1.0:
+                    var cc:Color = colors[v + j];
+                    cc.a *= wet;
+                    colors[v + j] = cc;
             # clockwise winding seen from above
             indices[k] = v;
             indices[k + 1] = v + 1;

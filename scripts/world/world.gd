@@ -95,9 +95,45 @@ var _spoiled_ground:Dictionary = {};        # item -> units that spoiled lying o
 static func alive(o:Variant) -> bool:
     return o != null and is_instance_valid(o) and not o.removed;
 
+# While the loading screen is up the world is built a stage at a time, with a frame between so the screen can move (without it,
+# the whole build is done at once, which is what the tests want). The stage's name and how far along the build is go to the screen.
+var _staged     :bool = false;
+var _grass      :GrassDetail;
+var _ground     :GroundPlants;
+
+func _step(fraction:float, text:String) -> void:
+    if _staged:
+        LoadingScreen.progress(fraction, text);
+        await get_tree().process_frame;
+
+# After the build, while the screen is still up: everything that fills in over the following frames (ground chunks, grass,
+# ground plants, the trees) is finished at a quicker pace, and a few frames are drawn so the first sight of the map is whole.
+func _settle() -> void:
+    if not _staged:
+        return;
+    visuals.process_mode = Node.PROCESS_MODE_INHERIT;
+    for c in get_children():
+        if c is AmbientAudio:
+            c.process_mode = Node.PROCESS_MODE_INHERIT;
+    var total:int = maxi(1, terrain._dirty.size() + _grass._dirty.size() + _ground._dirty.size());
+    for frame in 900:
+        var left:int = terrain._dirty.size() + _grass._dirty.size() + _ground._dirty.size();
+        LoadingScreen.progress(lerpf(0.82, 0.98, 1.0 - float(left) / total), "Growing the grass and flowers" if left > 0 else "Almost there");
+        if left == 0 and not renderer._dirty and frame > 8:
+            break;
+        await get_tree().process_frame;
+    terrain.chunks_per_frame = 0;
+    _grass.rebuilds_per_frame = GrassDetail.REBUILDS_PER_FRAME;
+    _ground.rebuilds_per_frame = GroundPlants.REBUILDS_PER_FRAME;
+    for frame in 6:
+        await get_tree().process_frame;        # (a few frames with everything in view: shaders are compiled behind the screen, not after it)
+    LoadingScreen.finish();
+
 func _ready() -> void:
     instance = self;
     is_backdrop = backdrop;
+    _staged = LoadingScreen.active;
+    await _step(0.02, "Gathering the settlers" if pending_load.is_empty() else "Opening the save");
     var save:Dictionary = pending_load;
     pending_load = {};
     var loading:bool = not save.is_empty();
@@ -113,7 +149,7 @@ func _ready() -> void:
     elif world_seed == 0:
         world_seed = new_game_seed if new_game_seed > 0 else randi() % 1000000;
         new_game_seed = 0;
-    if not loading and not backdrop and Scenarios.pending != &"":
+    if not loading and not is_backdrop and Scenarios.pending != &"":
         scenario = ScenarioRun.new(Scenarios.pending);
     Scenarios.pending = &"";
     rng.seed = world_seed;
@@ -124,13 +160,17 @@ func _ready() -> void:
     terrain.water_source = func(i:int) -> float: return water_reach()[i];
     terrain.name = "Terrain";
     terrain.world_seed_for_textures = world_seed;
+    if _staged:
+        terrain.chunks_per_frame = 3;
     add_child(terrain);
+    await _step(0.05, "Raising the hills");
     terrain.generate(world_seed);
     if loading:
         terrain.heights = save["heights"];
         terrain.overlay = save["overlay"];
         terrain.mark_all_dirty();
     terrain.changed.connect(_on_terrain_changed);
+    await _step(0.22, "Enriching the soil");
 
     var n:int = Terrain.SIZE * Terrain.SIZE;
     occupant.resize(n);
@@ -140,12 +180,17 @@ func _ready() -> void:
     nav.setup(Terrain.SIZE);
     _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
 
+    await _step(0.34, "Lighting the sky");
     visuals = WorldVisuals.new(self);
     visuals.name = "Visuals";
+    if _staged:
+        visuals.process_mode = Node.PROCESS_MODE_DISABLED;       # (it reads the camera, which does not exist yet)
     add_child(visuals);
     visuals.setup_environment();
     var ambient:AmbientAudio = AmbientAudio.new(self);
     ambient.name = "Ambient";
+    if _staged:
+        ambient.process_mode = Node.PROCESS_MODE_DISABLED;
     add_child(ambient);
     traders = Traders.new(self);
     _entities = Node3D.new();
@@ -155,20 +200,28 @@ func _ready() -> void:
     renderer.name = "Nature";
     add_child(renderer);
     add_child(RoadDetail.new(self));
-    add_child(GrassDetail.new(self));
-    add_child(GroundPlants.new(self));
+    _grass = GrassDetail.new(self);
+    _ground = GroundPlants.new(self);
+    if _staged:
+        _grass.rebuilds_per_frame = 10;
+        _ground.rebuilds_per_frame = 6;
+    add_child(_grass);
+    add_child(_ground);
     jobs = JobManager.new(self);
     families = Families.new(self);
     policies.changed.connect(jobs.on_policy_changed);
 
+    await _step(0.5, "Restoring your colony" if loading else "Planting the forests");
     if loading:
         _restore_entities(save);
     else:
         _spawn_nature();
         var start:Vector2i = _find_start_cell();
         _clear_nodes(start, 13);
-        if backdrop:
+        if is_backdrop:
+            await _step(0.7, "Building the town");
             TitleBackdrop.build(self, start);
+            await _settle();
             return;
         if choose_start:
             choose_start = false;
@@ -179,6 +232,7 @@ func _ready() -> void:
         else:
             _found_colony(start);
 
+    await _step(0.76, "Building the interface");
     camera_rig = RTSCamera.new();
     camera_rig.name = "CameraRig";
     add_child(camera_rig);
@@ -209,6 +263,7 @@ func _ready() -> void:
         notify("Choose where to settle: click to place your %s." % Defs.BUILDINGS[GameRules.start_def()]["name"]);
     else:
         notify("Game loaded." if loading else "Your settlers have arrived. Spring has begun.");
+    await _settle();
 
 func idx(c:Vector2i) -> int:
     return c.y * Terrain.SIZE + c.x;

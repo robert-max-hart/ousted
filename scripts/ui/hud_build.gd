@@ -254,7 +254,7 @@ static func _build_menu(hud:HUD, root:Control) -> void:
         ["Save game...", func() -> void: _open_save_panel(hud, true)],
         ["Load game...", func() -> void: _open_save_panel(hud, false)],
         ["Settings...", func() -> void: hud._menu.add_child(SettingsPanel.new())],
-        ["Quit to title", func() -> void: hud.get_tree().change_scene_to_file(hud.TITLE_SCENE)],
+        ["Quit to title", func() -> void: LoadingScreen.begin(hud.get_tree()); hud.get_tree().change_scene_to_file(hud.TITLE_SCENE)],
         ["Quit game", func() -> void: hud.get_tree().quit()],
     ];
     for item in items:

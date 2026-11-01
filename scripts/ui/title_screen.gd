@@ -40,6 +40,7 @@ var _ui_root    :Control;               # the menu's layer: modal panels go in h
 var _continue_slot:String = "";
 
 func _ready() -> void:
+    LoadingScreen.begin(get_tree());          # the picture behind the title is built a stage at a time under the loading screen
     _build_backdrop();
     _build_ui();
 
@@ -473,6 +474,7 @@ func _launch() -> void:
     GameClock.reset();
     Weather.reset();
     GameClock.locked = false;
+    LoadingScreen.begin(get_tree());
     get_tree().change_scene_to_file(SaveGame.MAIN_SCENE);
 
 func _show_load() -> void:

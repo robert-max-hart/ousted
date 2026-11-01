@@ -19,6 +19,7 @@ const GRASS_SWAY    :float = 0.07;      # metres the tips bend in calm weather
 const GRASS_HEIGHT  :float = 0.2;       # (a blade is 0.2 tall)
 const DRAW_DISTANCE :float = 52.0;      # metres from the camera to a block's middle
 const REBUILDS_PER_FRAME:int = 4;
+var rebuilds_per_frame:int = REBUILDS_PER_FRAME;       # more while the loading screen is up
 const BY_SEASON     :Array[Color] = [
     Color(0.36, 0.58, 0.22), Color(0.4, 0.57, 0.2), Color(0.64, 0.52, 0.22), Color(0.66, 0.6, 0.42),
 ];
@@ -32,7 +33,7 @@ var _mesh       :ArrayMesh;
 
 func _init(w:World) -> void:
     _world = w;
-    _mat = WindSway.make(BY_SEASON[Climate.look(GameClock.season())], GRASS_SWAY, GRASS_HEIGHT, true);       # blades sway in the wind (WindSway)
+    _mat = WindSway.make(Climate.tuft_colour(Climate.look(GameClock.season()), BY_SEASON[Climate.look(GameClock.season())]), GRASS_SWAY, GRASS_HEIGHT, true);       # blades sway in the wind (WindSway)
     _mesh = _make_tuft();
 
 func _ready() -> void:
@@ -44,7 +45,7 @@ func _ready() -> void:
             _dirty.append(Vector2i(bx, bz));
 
 func _on_season(s:int) -> void:
-    WindSway.set_color(_mat, BY_SEASON[Climate.look(s)]);
+    WindSway.set_color(_mat, Climate.tuft_colour(Climate.look(s), BY_SEASON[Climate.look(s)]));
     reload();       # the winter cover differs, so every block is rebuilt
 
 # Rebuilds every block (a season change, or the density setting).
@@ -65,7 +66,7 @@ func _on_terrain_changed(r:Rect2i) -> void:
                 _dirty.append(b);
 
 func _process(_delta:float) -> void:
-    for i in mini(REBUILDS_PER_FRAME, _dirty.size()):
+    for i in mini(rebuilds_per_frame, _dirty.size()):
         _rebuild(_dirty.pop_front());
 
 # Three crossed blades that lean a little.
@@ -86,6 +87,7 @@ func _make_tuft() -> ArrayMesh:
 func _rebuild(b:Vector2i) -> void:
     var t:Terrain = _world.terrain;
     var winter:bool = Climate.is_dormant();
+    var climate_share:float = float(Climate.data().get("tufts", 1.0));
     var spots:Array[Vector3] = [];
     var tints:Array[float] = [];
     for z in range(b.y * BLOCK, (b.y + 1) * BLOCK):
@@ -94,7 +96,7 @@ func _rebuild(b:Vector2i) -> void:
             if not _grassy(c):
                 continue;
             var h:int = ((x * 73856093) ^ (z * 19349663)) & 0xffffff;
-            var want:float = DENSITY * Settings.grass_share() * (WINTER_SHARE if winter else 1.0);
+            var want:float = DENSITY * Settings.grass_share() * climate_share * (WINTER_SHARE if winter else 1.0);
             var copies:int = floori(want) + (1 if float(h & 255) / 255.0 < want - floor(want) else 0);
             for k in copies:
                 var hk:int = (h * (k + 3) + k * 40503) & 0xffffff;

@@ -69,11 +69,14 @@ func restore_state(d:Dictionary) -> void:
 
 # Game hours elapsed for a frame of real_delta seconds.
 func game_hours(real_delta:float) -> float:
+    if held:
+        return 0.0;
     return real_delta * SPEEDS[speed_index] / GameRules.seconds_per_hour();
 
 func speed() -> float:
-    return SPEEDS[speed_index];
+    return 0.0 if held else SPEEDS[speed_index];
 
+var held:bool = false;             # the loading screen is up: no time passes (see LoadingScreen)
 var locked:bool = false;           # the speed can't be changed (a new game waiting for the Town Hall to be placed)
 
 func set_speed(index:int) -> void:

@@ -142,6 +142,7 @@ static func start_from_slot(tree:SceneTree, slot:String) -> String:
     GameClock.restore_state(data["clock"]);
     Weather.restore_state(data["weather"]);
     World.pending_load = data;
+    LoadingScreen.begin(tree);
     tree.change_scene_to_file(MAIN_SCENE);
     return "";
 
@@ -163,5 +164,6 @@ static func load_slot(world:World, slot:String = QUICKSAVE) -> void:
         GameClock.restore_state(data["clock"]);
         Weather.restore_state(data["weather"]);
         World.pending_load = data;
+        LoadingScreen.begin(tree);
         parent.add_child((load(MAIN_SCENE) as PackedScene).instantiate());
     tree.process_frame.connect(swap, CONNECT_ONE_SHOT);

@@ -3,6 +3,11 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.17 | 31 Oct 2026 | Loading screens, a sandy desert, no snow in the water
+- Loading a game, starting a new one and arriving at the title screen now show a loading screen with a progress bar and a tip. The map is built behind it and only revealed when everything is ready, so it no longer appears piece by piece, and the first moments of play are smooth instead of stuttering.
+- The desert looks like a desert: tan ground, sandstone rocks, pale sand beaches, sparse straw-coloured grass and very few flowers, and far fewer trees (about 100 on a large map instead of several hundred).
+- Snow no longer settles on the river bed, the fords or the waterline: it fades out up the shore.
+
 # 0.6.16 | 31 Oct 2026 | Gates that open, planked stockpiles, arched bridges
 - Fields, pastures and graveyards now have a gate in their fence that swings open when a citizen walks up to it, and shuts again behind them.
 - Stockpiles are laid with planks across a platform, with a low board round the edge, instead of a plain slab.

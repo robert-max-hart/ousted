@@ -13,7 +13,8 @@ enum Id { TEMPERATE, ARCTIC, DESERT, TROPICAL };      # (new ids go last: saves 
 
 # temps: mid-season mean C for spring, summer, autumn and winter. swing: day and night spread (+-).
 # rain: chance an hour starts a spell, by season; rain_stop: chance an hour ends one. drought: chance a day starts
-# a dry spell, by season. warning: an optional line shown in red under the description on the New Game screen. trees: woodland density against the temperate map. winter: the land goes bare and
+# a dry spell, by season. ground, rock, sand: the colours of the land (four seasons for the ground; the default is green), tufts and tuft_colours: how many grass tufts
+# stand on it (a share of the usual) and their colours by season, flowers: the share of the usual flowers. warning: an optional line shown in red under the description on the New Game screen. trees: woodland density against the temperate map. winter: the land goes bare and
 # white in the last season (a hot climate keeps its summer look all year). species: the trees that grow here and their share, in the order
 # they lie across the land's patches (so the ones next to each other in the list meet in a mixed edge); dead: the share of trees that are dead.
 const DEFS:Dictionary = {
@@ -33,8 +34,12 @@ const DEFS:Dictionary = {
     Id.DESERT: {
         "name": "Desert", "desc": "Hot and dry with cool nights. Rain is rare and droughts are common: water is everything. Food spoils quickly.",
         "temps": [22.0, 34.0, 23.0, 14.0], "swing": 6.0, "rain": [0.012, 0.005, 0.012, 0.015], "rain_stop": 0.2,
-        "drought": [0.05, 0.1, 0.05, 0.02], "trees": 0.2, "winter": false,
+        "drought": [0.05, 0.1, 0.05, 0.02], "trees": 0.04, "winter": false,
         "species": [[&"palm", 1.0]], "dead": 0.5,
+        "ground": [Color(0.66, 0.57, 0.4), Color(0.7, 0.6, 0.41), Color(0.67, 0.57, 0.4), Color(0.64, 0.56, 0.41)],
+        "rock": Color(0.6, 0.48, 0.38), "sand": Color(0.76, 0.67, 0.48),
+        "tufts": 0.3, "tuft_colours": [Color(0.66, 0.58, 0.32), Color(0.7, 0.6, 0.32), Color(0.68, 0.57, 0.32), Color(0.64, 0.57, 0.38)],
+        "flowers": 0.12,
     },
     Id.TROPICAL: {
         "name": "Tropical", "desc": "Warm all year with frequent rain: no frost and no heating, so crops grow all year, but food spoils fast.",
@@ -98,3 +103,8 @@ static func plant_kind(roll:float) -> StringName:
         if roll < at:
             return e[0];
     return d["species"][d["species"].size() - 1][0];
+
+# The grass tuft colour for a look (a season): the climate's own, or the usual green.
+static func tuft_colour(look_season:int, default:Color) -> Color:
+    var cols:Variant = DEFS[current].get("tuft_colours");
+    return cols[look_season] if cols != null else default;

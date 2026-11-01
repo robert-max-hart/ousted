@@ -13,6 +13,7 @@ const BLOCK         :int = 16;
 const DIR           :String = "res://assets/models/ground/";
 const DRAW_DISTANCE :float = 46.0;
 const REBUILDS_PER_FRAME:int = 2;
+var rebuilds_per_frame:int = REBUILDS_PER_FRAME;       # more while the loading screen is up
 const FLOWER_DENSITY:float = 0.9;       # flower clumps per cell inside a flower patch
 const FERN_DENSITY  :float = 0.55;      # ferns per cell beside trees
 const REED_DENSITY  :float = 1.1;       # reed clumps per cell at the water's edge, inside a reed patch
@@ -43,6 +44,7 @@ var _patch      :FastNoiseLite;
 var _colour     :FastNoiseLite;
 var _reed       :FastNoiseLite;
 var _reduced    :bool = false;
+var _flower_share:float = 1.0;
 
 func _init(w:World) -> void:
     _world = w;
@@ -106,7 +108,7 @@ func _on_terrain_changed(r:Rect2i) -> void:
                 _dirty.append(b);
 
 func _process(_delta:float) -> void:
-    for i in mini(REBUILDS_PER_FRAME, _dirty.size()):
+    for i in mini(rebuilds_per_frame, _dirty.size()):
         _rebuild(_dirty.pop_front());
 
 func _hash(x:int, z:int, k:int) -> int:
@@ -120,6 +122,7 @@ func _rebuild(b:Vector2i) -> void:
     var share:float = Settings.grass_share();
     var look:int = Climate.look(GameClock.season());
     var dormant:bool = Climate.is_dormant();
+    _flower_share = float(Climate.data().get("flowers", 1.0));
     var found:Dictionary = {};            # kind -> Array of [position, yaw, scale, tint, flower colour]
     for kind in LAYERS:
         found[kind] = [];
@@ -144,7 +147,7 @@ func _rebuild(b:Vector2i) -> void:
 
 # Flowers and ferns on an open grassy cell.
 func _land_plants(c:Vector2i, found:Dictionary, share:float, look:int, dormant:bool) -> void:
-    var bloom:float = 0.0 if dormant else FLOWER_SHARE[look];
+    var bloom:float = 0.0 if dormant else FLOWER_SHARE[look] * _flower_share;
     var n:float = _patch.get_noise_2d(c.x, c.y);
     if bloom > 0.0 and n > 0.1:
         var h:int = _hash(c.x, c.y, 1);

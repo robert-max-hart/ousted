@@ -29,7 +29,7 @@ func _process(delta:float) -> void:
         print("SAVE: ", SaveGame.write(world, SLOT), " pawns ", world.pawns.size(), " nodes ", world.nodes.size(), " buildings ", world.buildings.size(), " piles ", world.piles.size());
         SaveGame.load_slot(world, SLOT);
         return;
-    if _loaded and not _checked and World.instance != world and is_instance_valid(World.instance) and World.instance.is_inside_tree():
+    if _loaded and not _checked and World.instance != world and is_instance_valid(World.instance) and World.instance.is_inside_tree() and not LoadingScreen.active:
         _checked = true;
         world = World.instance;
         _compare(_before, world.serialize());
