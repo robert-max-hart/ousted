@@ -569,8 +569,12 @@ func is_bridge(c:Vector2i) -> bool:
 # The height citizens stand at on this spot: the ground, or the deck of a bridge over water.
 func stand_y(x:float, z:float) -> float:
     var y:float = terrain.height_at(x, z);
-    if y < Terrain.WATER_LEVEL + Building.DECK_HEIGHT and is_bridge(Vector2i(int(x), int(z))):
-        return Terrain.WATER_LEVEL + Building.DECK_HEIGHT;
+    if y < Terrain.WATER_LEVEL + Building.DECK_HEIGHT + Building.ARCH_MAX:
+        var c:Vector2i = Vector2i(int(x), int(z));
+        if is_bridge(c):
+            var top:float = Terrain.WATER_LEVEL + Building.DECK_HEIGHT + (occupant[idx(c)] as Building).deck_lift_at(x, z);       # (a bridge arches, a pier is flat)
+            if y < top:
+                return top;
     return y;
 
 

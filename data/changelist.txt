@@ -3,6 +3,11 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.16 | 31 Oct 2026 | Gates that open, planked stockpiles, arched bridges
+- Fields, pastures and graveyards now have a gate in their fence that swings open when a citizen walks up to it, and shuts again behind them.
+- Stockpiles are laid with planks across a platform, with a low board round the edge, instead of a plain slab.
+- Bridges longer than three tiles now arch in the middle, and citizens walk up and over the curve.
+
 # 0.6.15 | 31 Oct 2026 | Chicks, lambs and calves, and herds that wander
 - Newborn animals now appear small: chicks (yellow), lambs and calves stay close to their mothers and grow up over a few days (6 for chicks, 12 for lambs, 16 for calves). They are only a matter of looks: breeding and what the animals give are as before.
 - Herds wander around inside their pasture instead of standing near one spot. Each animal walks across the grass, stops with its head down to graze (in the cold months, when they eat grain, they keep their heads up), and turns to face the way it is going. Chickens peck all year.

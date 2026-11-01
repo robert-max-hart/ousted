@@ -12,6 +12,10 @@
 #       bridge_rail       one cell of handrail along both sides
 #       bridge_post       a rail post (a pair, one each side, at the ends of a cell)
 #       bridge_stilt      a pair of posts with a brace, standing down into the water
+#       fence_<kind>_leaf the gate itself, hinged at its origin and reaching 0.86 along x (wood, field, stone);
+#                         the game swings it open when a citizen comes near
+#       pad_tile          one cell of a stockpile's plank platform (1 by 1, centred on its thickness)
+#       pad_kerb          a low edge board along one side of a cell (along x, at z = -0.5)
 #       headstone_0..2    a slab, a round-topped stone and a cross, each on a little mound
 #     Facing and up: +x along, +y up, z across.
 #         python3 tools/make_structures.py
@@ -96,9 +100,31 @@ def make_stone():
     g.ball(0, 0.42 + 0.12, 0, 0.12, 0.12, 0.12, shade(0.9), segs=8, rings=4)
     g.write("fence_stone_gate", OUT)
 
+def leaf(name, lo, hi, kind):
+    """A gate leaf from its hinge (the origin) along +x: a frame of rails with uprights and a brace; `lo` and `hi` are the rail heights."""
+    m = Mesh()
+    L = 0.86
+    if kind == "bars":                                              # iron: top and bottom rails and upright bars, with a spear tip
+        for y in (lo, hi):
+            m.box(L / 2, y, 0, L, 0.045, 0.045, IRON)
+        for k in range(7):
+            x = 0.03 + k * (L - 0.06) / 6
+            m.box(x, (lo + hi) / 2, 0, 0.03, hi - lo + 0.12, 0.03, IRON)
+            m.frustum(x, hi + 0.06, 0, 0.04, 0.04, 0.0, 0.0, 0.07, (0.3, 0.3, 0.33))
+    else:                                                           # wood: two rails, an upright at each end and a diagonal brace
+        for y in (lo, hi):
+            m.box(L / 2, y, 0, L, 0.07, 0.04, shade(1.0))
+        for x in (0.035, L - 0.035):
+            m.box(x, (lo + hi) / 2, 0, 0.07, hi - lo + 0.1, 0.05, shade(0.9))
+        m.limb(v(0.07, lo, 0.025), v(L - 0.07, hi, 0.025), 0.022, 0.022, shade(0.8), segs=4)
+    m.write(name, OUT)
+
 make_wood()
 make_rope()
 make_stone()
+leaf("fence_wood_leaf", 0.32, 0.62, "boards")
+leaf("fence_field_leaf", 0.18, 0.4, "boards")
+leaf("fence_stone_leaf", 0.1, 0.62, "bars")
 
 
 # --------------------------------
@@ -130,6 +156,24 @@ def bridge():
     s.write("bridge_stilt", OUT)
 
 bridge()
+
+
+# --------------------------------
+# The stockpile's platform: planks laid across, with a low board round the edge
+
+def pad():
+    t = 0.1
+    m = Mesh()
+    for k in range(5):
+        m.box(0, 0, -0.4 + k * 0.2, 1.0, t, 0.19, shade(0.9 + 0.1 * ((k * 5) % 3) / 2))
+    for x in (-0.3, 0.3):                                           # two bearers under the planks
+        m.box(x, -t / 2 - 0.02, 0, 0.1, 0.04, 1.0, shade(0.55))
+    m.write("pad_tile", OUT)
+    k = Mesh()
+    k.box(0, t / 2 + 0.03, -0.46, 1.0, 0.07, 0.08, shade(0.78))
+    k.write("pad_kerb", OUT)
+
+pad()
 
 
 # --------------------------------

@@ -61,9 +61,7 @@ static func _build_visual(b:Building) -> void:
         "bridge":
             BuildingVisuals._build_bridge(b, h);
         "pile":
-            var pad:BoxMesh = BoxMesh.new();
-            pad.size = Vector3(b.vsize.x - 0.3, h, b.vsize.y - 0.3);
-            b._body = b._add_mesh(pad, b._body_mat, Vector3(0, h * 0.5, 0));
+            BuildingVisuals._build_pad(b, h);
             b._fence = Fence.new(b, &"rope", 2);
             b.add_child(b._fence);
             b.add_child(PileGoods.new(b));
@@ -104,6 +102,47 @@ static func _fit_to_footprint(b:Building) -> void:
     b.fit_shift = Vector3(-mid.x * fit, 0.0, -mid.y * fit).rotated(Vector3.UP, b.rotation.y);
     b.position += b.fit_shift;
 
+# A stockpile's platform: cells of planking tiled to the size it was dragged out to (inset a little from the footprint), with a low
+# board round the edge. The tiles are the body, which rises while it is a site.
+static func _build_pad(b:Building, h:float) -> void:
+    var tile:Mesh = load("%spad_tile.obj" % Fence.DIR) as Mesh;
+    var kerb:Mesh = load("%spad_kerb.obj" % Fence.DIR) as Mesh;
+    var w:int = b.vsize.x;
+    var d:int = b.vsize.y;
+    var sx:float = (w - 0.3) / w;
+    var sz:float = (d - 0.3) / d;
+    var floor_stamp:MeshStamp = MeshStamp.new();
+    var edge_stamp:MeshStamp = MeshStamp.new();
+    for j in d:
+        for i in w:
+            var at:Vector3 = Vector3((i + 0.5 - w * 0.5) * sx, 0.0, (j + 0.5 - d * 0.5) * sz);
+            floor_stamp.add(tile, Transform3D(Basis.from_scale(Vector3(sx, h / 0.1, sz)), at));
+            if j == 0:
+                edge_stamp.add(kerb, Transform3D(Basis.from_scale(Vector3(sx, 1.0, sz)), at));
+            if j == d - 1:
+                edge_stamp.add(kerb, Transform3D(Basis(Vector3.UP, PI).scaled(Vector3(sx, 1.0, sz)), at));
+            if i == 0:
+                edge_stamp.add(kerb, Transform3D(Basis(Vector3.UP, PI * 0.5).scaled(Vector3(sx, 1.0, sz)), at));
+            if i == w - 1:
+                edge_stamp.add(kerb, Transform3D(Basis(Vector3.UP, -PI * 0.5).scaled(Vector3(sx, 1.0, sz)), at));
+    b._body_mat.vertex_color_use_as_albedo = true;
+    b._body = b._add_mesh(floor_stamp.build(b._body_mat), b._body_mat, Vector3(0, h * 0.5, 0));
+    b._body_y0 = 0.0;
+    b._body_h = h;
+    var edge_mat:StandardMaterial3D = SurfaceTextures.material(&"planks", Color(0.5, 0.4, 0.28));
+    edge_mat.vertex_color_use_as_albedo = true;
+    b.add_decor(edge_stamp.build(edge_mat), edge_mat, Vector3(0, h * 0.5, 0));
+
+# The platform again at a new size (a stockpile that was expanded).
+static func rebuild_pad(b:Building) -> void:
+    b.vsize = b.size;
+    b._body.queue_free();
+    for d in b._decor:
+        d.queue_free();
+    b._decor.clear();
+    _build_pad(b, b.def.get("height", 0.1));
+    b._update_visual();
+
 # A plank deck with a handrail along each long side and stilts down to the water, tiled from cell-long pieces (assets/models/structures,
 # made by tools/make_structures.py) to the length that was dragged out.
 static func _build_bridge(b:Building, h:float) -> void:
@@ -112,10 +151,16 @@ static func _build_bridge(b:Building, h:float) -> void:
     var length:int = maxi(b.vsize.x, b.vsize.y);
     var width:float = float(mini(b.vsize.x, b.vsize.y));
     var turn:Basis = Basis(Vector3.UP, 0.0 if along_x else PI * 0.5);
-    var squeeze:Basis = turn * Basis.from_scale(Vector3(1.0, 1.0, width));         # (the pieces are one cell wide)
+    var flip:float = 1.0 if along_x else -1.0;        # (a turned piece's +x points the other way along the bridge)
     var dir:Vector3 = Vector3.RIGHT if along_x else Vector3.BACK;
-    var dir_xf:Callable = func(at:float, y:float, wide:bool) -> Transform3D:
-        return Transform3D(squeeze if wide else turn, dir * at + Vector3(0, y, 0));
+    var rise:float = b.arch_rise();
+    # A piece at distance `at` along the bridge (from its middle): lifted onto the arch and pitched to follow it.
+    var dir_xf:Callable = func(at:float, y:float, wide:bool, pitch:bool) -> Transform3D:
+        var u:float = (at + length * 0.5) / length;
+        var lift:float = b.arch_at(u);
+        var slope:float = atan(rise * 4.0 * (1.0 - 2.0 * u) / length) * flip if pitch else 0.0;
+        var scale:Basis = Basis.from_scale(Vector3(1.0, 1.0, width if wide else 1.0));
+        return Transform3D(turn * Basis(Vector3.BACK, slope) * scale, dir * at + Vector3(0, y + lift, 0));
     var deck_mesh:Mesh = load("%sbridge_deck.obj" % Fence.DIR) as Mesh;
     var rail_mesh:Mesh = load("%sbridge_rail.obj" % Fence.DIR) as Mesh;
     var post_mesh:Mesh = load("%sbridge_post.obj" % Fence.DIR) as Mesh;
@@ -124,13 +169,13 @@ static func _build_bridge(b:Building, h:float) -> void:
     var rails:MeshStamp = MeshStamp.new();
     for k in length:
         var at:float = -length * 0.5 + k + 0.5;
-        deck.add(deck_mesh, dir_xf.call(at, 0.0, true));
-        rails.add(rail_mesh, dir_xf.call(at, top, true));
+        deck.add(deck_mesh, dir_xf.call(at, 0.0, true, true));
+        rails.add(rail_mesh, dir_xf.call(at, top, true, true));
     for j in range(0, length + 1):
         if j % 2 == 0 or j == length:
-            rails.add(post_mesh, dir_xf.call(-length * 0.5 + j, top, true));
+            rails.add(post_mesh, dir_xf.call(-length * 0.5 + j, top, true, false));
     for j in range(1, length, 2):
-        rails.add(stilt_mesh, dir_xf.call(-length * 0.5 + j, top - h, true));
+        rails.add(stilt_mesh, dir_xf.call(-length * 0.5 + j, top - h, true, false));
     b._body_mat.vertex_color_use_as_albedo = true;
     b._body = b._add_mesh(deck.build(b._body_mat), b._body_mat, Vector3(0, top - h * 0.5, 0));
     b._body_y0 = top - h;

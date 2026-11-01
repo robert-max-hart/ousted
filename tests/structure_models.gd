@@ -45,6 +45,26 @@ func _ready() -> void:
         long_bridge._body.mesh.get_aabb().size.x > short_bridge._body.mesh.get_aabb().size.x * 2.0);
     _expect("a bridge dragged along z has its deck along z", turned._body.mesh.get_aabb().size.z > 7.0 and turned._body.mesh.get_aabb().size.x < 2.0);
     _expect("and rails and stilts as decor", turned._decor.size() == 1 and (turned._decor[0].mesh as Mesh).get_aabb().size.y > 1.5);
+    # the gate opens for a citizen and shuts again
+    _expect("a pasture has a gate leaf, a graveyard too, a stockpile none", pasture._fence._leaf != null and yard._fence._leaf != null and pile._fence._leaf == null);
+    GameClock.set_speed(1);
+    var walker:Pawn = world.pawns[0];
+    var mouth:Vector2 = pasture._fence._mouth;
+    walker.position = Vector3(mouth.x, world.terrain.height_at(mouth.x, mouth.y), mouth.y);
+    for i in 90:
+        pasture._fence._process(0.1);
+    _expect("the gate swings open when a citizen is at it (%.2f)" % pasture._fence._leaf.rotation.y, pasture._fence._leaf.rotation.y > Fence.OPEN_ANGLE - 0.05);
+    walker.position = Vector3(mouth.x + 30.0, 0.0, mouth.y);
+    for i in 90:
+        pasture._fence._process(0.1);
+    _expect("and shuts when they have gone", absf(pasture._fence._leaf.rotation.y) < 0.05);
+    GameClock.set_speed(0);
+    # the stockpile's platform is tiled planks, and a long bridge arches
+    _expect("a stockpile's platform is a tiled mesh with a kerb", pile._body.mesh is ArrayMesh and pile._body.mesh.get_aabb().size.x > 3.5 and pile._decor.size() >= 1);
+    _expect("a short bridge is flat and a long one arches (%.2f, %.2f)" % [short_bridge.arch_rise(), long_bridge.arch_rise()], short_bridge.arch_rise() == 0.0 and long_bridge.arch_rise() > 0.2 and long_bridge.arch_rise() <= Building.ARCH_MAX);
+    var mid_lift:float = long_bridge.deck_lift_at(long_bridge.origin.x + 4.0, long_bridge.origin.y + 0.5);
+    _expect("its middle is higher than its ends", mid_lift > long_bridge.deck_lift_at(long_bridge.origin.x + 0.2, long_bridge.origin.y + 0.5) + 0.15);
+    _expect("and its deck mesh stands taller than a flat one", long_bridge._body.mesh.get_aabb().size.y > short_bridge._body.mesh.get_aabb().size.y + 0.15);
     print("STRUCTURE MODELS %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

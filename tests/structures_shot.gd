@@ -39,6 +39,7 @@ func _ready() -> void:
     world.place_building(&"bridge", _o + Vector2i(0, 9), Vector2i(7, 1), true);
     world.place_building(&"bridge", _o + Vector2i(9, 8), Vector2i(1, 5), true);
     world.place_building(&"bridge", _o + Vector2i(12, 9), Vector2i(3, 1), true);
+    world.place_building(&"bridge", _o + Vector2i(0, 14), Vector2i(12, 1), true);       # long enough to arch
     world.camera_rig.focus_on(Vector3(_o.x + 12.0, 0, _o.y + 5.0));
     world.camera_rig._distance = 26.0;
     world.camera_rig._target_distance = 26.0;
@@ -47,6 +48,8 @@ func _ready() -> void:
 
 func _process(_delta:float) -> void:
     _frame += 1;
+    if _frame > 190 and not world.pawns.is_empty():
+        world.pawns[0].position = Vector3(_o.x + 11.5, world.terrain.height_at(_o.x + 11.5, _o.y + 6.3), _o.y + 6.3);       # a citizen at the pasture's gate
     match _frame:
         40:
             _shot("structures_all");
@@ -66,6 +69,23 @@ func _process(_delta:float) -> void:
             world.camera_rig._target_distance = 9.0;
         130:
             _shot("structures_fences");
+            world.camera_rig.focus_on(Vector3(_o.x + 4.0, 0, _o.y + 13.0));
+            world.camera_rig._distance = 8.0;
+            world.camera_rig._target_distance = 8.0;
+            world.camera_rig._pitch = deg_to_rad(-14.0);
+            world.camera_rig._yaw = deg_to_rad(20.0);
+        160:
+            _shot("structures_arch");
+            world.camera_rig.focus_on(Vector3(_o.x + 11.5, 0, _o.y + 5.5));
+            world.camera_rig._distance = 6.0;
+            world.camera_rig._target_distance = 6.0;
+            world.camera_rig._pitch = deg_to_rad(-28.0);
+            world.camera_rig._yaw = deg_to_rad(0.0);
+        190:
+            _shot("structures_gate_shut");
+            GameClock.set_speed(1);
+        240:
+            _shot("structures_gate_open");
             get_tree().quit();
 
 func _shot(n:String) -> void:

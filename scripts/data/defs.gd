@@ -140,7 +140,7 @@ const BUILDINGS:Dictionary = {
     },
     &"stockpile": {
         "name": "Stockpile", "size": Vector2i(4, 4), "cost": {&"wood": 4}, "work": 3.0,
-        "shape": "pile", "height": 0.1, "color": Color(0.46, 0.37, 0.26), "wall": &"plaster",
+        "shape": "pile", "height": 0.1, "color": Color(0.62, 0.5, 0.36), "wall": &"planks",
         "storage": true, "capacity": 150, "walkable": true, "drag_size": true, "flatten": true, "scalable": true,
         "desc": "An open area where citizens drop off goods. Drag to size it: a 4x4 holds 150 units, and cost and capacity grow with the area. Item filters can be set in the inspector.",
     },

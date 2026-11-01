@@ -53,7 +53,7 @@ func _stockpile(o:Vector2i) -> void:
     _finish(s);
     _expect("done: it is 6x4 with more capacity (%d to %d)" % [cap, s.capacity()], s.size == Vector2i(6, 4) and s.capacity() > cap);
     _expect("goods kept, no longer a site", s.amount(&"wood") == 30 and not s.is_site() and s.is_complete());
-    _expect("the pad was resized", ((s._body.mesh as BoxMesh).size.x - 5.7) < 0.01);
+    _expect("the pad was resized", absf(s._body.mesh.get_aabb().size.x - 5.7) < 0.05);
     # blocked by a neighbour
     var other:Building = world.place_building(&"house", o + Vector2i(8, 0), Vector2i(3, 3), true);
     _expect("a building in the way blocks it", Expansion.block_reason(world, s, Expansion.target_rect(s, o + Vector2i(9, 1))) == "Something is already built here");

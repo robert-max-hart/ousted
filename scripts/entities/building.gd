@@ -11,6 +11,8 @@ enum State { CONSTRUCTION, COMPLETE };
 # served highest first (ties go to the nearest).
 # The top of a bridge deck above the water surface (citizens on it stand at this height).
 const DECK_HEIGHT:float = 0.5;
+const ARCH_PER_CELL:float = 0.05;       # a bridge longer than three cells arches: this much rise for each extra cell
+const ARCH_MAX:float = 0.3;             # most a bridge rises in the middle
 const PRIORITY_NAMES:Array[String] = ["Paused", "Low", "Medium", "High", "Critical"];
 const PRIORITY_PAUSED:int = 0;
 const PRIORITY_MEDIUM:int = 2;
@@ -105,7 +107,7 @@ func on_resized(_old:Rect2i) -> void:
     var center:Vector2 = Vector2(origin.x + size.x * 0.5, origin.y + size.y * 0.5);
     position = Vector3(center.x, _ground_y(center), center.y);
     if def.get("shape", "") == "pile" and _body != null:
-        (_body.mesh as BoxMesh).size = Vector3(size.x - 0.3, def.get("height", 0.1), size.y - 0.3);
+        BuildingVisuals.rebuild_pad(self);
     if _fence != null:
         _fence.rebuild();
 
@@ -133,6 +135,24 @@ static func pier_rect_for(def:Dictionary, o:Vector2i, s:Vector2i, f:int) -> Rect
     if dx < 0:
         return Rect2i(o, Vector2i(depth, s.y));
     return Rect2i(Vector2i(o.x + s.x - depth, o.y), Vector2i(depth, s.y));
+
+# How high the middle of a bridge stands above its ends (0 for a short one, and for anything that is not a bridge).
+func arch_rise() -> float:
+    if not def.get("bridge", false):
+        return 0.0;
+    return clampf((maxi(vsize.x, vsize.y) - 3) * ARCH_PER_CELL, 0.0, ARCH_MAX);
+
+# The lift at a point `u` (0 to 1) of the way along a bridge: a parabola.
+func arch_at(u:float) -> float:
+    return arch_rise() * 4.0 * u * (1.0 - u);
+
+# The lift of the deck at a point of the ground plan (citizens walk over the arch, see World.stand_y).
+func deck_lift_at(x:float, z:float) -> float:
+    if arch_rise() <= 0.0:
+        return 0.0;
+    var r:Rect2i = rect();
+    var u:float = (x - r.position.x) / r.size.x if r.size.x >= r.size.y else (z - r.position.y) / r.size.y;
+    return arch_at(clampf(u, 0.0, 1.0));
 
 # Whether citizens walk over this cell of the footprint on a deck: a fishing hut's pier, and the centre line of the hut leading
 # to it from the door (a doorway through the hut, so the pier is never cut off by water on its sides).

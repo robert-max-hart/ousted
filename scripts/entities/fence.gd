@@ -9,7 +9,8 @@
 #     (Building.on_terrain_changed). The pieces are models
 #     (assets/models/structures, made by tools/make_structures.py):
 #     a post, a one-cell rail that is stretched to the slope, and a
-#     gate post.
+#     gate post, and for wood, field and stone fences a gate leaf
+#     that swings open (inwards) while a citizen is near it.
 #     Kinds: wood (posts and two rails), field (low, for crop fields),
 #     stone (a low wall with piers), rope (short posts and one rope,
 #     for stockpiles).
@@ -17,6 +18,10 @@
 class_name Fence extends Node3D;
 
 const DIR:String = "res://assets/models/structures/";
+const OPEN_ANGLE :float = 1.35;      # radians the gate leaf swings open
+const OPEN_NEAR  :float = 2.0;       # metres from the gate a citizen makes it open
+const SWING_RATE :float = 3.5;       # radians a second
+
 
 var _b          :Building;
 var _kind       :StringName;
@@ -25,6 +30,11 @@ var _posts      :MultiMeshInstance3D;
 var _rails      :MultiMeshInstance3D;
 var _gates      :MultiMeshInstance3D;
 var _was_done   :bool = false;
+var _leaf       :MeshInstance3D = null;       # the gate itself (none for a rope fence or a wider gap)
+var _hinge      :Vector3 = Vector3.ZERO;
+var _mouth      :Vector2 = Vector2.ZERO;      # the middle of the gap, on the ground plan (where citizens pass)
+var _swing      :float = 0.0;                 # 0 shut to OPEN_ANGLE open
+var _look_t     :float = 0.0;
 
 func _init(b:Building, kind:StringName, gap:int = 1) -> void:
     _b = b;
@@ -42,6 +52,15 @@ func _init(b:Building, kind:StringName, gap:int = 1) -> void:
     _posts = _layer(&"post", tex, tint);
     _gates = _layer(&"gate", tex, tint);
     _rails = _layer(&"rail", tex, Color(0.74, 0.66, 0.46) if kind == &"rope" else tint);
+    if gap == 1 and kind != &"rope":
+        _leaf = MeshInstance3D.new();
+        _leaf.mesh = load("%sfence_%s_leaf.obj" % [DIR, kind]) as Mesh;
+        var mat:StandardMaterial3D = _b._flat_mat(Color.WHITE) if kind == &"stone" else SurfaceTextures.material(tex, tint);       # (the iron gate keeps its own colours)
+        if kind != &"stone":
+            mat.uv1_world_triplanar = true;
+        mat.vertex_color_use_as_albedo = true;
+        _leaf.material_override = mat;
+        add_child(_leaf);
 
 func _layer(part:StringName, tex:StringName, tint:Color) -> MultiMeshInstance3D:
     var mm:MultiMesh = MultiMesh.new();
@@ -56,12 +75,32 @@ func _layer(part:StringName, tex:StringName, tint:Color) -> MultiMeshInstance3D:
     add_child(mmi);
     return mmi;
 
-func _process(_delta:float) -> void:
+func _process(delta:float) -> void:
     var done:bool = _b.state == Building.State.COMPLETE;
     visible = done;
     if done and not _was_done:
         rebuild();
     _was_done = done;
+    if done and _leaf != null:
+        _swing_gate(delta);
+
+# The gate opens while a citizen is near the gap and shuts again after (it freezes with the game when paused).
+func _swing_gate(delta:float) -> void:
+    _look_t -= delta;
+    var want:float = _swing;
+    if _look_t <= 0.0:
+        _look_t = 0.2;
+        _near = false;
+        for p in _b.world.pawns:
+            if not p.removed and not p.indoors and Vector2(p.position.x, p.position.z).distance_to(_mouth) < OPEN_NEAR:
+                _near = true;
+                break;
+    want = OPEN_ANGLE if _near else 0.0;
+    var dt:float = delta * minf(World.fx_speed(), 3.0);
+    _swing = move_toward(_swing, want, SWING_RATE * dt);
+    _leaf.rotation.y = _swing;          # (positive turns +x toward -z: into the enclosure)
+
+var _near:bool = false;
 
 func rebuild() -> void:
     var t:Terrain = _b.world.terrain;
@@ -104,6 +143,12 @@ func rebuild() -> void:
     gm.instance_count = tall.size();
     for i in tall.size():
         gm.set_instance_transform(i, _post_at(t, tall[i], -gate_aabb.position.y));
+    if _leaf != null:
+        # hinged on the west gate post, which stands at the gap's west edge, shutting across to the east one
+        var hp:Vector2i = Vector2i(gate, r.end.y);
+        _hinge = Vector3(hp.x + 0.07, t.corner(hp.x, hp.y) - 0.05, hp.y);
+        _leaf.position = _hinge;
+        _mouth = Vector2(gate + _gap * 0.5, r.end.y + 0.3);
     var rm:MultiMesh = _rails.multimesh;
     rm.instance_count = edges.size() * rails_per;
     var post_h:float = post_aabb.size.y;
