@@ -23,6 +23,28 @@ static func material(kind:StringName, tint:Color) -> StandardMaterial3D:
     m.roughness = 0.9;
     return m;
 
+# A shingle roof: the same triplanar texture and tint, and snow on top (shaders/roof.gdshader). `vertex_colours` lets a modelled
+# roof's own shading through. Registered with WindSway so it gets the snow cover.
+static func roof_material(tint:Color, vertex_colours:bool = false) -> ShaderMaterial:
+    var m:ShaderMaterial = ShaderMaterial.new();
+    m.shader = load("res://shaders/roof.gdshader") as Shader;
+    m.set_shader_parameter("tex", texture(&"shingle"));
+    m.set_shader_parameter("tex_scale", 1.0 / METRES);
+    m.set_shader_parameter("albedo", tint);
+    m.set_shader_parameter("use_vertex", 1.0 if vertex_colours else 0.0);
+    WindSway.track(m);
+    return m;
+
+# The material for a building's loose parts in their own vertex colours (tower caps, columns, props): no texture, snow on top.
+# One shared material (it keeps no per-building state).
+static var _snowy:ShaderMaterial;
+
+static func snowy_parts_material() -> ShaderMaterial:
+    if _snowy == null:
+        _snowy = roof_material(Color.WHITE, true);
+        _snowy.set_shader_parameter("tex_amount", 0.0);
+    return _snowy;
+
 static func texture(kind:StringName) -> ImageTexture:
     if not _cache.has(kind):
         var img:Image = Image.create(SIZE, SIZE, true, Image.FORMAT_RGB8);

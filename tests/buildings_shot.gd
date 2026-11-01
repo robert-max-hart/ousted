@@ -78,6 +78,17 @@ func _process(_delta:float) -> void:
             GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 3) * GameClock.HOURS_PER_DAY + 19.5;
         140:
             _shot("buildings_dusk");
+            GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 3 + 3) * GameClock.HOURS_PER_DAY + 12.0;
+            world.visuals.snow_cover = 0.35;
+            world.camera_rig._yaw -= deg_to_rad(55.0);
+            world.camera_rig._distance = 14.0;
+            world.camera_rig._target_distance = 14.0;
+            world.camera_rig._pitch = deg_to_rad(-38.0);
+        180:
+            _shot("buildings_light_snow");
+            world.visuals.snow_cover = 0.9;
+        210:
+            _shot("buildings_deep_snow");
             get_tree().quit();
 
 func _shot(n:String) -> void:

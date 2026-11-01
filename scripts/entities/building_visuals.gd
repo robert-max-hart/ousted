@@ -164,7 +164,7 @@ static func _build_boxes_mine(b:Building, h:float) -> void:
     b._body = b._add_mesh(shed, b._body_mat, Vector3(-b.vsize.x * 0.2, h * 0.5, -b.vsize.y * 0.25));
     var cap:PrismMesh = PrismMesh.new();
     cap.size = Vector3(b.vsize.x * 0.55, h * 0.4, b.vsize.y * 0.45);
-    b._roof = b._add_mesh(cap, SurfaceTextures.material(&"shingle", b.def.get("roof", Color.BROWN)), Vector3(-b.vsize.x * 0.2, h + h * 0.2, -b.vsize.y * 0.25));
+    b._roof = b._add_mesh(cap, SurfaceTextures.roof_material(b.def.get("roof", Color.BROWN)), Vector3(-b.vsize.x * 0.2, h + h * 0.2, -b.vsize.y * 0.25));
     BuildingShapes.mine_extras(b);
 
 static func _build_boxes_house(b:Building, h:float) -> void:
@@ -174,7 +174,7 @@ static func _build_boxes_house(b:Building, h:float) -> void:
     var pitch:float = b.def.get("roof_pitch", 0.55);
     var prism:PrismMesh = PrismMesh.new();
     prism.size = Vector3(b.vsize.x - 0.1, h * pitch, b.vsize.y - 0.2);
-    b._roof = b._add_mesh(prism, SurfaceTextures.material(&"shingle", b.def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
+    b._roof = b._add_mesh(prism, SurfaceTextures.roof_material(b.def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
     BuildingVisuals._build_door(b, Vector2(b.vsize.x - 0.5, b.vsize.y - 0.5), h);
     if b.def.has("fuel_capacity"):
         BuildingVisuals._build_chimney(b, h);
@@ -212,9 +212,7 @@ static func _build_model(b:Building, bh:float, body_mat:Material = null, roof_ma
     var roof:Mesh = BuildingVisuals._model(b, "roof");
     if roof != null:
         if roof_mat == null:
-            var shingle:StandardMaterial3D = SurfaceTextures.material(&"shingle", b.def.get("roof", Color.DARK_RED));
-            shingle.vertex_color_use_as_albedo = true;
-            roof_mat = shingle;
+            roof_mat = SurfaceTextures.roof_material(b.def.get("roof", Color.DARK_RED), true);
         b.set_roof(b._add_mesh(roof, roof_mat, Vector3.ZERO));
     var door:Mesh = BuildingVisuals._model(b, "door");
     if door != null:
@@ -230,7 +228,7 @@ static func _build_model(b:Building, bh:float, body_mat:Material = null, roof_ma
     for part in ["extras", "decor"]:
         var loose:Mesh = BuildingVisuals._model(b, part);
         if loose != null:
-            b.add_decor(loose, flat, Vector3.ZERO);
+            b.add_decor(loose, SurfaceTextures.snowy_parts_material(), Vector3.ZERO);       # snow lies on the tower caps and props
             if part == "decor":
                 b.set_meta(&"decor_modelled", true);
     var glow:Mesh = BuildingVisuals._model(b, "glow");

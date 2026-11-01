@@ -49,8 +49,8 @@ static func _colour(c:Color) -> StandardMaterial3D:
     m.roughness = 0.9;
     return m;
 
-static func _roof_mat(b:Building) -> StandardMaterial3D:
-    return SurfaceTextures.material(&"shingle", b.def.get("roof", Color.BROWN));
+static func _roof_mat(b:Building) -> ShaderMaterial:
+    return SurfaceTextures.roof_material(b.def.get("roof", Color.BROWN));
 
 # --------------------------------
 # Fishing hut: a small hut on the shore (the front half of the footprint, with the door) and a pier on stilts over the

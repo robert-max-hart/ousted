@@ -37,6 +37,11 @@ func _ready() -> void:
         if b.def.get("shape", "") == "house":
             _expect("%s has a door" % id, b._door != null);
         if id == &"house":
+            var roof_mat:ShaderMaterial = b._roof.material_override as ShaderMaterial;
+            _expect("a house's roof takes snow (roof shader)", roof_mat != null and roof_mat.shader.resource_path.ends_with("roof.gdshader"));
+            WindSway.update(1.0, 1.0, 0.6);
+            _expect("and gets the snow cover", roof_mat != null and is_equal_approx(float(roof_mat.get_shader_parameter("snow")), 0.6));
+            WindSway.update(1.0, 1.0, 0.0);
             _expect("a house has lit windows and a chimney", b._windows.size() == 1 and b._window_mat != null and b._chimney != null and b._smoke != null);
     var site:Building = world.place_building(&"house", at + Vector2i(0, 4), Vector2i(3, 3));
     _expect("a site has the same parts", site._body != null and site._body.mesh is ArrayMesh);

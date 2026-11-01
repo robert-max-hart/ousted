@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.13 | 31 Oct 2026 | Snow on roofs
+- Snow now settles on the roofs of buildings, including the tower caps, steps and props, thickening as the ground cover deepens and whitening flatter roofs first. Roofs show their shingles through light snow, and are plain again in summer.
+
 # 0.6.12 | 31 Oct 2026 | Clouds round the map, flowers, ferns and reeds, snowy rocks
 - The map no longer ends in a hard cut with empty sky beyond it. A bank of cloud billows stands along all four edges, rising a little above the ground there, and a sea of cloud stretches out under and around the map to the horizon. From the edge, from above and from outside, the land now looks like an island in the clouds.
 - The clouds follow the sky: white by day, gold at dusk and bluish at night, and they swell and drift slowly with the game clock (and stop when it is paused). Their edges are wispy and break up into fine wisps, and they fade out softly where they meet the ground instead of ending in a hard line. Settings has a Wispy clouds switch for the broken-up edges.
