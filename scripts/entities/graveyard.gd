@@ -182,7 +182,7 @@ func help_text() -> String:
 static func _shapes() -> Array[Mesh]:
     var out:Array[Mesh] = [];
     for k in 3:
-        out.append(load("%sheadstone_%d.obj" % [Fence.DIR, k]) as Mesh);
+        out.append(load("%sheadstone_%d.obj" % [Settings.model_dir(Fence.DIR), k]) as Mesh);
     return out;
 
 func _rebuild_stones() -> void:

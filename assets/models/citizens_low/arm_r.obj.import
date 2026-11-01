@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://yuh11qe20pt3"
+path="res://.godot/imported/arm_r.obj-71d89f43c96896230ae87f1d1288eb65.mesh"
+
+[deps]
+
+files=["res://.godot/imported/arm_r.obj-71d89f43c96896230ae87f1d1288eb65.mesh"]
+
+source_file="res://assets/models/citizens_low/arm_r.obj"
+dest_files=["res://.godot/imported/arm_r.obj-71d89f43c96896230ae87f1d1288eb65.mesh", "res://.godot/imported/arm_r.obj-71d89f43c96896230ae87f1d1288eb65.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

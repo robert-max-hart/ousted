@@ -41,9 +41,13 @@ var _forms      :Dictionary = {};       # form -> MultiMeshInstance3D
 static func form_of(item:StringName) -> StringName:
     return FORMS.get(item, DEFAULT_FORM);
 
+# Forgets the loaded meshes (the model detail changed).
+static func drop_caches() -> void:
+    _meshes.clear();
+
 static func mesh_for(form:StringName) -> Mesh:
     if not _meshes.has(form):
-        _meshes[form] = load("%s%s.obj" % [DIR, form]) as Mesh;
+        _meshes[form] = load("%s%s.obj" % [Settings.model_dir(DIR), form]) as Mesh;
     return _meshes[form];
 
 static func _mat() -> ShaderMaterial:

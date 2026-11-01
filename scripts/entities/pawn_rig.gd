@@ -63,9 +63,13 @@ var _height   :float = 1.0;       # this citizen's own build, a few percent eith
 var _size_key :int = -1;
 var _elder    :bool = false;
 
+# Forgets the loaded meshes (the model detail changed).
+static func drop_caches() -> void:
+    _meshes.clear();
+
 static func part(name:String) -> Mesh:
     if not _meshes.has(name):
-        _meshes[name] = load("%s%s.obj" % [DIR, name]) as Mesh;
+        _meshes[name] = load("%s%s.obj" % [Settings.model_dir(DIR), name]) as Mesh;
     return _meshes[name];
 
 # Builds the body. `rng` is seeded from the citizen's look seed.

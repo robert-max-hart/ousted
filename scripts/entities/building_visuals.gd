@@ -13,7 +13,7 @@ class_name BuildingVisuals extends RefCounted;
 const MODEL_DIR:String = "res://assets/models/buildings/";
 
 static func _model(b:Building, part:String) -> Mesh:
-    var path:String = "%sbuilding_%s_%s.obj" % [MODEL_DIR, b.def_id, part];
+    var path:String = "%sbuilding_%s_%s.obj" % [Settings.model_dir(MODEL_DIR), b.def_id, part];
     return load(path) as Mesh if ResourceLoader.exists(path) else null;
 
 
@@ -104,8 +104,8 @@ static func _fit_to_footprint(b:Building) -> void:
 # A stockpile's platform: cells of planking tiled to the size it was dragged out to (inset a little from the footprint), with a low
 # board round the edge. The tiles are the body, which rises while it is a site.
 static func _build_pad(b:Building, h:float) -> void:
-    var tile:Mesh = load("%spad_tile.obj" % Fence.DIR) as Mesh;
-    var kerb:Mesh = load("%spad_kerb.obj" % Fence.DIR) as Mesh;
+    var tile:Mesh = load("%spad_tile.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
+    var kerb:Mesh = load("%spad_kerb.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
     var w:int = b.vsize.x;
     var d:int = b.vsize.y;
     var sx:float = (w - 0.3) / w;
@@ -160,10 +160,10 @@ static func _build_bridge(b:Building, h:float) -> void:
         var slope:float = atan(rise * 4.0 * (1.0 - 2.0 * u) / length) * flip if pitch else 0.0;
         var scale:Basis = Basis.from_scale(Vector3(1.0, 1.0, width if wide else 1.0));
         return Transform3D(turn * Basis(Vector3.BACK, slope) * scale, dir * at + Vector3(0, y + lift, 0));
-    var deck_mesh:Mesh = load("%sbridge_deck.obj" % Fence.DIR) as Mesh;
-    var rail_mesh:Mesh = load("%sbridge_rail.obj" % Fence.DIR) as Mesh;
-    var post_mesh:Mesh = load("%sbridge_post.obj" % Fence.DIR) as Mesh;
-    var stilt_mesh:Mesh = load("%sbridge_stilt.obj" % Fence.DIR) as Mesh;
+    var deck_mesh:Mesh = load("%sbridge_deck.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
+    var rail_mesh:Mesh = load("%sbridge_rail.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
+    var post_mesh:Mesh = load("%sbridge_post.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
+    var stilt_mesh:Mesh = load("%sbridge_stilt.obj" % Settings.model_dir(Fence.DIR)) as Mesh;
     var deck:MeshStamp = MeshStamp.new();
     var rails:MeshStamp = MeshStamp.new();
     for k in length:

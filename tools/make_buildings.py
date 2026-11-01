@@ -21,6 +21,8 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from meshlib import Mesh, shade
+import meshlib
+meshlib.configure()
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "models", "buildings")
 v = lambda x, y, z: (x, y, z)
@@ -74,6 +76,9 @@ def solid(m, top, bottom, col):
 # --------------------------------
 # One cottage
 
+LOW = meshlib.DETAIL < 1.0          # the reduced set leaves out the smallest details: bracing, sills, shutters, boards on the door, brick courses
+
+
 def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, windows=3, side_windows=0, shutters=False, timber=False,
             logs=False, quoins=False, footing=0.2, step=True, overhang=0.2, thickness=0.08, home=False, chimney=False,
             sign=False, awning=False, small=False):
@@ -101,11 +106,11 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
             body.box(0, shift + h * 0.42, sz_ * hz, bx, 0.07, 0.07, TIMBER)
         for sx_ in (-1, 1):
             body.box(sx_ * hx, shift + h - 0.05, 0, 0.08, 0.1, bz + 0.08, TIMBER)
-        for sgn in (-1, 1):
+        for sgn in ((-1, 1) if not LOW else ()):
             body.limb(v(-hx * 0.55, shift + h, sgn * (hz + 0.03)), v(0, shift + h + apex * 0.7, sgn * (hz + 0.03)), 0.035, 0.035, TIMBER, segs=4)
             body.limb(v(hx * 0.55, shift + h, sgn * (hz + 0.03)), v(0, shift + h + apex * 0.7, sgn * (hz + 0.03)), 0.035, 0.035, TIMBER, segs=4)
     if logs:                                    # log-cabin corners: round log ends poking out, every other course
-        for k in range(int(h / 0.26)):
+        for k in range(int(h / 0.26) if not LOW else 0):
             y = shift + 0.13 + k * 0.26
             for sx_ in (-1, 1):
                 for sz_ in (-1, 1):
@@ -113,7 +118,7 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
                     body.limb(v(sx_ * (hx - 0.1), y, sz_ * (hz + off)), v(sx_ * (hx + 0.14), y, sz_ * (hz + off)), 0.1, 0.1, DARK_TIMBER, segs=6) if k % 2 == 0 else \
                         body.limb(v(sx_ * (hx + off), y, sz_ * (hz - 0.1)), v(sx_ * (hx + off), y, sz_ * (hz + 0.14)), 0.1, 0.1, DARK_TIMBER, segs=6)
     if quoins:                                  # lighter corner stones
-        for k in range(int(h / 0.3)):
+        for k in range(int(h / 0.3) if not LOW else 0):
             y = shift + 0.15 + k * 0.3
             w = 0.34 if k % 2 == 0 else 0.22
             for sx_ in (-1, 1):
@@ -144,8 +149,9 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
     for (px, py, pz, nx, front_) in pane_pts:
         if front_:
             body.box(px, py, pz + 0.03, 0.56, 0.56, 0.06, DARK_TIMBER)
-            body.box(px, py - 0.31, pz + 0.07, 0.62, 0.05, 0.12, STONE_BASE)
-            if shutters:
+            if not LOW:
+                body.box(px, py - 0.31, pz + 0.07, 0.62, 0.05, 0.12, STONE_BASE)
+            if shutters and not LOW:
                 for s_ in (-1, 1):
                     body.box(px + s_ * 0.4, py, pz + 0.04, 0.22, 0.56, 0.04, (0.3, 0.45, 0.38))
         else:
@@ -168,7 +174,7 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
         bottom = [v(p[0] * 0.98, p[1] - t, p[2]) for p in top]
         solid(roof, top, bottom, shade(1.0 if sgn > 0 else 0.92))
     roof.box(0, h + apex + 0.03, 0, 0.16, 0.1, rz * 2 + 0.04, shade(0.78))                   # the ridge cap
-    for sgn in (-1, 1):                                                                    # barge boards, front and back
+    for sgn in ((-1, 1) if not LOW else ()):                                               # barge boards, front and back
         for side in (-1, 1):
             roof.limb(v(side * (rx + 0.01), h - 0.06, sgn * (rz + 0.01)), v(0, h + apex + 0.02, sgn * (rz + 0.01)), 0.045, 0.045, shade(0.6), segs=4)
     roof.write("building_%s_roof" % name, OUT)
@@ -176,7 +182,7 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
     # the door
     door = Mesh()
     door.box(0, dh / 2, hz + 0.045, dw, dh, 0.06, DOOR)
-    for k in range(3):                                                                     # boards and a handle
+    for k in range(3 if not LOW else 0):                                                   # boards and a handle
         door.box(-dw / 3 + k * dw / 3, dh / 2, hz + 0.08, 0.02, dh - 0.1, 0.02, (0.2, 0.12, 0.07))
     door.box(dw * 0.3, dh * 0.5, hz + 0.09, 0.05, 0.05, 0.04, (0.7, 0.6, 0.3))
     door.write("building_%s_door" % name, OUT)
@@ -196,7 +202,7 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
         ch = top_y - base_y
         c = Mesh()
         c.box(0, 0, 0, 0.4, ch, 0.4, BRICK)
-        for k in range(int(ch / 0.14)):                                                    # courses of brick, a darker line each
+        for k in range(int(ch / 0.14) if not LOW else 0):                                  # courses of brick, a darker line each
             c.box(0, -ch / 2 + 0.07 + k * 0.14, 0, 0.42, 0.015, 0.42, (0.4, 0.25, 0.2))
         c.box(0, ch / 2 + 0.03, 0, 0.5, 0.07, 0.5, (0.45, 0.45, 0.46))                     # the cap
         c.write("building_%s_chimney" % name, OUT)

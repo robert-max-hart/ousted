@@ -25,6 +25,8 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from meshlib import Mesh
+import meshlib
+meshlib.configure()
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "models", "citizens")
 

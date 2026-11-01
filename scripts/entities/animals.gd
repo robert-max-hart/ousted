@@ -28,8 +28,13 @@ static var _whole:Dictionary = {};
 static func part(kind:StringName, which:StringName) -> Mesh:
     var key:String = "%s_%s" % [kind, which];
     if not _meshes.has(key):
-        _meshes[key] = load("%sanimal_%s.obj" % [DIR, key]) as Mesh;
+        _meshes[key] = load("%sanimal_%s.obj" % [Settings.model_dir(DIR), key]) as Mesh;
     return _meshes[key];
+
+# Forgets the loaded meshes (the model detail changed).
+static func drop_caches() -> void:
+    _meshes.clear();
+    _whole.clear();
 
 # The material for a part: the body is plain vertex colours; legs and head use the animal shader with this kind's gait.
 static func material(kind:StringName, which:StringName) -> Material:

@@ -54,14 +54,14 @@ func _init(b:Building, kind:StringName, gap:int = 1) -> void:
     _rails = _layer(&"rail", tex, Color(0.74, 0.66, 0.46) if kind == &"rope" else tint);
     if gap == 1 and kind != &"rope":
         _leaf = MeshInstance3D.new();
-        _leaf.mesh = load("%sfence_%s_leaf.obj" % [DIR, kind]) as Mesh;
+        _leaf.mesh = load("%sfence_%s_leaf.obj" % [Settings.model_dir(DIR), kind]) as Mesh;
         _leaf.material_override = SurfaceTextures.snowy_parts_material() if kind == &"stone" else SurfaceTextures.snowy_material(tex, tint, true, true);       # (the iron gate keeps its own colours)
         add_child(_leaf);
 
 func _layer(part:StringName, tex:StringName, tint:Color) -> MultiMeshInstance3D:
     var mm:MultiMesh = MultiMesh.new();
     mm.transform_format = MultiMesh.TRANSFORM_3D;
-    mm.mesh = load("%sfence_%s_%s.obj" % [DIR, _kind, part]) as Mesh;
+    mm.mesh = load("%sfence_%s_%s.obj" % [Settings.model_dir(DIR), _kind, part]) as Mesh;
     var mat:ShaderMaterial = SurfaceTextures.snowy_material(tex, tint, true, true);       # (the models shade their parts: nails, stone courses, caps; snow lies on the tops)
     var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
     mmi.multimesh = mm;

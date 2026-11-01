@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://db20vos4flikx"
+path="res://.godot/imported/building_fishing_hut_base.obj-f63456a9bfe406b4756c7cb26134010b.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_fishing_hut_base.obj-f63456a9bfe406b4756c7cb26134010b.mesh"]
+
+source_file="res://assets/models/buildings_low/building_fishing_hut_base.obj"
+dest_files=["res://.godot/imported/building_fishing_hut_base.obj-f63456a9bfe406b4756c7cb26134010b.mesh", "res://.godot/imported/building_fishing_hut_base.obj-f63456a9bfe406b4756c7cb26134010b.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

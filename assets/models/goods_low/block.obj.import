@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://p1vamp56h18l"
+path="res://.godot/imported/block.obj-ed4b7b185ec19d9edc91add85d21f811.mesh"
+
+[deps]
+
+files=["res://.godot/imported/block.obj-ed4b7b185ec19d9edc91add85d21f811.mesh"]
+
+source_file="res://assets/models/goods_low/block.obj"
+dest_files=["res://.godot/imported/block.obj-ed4b7b185ec19d9edc91add85d21f811.mesh", "res://.godot/imported/block.obj-ed4b7b185ec19d9edc91add85d21f811.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

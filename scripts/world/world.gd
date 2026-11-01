@@ -132,6 +132,7 @@ func _settle() -> void:
 func _ready() -> void:
     instance = self;
     is_backdrop = backdrop;
+    ModelDetail.note_start();
     _staged = LoadingScreen.active;
     await _step(0.02, "Gathering the settlers" if pending_load.is_empty() else "Opening the save");
     var save:Dictionary = pending_load;

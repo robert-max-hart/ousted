@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dvf7p2fjc0udx"
+path="res://.godot/imported/building_still_decor.obj-3ea93eaff7059f0a8050f6e3a9eb6e47.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_still_decor.obj-3ea93eaff7059f0a8050f6e3a9eb6e47.mesh"]
+
+source_file="res://assets/models/buildings_low/building_still_decor.obj"
+dest_files=["res://.godot/imported/building_still_decor.obj-3ea93eaff7059f0a8050f6e3a9eb6e47.mesh", "res://.godot/imported/building_still_decor.obj-3ea93eaff7059f0a8050f6e3a9eb6e47.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

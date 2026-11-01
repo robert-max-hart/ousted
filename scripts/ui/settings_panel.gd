@@ -65,7 +65,7 @@ func _init() -> void:
         detail.add_item(n);
     detail.select(Settings.model_detail);
     detail.item_selected.connect(func(i:int) -> void: Settings.set_value("model_detail", i));
-    _row(col, "Model detail", detail, "Reduced uses simpler trees, bushes, rocks and crops (fewer sides, leaves and stalks). Helps weak graphics cards.");
+    _row(col, "Model detail", detail, "Reduced uses simpler models for everything: trees, bushes, rocks, crops, buildings, citizens, animals and fences (fewer sides, leaves and small details, about half the triangles). Helps weak graphics cards.");
     _check(col, "Tree sway", Settings.sway, "sway", "Trees, bushes and hazel bend in the wind. Off helps weak graphics cards.");
     _check(col, "Grass sway", Settings.grass_sway, "grass_sway", "The grass tufts bend in the wind. Off helps weak graphics cards.");
     _check(col, "Ground detail", Settings.ground, "ground", "Grain on the ground and bands on steep slopes. Off shows the plain ground colour.");

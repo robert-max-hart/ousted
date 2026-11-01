@@ -16,7 +16,7 @@ const GRASS_SHARES:Array[float]  = [0.0, 0.4, 1.0, 1.4];
 const WATER_NAMES:Array[String] = ["Simple", "Medium", "Full"];
 
 # How far away trees, bushes, rocks and crops are drawn (metres from the camera; 0 is no limit), and which set of models: the full
-# one or the reduced one with fewer sides, stalks and leaves (assets/models/<set>_low, see tools/make_models.py).
+# one or the reduced one with fewer sides, stalks and leaves (assets/models/<set>_low, see tools/make_models.py; ModelDetail swaps the world).
 const DISTANCE_NAMES:Array[String] = ["Near", "Normal", "Far"];
 const DISTANCES:Array[float] = [60.0, 110.0, 0.0];
 const DETAIL_NAMES:Array[String] = ["Full", "Reduced"];
@@ -160,6 +160,7 @@ static func apply() -> void:
     Sfx.apply_volumes();
     var w:World = World.instance;
     CropMeshes.reload_if_needed();
+    ModelDetail.apply(w);
     if w != null and is_instance_valid(w):
         if w.renderer != null:
             w.renderer.apply_settings();

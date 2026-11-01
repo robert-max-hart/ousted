@@ -17,6 +17,8 @@ import math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from meshlib import Mesh, shade
+import meshlib
+meshlib.configure()
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "models", "animals")
 v = lambda x, y, z: (x, y, z)
