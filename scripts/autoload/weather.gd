@@ -29,6 +29,8 @@ const SNAP_DAYS         :Vector2i = Vector2i(3, 6);                   # how long
 const SNAP_REST         :int = 6;                                     # days after one before another can start
 const HEAT_DELTA        :float = 7.0;                                 # C hotter than the season while a heat wave lasts
 const COLD_DELTA        :float = -8.0;                                # ... and colder in a cold snap
+const SNOW_BUILD_PER_HOUR:float = 0.18;                       # snow cover gained an hour in full snowfall (about 6 hours of heavy snow to cover the ground)
+const SNOW_MELT_PER_HOUR :float = 0.01;                       # lost an hour above freezing, times (temperature + 1)
 const SNOW_BELOW        :float = 0.0;                         # C: all precipitation is snow
 const RAIN_ABOVE        :float = 3.0;                         # C: all precipitation is rain
 
@@ -43,6 +45,8 @@ var _next_flash     :float = 4.0;
 var snap_days       :int = 0;           # days left of a heat wave or cold snap
 var snap_dir        :int = 0;           # 1 a heat wave, -1 a cold snap
 var snap_rest       :int = 0;
+var snow_depth      :float = 0.0;       # 0..1, how much of the ground is under snow (WorldVisuals updates it each frame; saved)
+var snow_loaded     :bool = false;      # a saved depth was restored and the next world should keep it
 var drought_days    :int = 0;           # days left of a dry spell: no rain, hotter, everything dries faster
 var drought_rest    :int = 0;           # days left before another drought may start
 var drought_enabled :bool = true;       # tests that need steady weather switch it off
@@ -121,6 +125,17 @@ func snap_offset() -> float:
         return 0.0;
     return HEAT_DELTA if snap_dir > 0 else COLD_DELTA;
 
+# Snow on the ground builds while it snows, melts above freezing (faster when warm, and in rain) and otherwise stays.
+# `hours` is the game time that has passed (WorldVisuals gives it, so the title screen's weather runs while the clock is stopped).
+func update_snow(hours:float) -> void:
+    if hours <= 0.0:
+        return;
+    if is_snowing():
+        snow_depth += SNOW_BUILD_PER_HOUR * intensity * hours;
+    elif temperature > 0.5:
+        snow_depth -= SNOW_MELT_PER_HOUR * (temperature + 1.0) * (1.5 if intensity > 0.05 else 1.0) * hours;
+    snow_depth = clampf(snow_depth, 0.0, 1.0);
+
 func _roll_day() -> void:
     _day_offset = _rng.randf_range(-4.0, 4.0);
 
@@ -159,6 +174,8 @@ func reset(precipitation:float = 0.0) -> void:
     snap_days = 0;
     snap_dir = 0;
     snap_rest = 0;
+    snow_depth = 0.0;
+    snow_loaded = false;
     storm = false;
     storm_level = 0.0;
     is_raining = precipitation > 0.0;
@@ -168,7 +185,7 @@ func reset(precipitation:float = 0.0) -> void:
     weather_changed.emit();
 
 func save_state() -> Dictionary:
-    return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset, "drought_days": drought_days, "storm": storm, "storm_level": storm_level, "snap_days": snap_days, "snap_dir": snap_dir, "snap_rest": snap_rest};
+    return {"is_raining": is_raining, "intensity": intensity, "day_offset": _day_offset, "drought_days": drought_days, "storm": storm, "storm_level": storm_level, "snap_days": snap_days, "snap_dir": snap_dir, "snap_rest": snap_rest, "snow_depth": snow_depth};
 
 func restore_state(d:Dictionary) -> void:
     is_raining = d["is_raining"];
@@ -178,6 +195,8 @@ func restore_state(d:Dictionary) -> void:
     snap_days = d.get("snap_days", 0);
     snap_dir = d.get("snap_dir", 0) if snap_days > 0 else 0;
     snap_rest = d.get("snap_rest", 0);
+    snow_loaded = d.has("snow_depth");        # (an older save has none: the world starts with its season's snow)
+    snow_depth = clampf(float(d.get("snow_depth", 0.0)), 0.0, 1.0);
     storm = d.get("storm", false) and is_raining;
     storm_level = d.get("storm_level", 0.0) if storm else 0.0;
     _update_temperature();

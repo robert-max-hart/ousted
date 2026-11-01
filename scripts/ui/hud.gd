@@ -239,7 +239,8 @@ func _scroll_log_to_end() -> void:
 func _refresh_all() -> void:
     var w:World = World.instance;
     _date.text = "%s   %s" % [GameClock.date_string(), GameClock.time_string()];
-    _weather.text = "%s, %.0f C" % [Weather.description(), Weather.temperature];
+    var ground:String = ", deep snow" if Weather.snow_depth >= 0.7 else (", snow on the ground" if Weather.snow_depth >= 0.25 else "");        # (snow slows everyone on foot)
+    _weather.text = "%s, %.0f C%s" % [Weather.description(), Weather.temperature, ground];
     for item in SHOWN_ITEMS:
         _set_stock(item, Stock.amount(item));
     _set_stock(&"food", Stock.food_total());

@@ -8,6 +8,8 @@ class_name Pawn extends Node3D;
 const WALK_SPEED        :float = 3.0;      # metres per real second at 1x
 const WADE_SPEED_MULT   :float = 0.5;       # in shallow water
 const ROAD_SPEED_MULT   :float = 1.5;
+const SNOW_SPEED_MULT   :float = 0.6;       # on open ground under full snow cover (the speed falls away as the snow deepens)
+const SNOW_ROAD_MULT    :float = 0.9;       # on a road or bridge, which feet keep trodden, under full snow cover
 const COLD_DAMAGE_BELOW:float = 0.2;      # warmth under this starts hurting health, more the lower it gets
 const CARRY_CAP         :int = 6;
 const HUNGER_HOURS      :float = 30.0;     # full -> empty
@@ -629,13 +631,23 @@ func _plan_path(step:Dictionary) -> bool:
             return true;
     return false;
 
+# How fast a citizen walks over a cell against the open ground in clear weather: a road is quicker, shallow water slower, and snow
+# slows everything dry, less on roads and bridges (see Weather.snow_depth).
+func ground_speed(c:Vector2i) -> float:
+    var snow:float = Weather.snow_depth;
+    if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD:
+        return ROAD_SPEED_MULT * lerpf(1.0, SNOW_ROAD_MULT, snow);
+    if world.terrain.is_water(c):
+        return 1.0 * lerpf(1.0, SNOW_ROAD_MULT, snow) if world.is_bridge(c) else WADE_SPEED_MULT;
+    return lerpf(1.0, SNOW_SPEED_MULT, snow);
+
 # Advances along the path; returns true on arrival.
 func _follow_path(move_dt:float) -> bool:
     var time:float = move_dt;
     var base:float = WALK_SPEED * (0.75 if energy < 0.15 else 1.0);
     while time > 0.0 and _path_i < _path.size():
         var c:Vector2i = _path[_path_i];
-        var spd:float = base * (ROAD_SPEED_MULT if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD else WADE_SPEED_MULT if world.terrain.is_water(c) and not world.is_bridge(c) else 1.0);
+        var spd:float = base * ground_speed(c);
         var to:Vector2 = Vector2(c.x + 0.5 - position.x, c.y + 0.5 - position.z);
         var d:float = to.length();
         if d > 0.001:

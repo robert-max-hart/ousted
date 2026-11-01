@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.4 | 2 Nov 2026 | Snow slows travel
+- Snow on the ground now slows everyone on foot: at full cover citizens walk at 60% on open ground and at 90% of the usual speed on roads and bridges (a road is a bigger help in winter). The top bar says when there is snow on the ground. The depth is saved with the game.
+
 # 0.7.3 | 2 Nov 2026 | Wild foods of the climates
 - Each climate now has its own wild foods to forage. Arctic: lingonberries (summer and autumn), plenty of mushrooms, few berry bushes, no hazel. Desert: prickly pears, and date palms by the water; no berry bushes or hazel and hardly any mushrooms. Tropics: bananas and coconut palms all year, lots of mushrooms and healing herbs, fewer berry bushes, no hazel. The temperate map is as it was.
 - Five new foods (lingonberries, prickly pears, dates, bananas, coconuts) with their own models, spoilage and trade values. The Forager's Hut shows toggles and "Pick first" choices only for the foods that grow on that map. Foods that do not belong to a climate do not spread or get sown there.
