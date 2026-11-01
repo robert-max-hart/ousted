@@ -203,6 +203,8 @@ func _make_tree_layers(trunk_color:Color) -> void:
         &"birch": WindSway.make(Color(0.88, 0.86, 0.8), BIRCH_SWAY, BIRCH_HEIGHT), &"palm": WindSway.make(Color(0.62, 0.5, 0.36), PALM_SWAY, PALM_HEIGHT),
         &"dead": WindSway.make(Color(0.52, 0.47, 0.42), DEAD_SWAY, DEAD_HEIGHT),
     };
+    for trunk_mat in trunks.values():
+        WindSway.hold_snow(trunk_mat);       # snow lies on the branches and the root flare
     var crowns:Dictionary = {&"tree": _canopy_mat, &"oak": _oak_leaf_mat, &"birch": _birch_leaf_mat, &"palm": _palm_leaf_mat};
     var young:Dictionary = {&"sapling_pine": &"tree", &"sapling_broad": &"oak", &"sapling_palm": &"palm"};
     for kind in TREE_SPECS:

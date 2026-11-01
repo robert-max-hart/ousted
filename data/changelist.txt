@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.19 | 31 Oct 2026 | Snow on fences, headstones, awnings and branches
+- Snow now settles on fence posts and rails, the wall round a graveyard and its headstones, bridge rails, the market awning and the merchant's cart, and on the branches of trees.
+
 # 0.6.18 | 31 Oct 2026 | Trees fade out with distance
 - At the Near and Normal tree distance settings, trees, bushes, rocks, crops and grass now thin out gradually toward the draw distance instead of vanishing a block at a time.
 

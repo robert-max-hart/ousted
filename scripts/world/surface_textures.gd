@@ -23,15 +23,33 @@ static func material(kind:StringName, tint:Color) -> StandardMaterial3D:
     m.roughness = 0.9;
     return m;
 
-# A shingle roof: the same triplanar texture and tint, and snow on top (shaders/roof.gdshader). `vertex_colours` lets a modelled
-# roof's own shading through. Registered with WindSway so it gets the snow cover.
-static func roof_material(tint:Color, vertex_colours:bool = false) -> ShaderMaterial:
+# A building surface with snow on top (shaders/roof_common.gdshaderinc): the same triplanar texture and tint as the plain material, with the
+# model's vertex shading if `vertex_colours`, and `world_space` for the texture laid out in the world (fences keep their grain when a rail is
+# stretched). Registered with WindSway so it gets the snow cover.
+static func snowy_material(kind:StringName, tint:Color, vertex_colours:bool = false, world_space:bool = false) -> ShaderMaterial:
     var m:ShaderMaterial = ShaderMaterial.new();
     m.shader = load("res://shaders/roof.gdshader") as Shader;
-    m.set_shader_parameter("tex", texture(&"shingle"));
+    m.set_shader_parameter("tex", texture(kind));
     m.set_shader_parameter("tex_scale", 1.0 / METRES);
     m.set_shader_parameter("albedo", tint);
     m.set_shader_parameter("use_vertex", 1.0 if vertex_colours else 0.0);
+    m.set_shader_parameter("world_tex", 1.0 if world_space else 0.0);
+    WindSway.track(m);
+    return m;
+
+# A shingle roof (`vertex_colours` lets a modelled roof's own shading through).
+static func roof_material(tint:Color, vertex_colours:bool = false) -> ShaderMaterial:
+    return snowy_material(&"shingle", tint, vertex_colours);
+
+# The market's striped awning, with snow on top (red and cream stripes about a metre wide along x).
+static func awning_material(red:Color, cream:Color) -> ShaderMaterial:
+    var m:ShaderMaterial = ShaderMaterial.new();
+    m.shader = load("res://shaders/roof_double.gdshader") as Shader;
+    m.set_shader_parameter("albedo", Color.WHITE);
+    m.set_shader_parameter("stripe_scale", 0.45);
+    m.set_shader_parameter("stripe_a", red);
+    m.set_shader_parameter("stripe_b", cream);
+    m.set_shader_parameter("roughness_value", 1.0);
     WindSway.track(m);
     return m;
 

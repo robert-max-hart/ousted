@@ -51,8 +51,7 @@ static func _build_visual(b:Building) -> void:
             b._fence = Fence.new(b, &"stone", 1);       # the ground itself is a terrain overlay (Terrain.Overlay.GRAVE)
             b.add_child(b._fence);
         "cart":
-            var load_mat:StandardMaterial3D = b._flat_mat(Color.WHITE);
-            load_mat.vertex_color_use_as_albedo = true;
+            var load_mat:Material = SurfaceTextures.snowy_parts_material();       # (the cart's load keeps its own colours, with snow on top)
             if not BuildingVisuals._build_model(b, h, null, load_mat):
                 BuildingVisuals._build_boxes_cart(b, h);
         "fishing":
@@ -180,9 +179,8 @@ static func _build_bridge(b:Building, h:float) -> void:
     b._body = b._add_mesh(deck.build(b._body_mat), b._body_mat, Vector3(0, top - h * 0.5, 0));
     b._body_y0 = top - h;
     b._body_h = h;
-    var flat:StandardMaterial3D = b._flat_mat(Color.WHITE);
-    flat.vertex_color_use_as_albedo = true;
-    b.add_decor(rails.build(flat), flat, Vector3.ZERO);
+    var snowy:ShaderMaterial = SurfaceTextures.snowy_parts_material();
+    b.add_decor(rails.build(snowy), snowy, Vector3.ZERO);
 
 # The shapes of a building with no model files: plain boxes.
 static func _build_boxes_cart(b:Building, h:float) -> void:

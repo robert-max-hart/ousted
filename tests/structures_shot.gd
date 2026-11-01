@@ -10,6 +10,7 @@ var world:World;
 var _out:String = "user://";
 var _frame:int = 0;
 var _o:Vector2i;
+var _winter:bool = false;       # a second argument `snow`: winter, with snow on the ground
 
 func _ready() -> void:
     SaveGame.autosave_enabled = false;
@@ -18,10 +19,11 @@ func _ready() -> void:
     if args.size() > 0:
         _out = args[0];
     Defs.difficulty = &"easy";
+    _winter = args.size() > 1 and args[1] == "snow";
     world = (load("res://scenes/main.tscn") as PackedScene).instantiate();
     add_child(world);
     GameClock.set_speed(0);
-    GameClock.total_hours = (GameClock.DAYS_PER_SEASON * 1 + 3) * GameClock.HOURS_PER_DAY + 12.0;
+    GameClock.total_hours = (GameClock.DAYS_PER_SEASON * (3 if _winter else 1) + 3) * GameClock.HOURS_PER_DAY + 12.0;
     Weather._update_temperature();
     _o = TestSite.near(world, Vector2i(-24, -24), Vector2i(34, 20));
     for rn in world.nodes.duplicate():
@@ -48,6 +50,8 @@ func _ready() -> void:
 
 func _process(_delta:float) -> void:
     _frame += 1;
+    if _winter:
+        world.visuals.snow_cover = 0.75;
     if _frame > 190 and not world.pawns.is_empty():
         world.pawns[0].position = Vector3(_o.x + 11.5, world.terrain.height_at(_o.x + 11.5, _o.y + 6.3), _o.y + 6.3);       # a citizen at the pasture's gate
     match _frame:

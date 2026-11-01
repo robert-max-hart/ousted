@@ -65,6 +65,16 @@ func _ready() -> void:
     var mid_lift:float = long_bridge.deck_lift_at(long_bridge.origin.x + 4.0, long_bridge.origin.y + 0.5);
     _expect("its middle is higher than its ends", mid_lift > long_bridge.deck_lift_at(long_bridge.origin.x + 0.2, long_bridge.origin.y + 0.5) + 0.15);
     _expect("and its deck mesh stands taller than a flat one", long_bridge._body.mesh.get_aabb().size.y > short_bridge._body.mesh.get_aabb().size.y + 0.15);
+    # snow lies on fences, headstones and the awning (the building surface shader)
+    var fence_mat:ShaderMaterial = pasture._fence._rails.material_override as ShaderMaterial;
+    _expect("fence rails take snow", fence_mat != null and fence_mat.shader.resource_path.ends_with("roof.gdshader") and float(fence_mat.get_shader_parameter("world_tex")) == 1.0);
+    var stone_mat:ShaderMaterial = yard._stones[0].material_override as ShaderMaterial;
+    _expect("headstones take snow", stone_mat != null and stone_mat.shader.resource_path.ends_with("roof.gdshader"));
+    var awning:ShaderMaterial = BuildingShapes._awning(Color.RED, Color.WHITE);
+    _expect("the awning is striped and takes snow", awning.shader.resource_path.ends_with("roof_double.gdshader") and float(awning.get_shader_parameter("stripe_scale")) > 0.0);
+    WindSway.update(1.0, 1.0, 0.8);
+    _expect("and the cover reaches them", is_equal_approx(float(fence_mat.get_shader_parameter("snow")), 0.8) and is_equal_approx(float(awning.get_shader_parameter("snow")), 0.8));
+    WindSway.update(1.0, 1.0, 0.0);
     print("STRUCTURE MODELS %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

@@ -15,9 +15,7 @@ func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
     super.setup(w, id, o, s);
     graves.resize(plot_count());
     reserved.resize(plot_count());
-    var mat:StandardMaterial3D = SurfaceTextures.material(&"stone", Color(0.72, 0.72, 0.74));
-    mat.uv1_world_triplanar = true;
-    mat.vertex_color_use_as_albedo = true;           # the models shade the inscriptions, the mound and the flowers
+    var mat:ShaderMaterial = SurfaceTextures.snowy_material(&"stone", Color(0.72, 0.72, 0.74), true, true);       # (the models shade the inscriptions, the mound and the flowers; snow lies on the stones)
     for shape in _shapes():
         var mm:MultiMesh = MultiMesh.new();
         mm.transform_format = MultiMesh.TRANSFORM_3D;

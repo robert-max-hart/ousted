@@ -55,20 +55,14 @@ func _init(b:Building, kind:StringName, gap:int = 1) -> void:
     if gap == 1 and kind != &"rope":
         _leaf = MeshInstance3D.new();
         _leaf.mesh = load("%sfence_%s_leaf.obj" % [DIR, kind]) as Mesh;
-        var mat:StandardMaterial3D = _b._flat_mat(Color.WHITE) if kind == &"stone" else SurfaceTextures.material(tex, tint);       # (the iron gate keeps its own colours)
-        if kind != &"stone":
-            mat.uv1_world_triplanar = true;
-        mat.vertex_color_use_as_albedo = true;
-        _leaf.material_override = mat;
+        _leaf.material_override = SurfaceTextures.snowy_parts_material() if kind == &"stone" else SurfaceTextures.snowy_material(tex, tint, true, true);       # (the iron gate keeps its own colours)
         add_child(_leaf);
 
 func _layer(part:StringName, tex:StringName, tint:Color) -> MultiMeshInstance3D:
     var mm:MultiMesh = MultiMesh.new();
     mm.transform_format = MultiMesh.TRANSFORM_3D;
     mm.mesh = load("%sfence_%s_%s.obj" % [DIR, _kind, part]) as Mesh;
-    var mat:StandardMaterial3D = SurfaceTextures.material(tex, tint);
-    mat.uv1_world_triplanar = true;
-    mat.vertex_color_use_as_albedo = true;           # the models shade their parts (nails, stone courses, caps)
+    var mat:ShaderMaterial = SurfaceTextures.snowy_material(tex, tint, true, true);       # (the models shade their parts: nails, stone courses, caps; snow lies on the tops)
     var mmi:MultiMeshInstance3D = MultiMeshInstance3D.new();
     mmi.multimesh = mm;
     mmi.material_override = mat;

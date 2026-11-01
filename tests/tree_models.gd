@@ -97,6 +97,8 @@ func _ready() -> void:
         if is_instance_valid(falling) and not falling.is_queued_for_deletion():
             falling._process(0.05 / World.fx_speed());
     _expect("in the end it is gone", not is_instance_valid(falling) or falling.is_queued_for_deletion());
+    var trunk_mat:ShaderMaterial = ((world.renderer._layers[&"oak:0"] as ChunkedLayer).mesh as ArrayMesh).surface_get_material(0) as ShaderMaterial;
+    _expect("trunks and branches hold snow", float(trunk_mat.get_shader_parameter("snow_hold")) > 0.5);
     print("TREE MODELS %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 
