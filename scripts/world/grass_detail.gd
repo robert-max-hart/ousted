@@ -33,7 +33,7 @@ var _mesh       :ArrayMesh;
 
 func _init(w:World) -> void:
     _world = w;
-    _mat = WindSway.make(Climate.tuft_colour(Climate.look(GameClock.season()), BY_SEASON[Climate.look(GameClock.season())]), GRASS_SWAY, GRASS_HEIGHT, true);       # blades sway in the wind (WindSway)
+    _mat = WindSway.make(Climate.tuft_colour(Climate.look(GameClock.season()), BY_SEASON[Climate.look(GameClock.season())]), GRASS_SWAY, GRASS_HEIGHT, true, DRAW_DISTANCE);       # blades sway in the wind (WindSway)
     _mesh = _make_tuft();
 
 func _ready() -> void:
@@ -114,7 +114,7 @@ func _rebuild(b:Vector2i) -> void:
         mmi.multimesh = mm;
         mmi.material_override = _mat;
         mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-        mmi.visibility_range_end = DRAW_DISTANCE;
+        mmi.visibility_range_end = DRAW_DISTANCE + BLOCK;       # (the tufts thin out by themselves at DRAW_DISTANCE: this only skips blocks that are wholly beyond it)
         mmi.visibility_range_end_margin = 4.0;
         add_child(mmi);
         _blocks[b] = mmi;

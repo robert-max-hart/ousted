@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.18 | 31 Oct 2026 | Trees fade out with distance
+- At the Near and Normal tree distance settings, trees, bushes, rocks, crops and grass now thin out gradually toward the draw distance instead of vanishing a block at a time.
+
 # 0.6.17 | 31 Oct 2026 | Loading screens, a sandy desert, no snow in the water
 - Loading a game, starting a new one and arriving at the title screen now show a loading screen with a progress bar and a tip. The map is built behind it and only revealed when everything is ready, so it no longer appears piece by piece, and the first moments of play are smooth instead of stuttering.
 - The desert looks like a desert: tan ground, sandstone rocks, pale sand beaches, sparse straw-coloured grass and very few flowers, and far fewer trees (about 100 on a large map instead of several hundred).

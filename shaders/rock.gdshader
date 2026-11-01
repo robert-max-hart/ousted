@@ -16,6 +16,7 @@ void vertex() {
 }
 
 void fragment() {
+	fade_out(VERTEX, FRAGCOORD.xy);
 	vec3 base = sway_colour(COLOR);
 	float up = (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y;
 	float n = sin(wpos.x * 9.0 + wpos.z * 7.0) * sin(wpos.y * 11.0 + wpos.x * 5.0) * 0.5 + sin(wpos.z * 17.0 - wpos.y * 13.0) * 0.5;

@@ -11,6 +11,7 @@ void vertex() {
 }
 
 void fragment() {
+	fade_out(VERTEX, FRAGCOORD.xy);
 	float up = smoothstep(0.3, 0.85, (INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y);       // snow lies on what faces up
 	ALBEDO = mix(sway_colour(COLOR), snow_color, snow * snow_hold * up);
 	ROUGHNESS = roughness_value;

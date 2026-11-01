@@ -52,11 +52,11 @@ func _init(w:World) -> void:
     _colour = _noise(23, 0.11);
     _reed = _noise(37, 0.09);
     var s:int = Climate.look(GameClock.season());
-    _mats[&"stems"] = WindSway.make(STEMS_BY_SEASON[s], 0.05, 0.3, true);
-    _mats[&"heads"] = WindSway.make(Color(1, 1, 1), 0.06, 0.3, true);
-    _mats[&"fern"] = WindSway.make(FERN_BY_SEASON[s], 0.04, 0.4, true);
-    _mats[&"reed"] = WindSway.make(REED_BY_SEASON[s], 0.12, 1.0, true);
-    _mats[&"cattail"] = WindSway.make(Color(0.5, 0.33, 0.2), 0.12, 1.0, true);
+    _mats[&"stems"] = WindSway.make(STEMS_BY_SEASON[s], 0.05, 0.3, true, DRAW_DISTANCE);
+    _mats[&"heads"] = WindSway.make(Color(1, 1, 1), 0.06, 0.3, true, DRAW_DISTANCE);
+    _mats[&"fern"] = WindSway.make(FERN_BY_SEASON[s], 0.04, 0.4, true, DRAW_DISTANCE);
+    _mats[&"reed"] = WindSway.make(REED_BY_SEASON[s], 0.12, 1.0, true, DRAW_DISTANCE);
+    _mats[&"cattail"] = WindSway.make(Color(0.5, 0.33, 0.2), 0.12, 1.0, true, DRAW_DISTANCE);
     _load_meshes();
 
 func _noise(offset:int, freq:float) -> FastNoiseLite:
@@ -203,7 +203,7 @@ func _fill(key:String, model:String, mat_key:StringName, list:Array, is_heads:bo
         mmi.multimesh = mm;
         mmi.material_override = _mats[mat_key];
         mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
-        mmi.visibility_range_end = DRAW_DISTANCE;
+        mmi.visibility_range_end = DRAW_DISTANCE + BLOCK;
         mmi.visibility_range_end_margin = 4.0;
         add_child(mmi);
         _blocks[key] = mmi;

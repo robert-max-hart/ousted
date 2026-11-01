@@ -13,6 +13,20 @@ uniform float sway = 0.1;             // metres of sway at height_ref in calm we
 uniform float height_ref = 3.0;       // the height (in the mesh's own units) the sway is measured at
 uniform float flutter = 0.35;         // the share of fast small movement on top of the slow big waves
 uniform float roughness_value = 0.95;
+uniform float fade_end = 0.0;         // metres from the camera at which this thing is gone (0: never): set by WindSway.update from the draw distance
+uniform float fade_band = 14.0;       // it thins out over this many metres before that, as a dither
+
+// Thins the thing out toward its draw distance: pixels are dropped by a pattern that gets sparser with the distance from the camera,
+// so trees melt away at the edge instead of the whole block of them popping out (use in fragment(); `view` is VERTEX there).
+void fade_out(vec3 view, vec2 frag) {
+	if (fade_end > 0.0) {
+		float t = clamp((length(view) - (fade_end - fade_band)) / fade_band, 0.0, 1.0);
+		float dither = fract(52.9829189 * fract(dot(frag, vec2(0.06711056, 0.00583715))));
+		if (t > dither) {
+			discard;
+		}
+	}
+}
 
 vec3 sway_offset(vec3 base, float h) {
 	float k = clamp(h / height_ref, 0.0, 1.5);

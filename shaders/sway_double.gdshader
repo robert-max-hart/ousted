@@ -11,6 +11,7 @@ void vertex() {
 }
 
 void fragment() {
+	fade_out(VERTEX, FRAGCOORD.xy);
 	ALBEDO = sway_colour(COLOR);
 	ROUGHNESS = roughness_value;
 }

@@ -65,6 +65,22 @@ func _ready() -> void:
     _expect("Normal is farther than Near", any_mmi.visibility_range_end > Settings.DISTANCES[0] + ChunkedLayer.REACH);
     Settings.set_value("tree_distance", 2);
     _expect("and Far lifts it again", any_mmi.visibility_range_end == 0.0);
+    # trees thin out (a dither in their shader) at the draw distance, not block by block
+    var tree_mat:ShaderMaterial = (pine.mesh as ArrayMesh).surface_get_material(0) as ShaderMaterial;
+    Settings.set_value("tree_distance", 0);
+    WindSway.update(1.0, 1.0, 0.0);
+    _expect("Near: a tree material fades out at %.0f m" % Settings.DISTANCES[0], is_equal_approx(float(tree_mat.get_shader_parameter("fade_end")), Settings.DISTANCES[0]));
+    Settings.set_value("tree_distance", 1);
+    WindSway.update(1.0, 1.0, 0.0);
+    _expect("Normal: at %.0f m" % Settings.DISTANCES[1], is_equal_approx(float(tree_mat.get_shader_parameter("fade_end")), Settings.DISTANCES[1]));
+    Settings.set_value("tree_distance", 2);
+    WindSway.update(1.0, 1.0, 0.0);
+    _expect("Far: never", float(tree_mat.get_shader_parameter("fade_end")) == 0.0);
+    var grass_mat:ShaderMaterial;
+    for c in world.get_children():
+        if c is GrassDetail:
+            grass_mat = (c as GrassDetail)._mat;
+    _expect("grass tufts always fade at their own distance", is_equal_approx(float(grass_mat.get_shader_parameter("fade_end")), GrassDetail.DRAW_DISTANCE));
 
     # a field to follow the settings
     var at:Vector2i = TestSite.spot(world, Vector2i(6, 6), Vector2i(-14, -14));

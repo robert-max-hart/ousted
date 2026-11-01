@@ -228,10 +228,9 @@ func _make_tree_layers(trunk_color:Color) -> void:
 func _make_plant_layers(trunk_color:Color) -> void:
     var rock_mat:ShaderMaterial = _make_rock_material(Color(0.55, 0.54, 0.52));       # snow lies on these (shaders/rock.gdshader)
     var dark_mat:ShaderMaterial = _make_rock_material(Color(0.36, 0.35, 0.36));
-    var rust_mat:StandardMaterial3D = _make_material(Color(0.66, 0.31, 0.16));
-    var glint_mat:StandardMaterial3D = _make_material(Color(0.72, 0.74, 0.78));
-    glint_mat.metallic = 0.7;
-    glint_mat.roughness = 0.35;
+    var rust_mat:ShaderMaterial = WindSway.make(Color(0.66, 0.31, 0.16), 0.0, 1.0);         # (sway materials that do not sway, so they thin out with the ore body)
+    var glint_mat:ShaderMaterial = WindSway.make(Color(0.72, 0.74, 0.78), 0.0, 1.0);
+    glint_mat.set_shader_parameter("roughness_value", 0.4);
     var twig_mat:ShaderMaterial = WindSway.make(trunk_color, BUSH_SWAY, BUSH_HEIGHT);
     var hazel_stem_mat:ShaderMaterial = WindSway.make(trunk_color, HAZEL_SWAY, HAZEL_HEIGHT);
     var hazel_mat:ShaderMaterial = WindSway.make(Color(0.6, 0.58, 0.2), HAZEL_SWAY, HAZEL_HEIGHT);
@@ -259,7 +258,7 @@ func _make_plant_layers(trunk_color:Color) -> void:
         _add_surface(hazel, _plant("hazel_%d_leaves" % v), hazel_mat);
         _add_surface(hazel, _plant("hazel_%d_stems" % v), hazel_stem_mat);
         _layers[_key(&"hazel", v)] = ChunkedLayer.new(self, hazel);
-    var plain:StandardMaterial3D = _make_material(Color.WHITE);
+    var plain:ShaderMaterial = WindSway.make(Color.WHITE, 0.0, 1.0);       # (a sway material that does not sway: it thins out at the draw distance)
     var ripe:ArrayMesh = ArrayMesh.new();
     _add_surface(ripe, _plant("mushroom_ripe"), plain);
     _layers[&"mushroom"] = ChunkedLayer.new(self, ripe);
@@ -390,6 +389,7 @@ func _make_rock_material(c:Color) -> ShaderMaterial:
     var m:ShaderMaterial = ShaderMaterial.new();
     m.shader = load("res://shaders/rock.gdshader") as Shader;
     m.set_shader_parameter("albedo", c);
+    m.set_meta(&"fade", -1.0);               # thins out at the draw distance like the trees
     WindSway.track(m);
     return m;
 
