@@ -1,6 +1,7 @@
 # ----------------------------------------------------------------
 # HerdTasks
-#     Collecting what farm animals give: eggs, milk and manure.
+#     Collecting what farm animals give (eggs, milk and manure), honey
+#     from the hives and crabs from a fishing hut's pots.
 #     (Feeding is the generic input fetching, see ProductionTasks.)
 # ----------------------------------------------------------------
 class_name HerdTasks extends TaskBase;
@@ -13,7 +14,7 @@ func collect_task(p:Pawn) -> Task:
     var best_d:float = INF;
     var pc:Vector2 = Vector2(p.position.x, p.position.z);
     for b in world.buildings:
-        if not (b is Pasture or b is Apiary) or not b.is_complete() or b.claimed or p.has_failed(b):
+        if not (b is Pasture or b is Apiary or b is FishingHut) or not b.is_complete() or b.claimed or p.has_failed(b):
             continue;
         var ready:Dictionary = b.collectable();
         if ready.is_empty() or not Stock.has_room_for(ready["item"]):

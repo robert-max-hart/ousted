@@ -39,7 +39,7 @@ const TYPES:Dictionary = {
     &"metal": {
         "name": "metal trader", "weight": 2.0, "seeds": 0.15, "animals": 0.0, "sells": Vector2i(3, 5), "asks": Vector2i(3, 5), "mult": Vector2(0.8, 1.5),
         "brings": [&"wood", &"stone", &"iron", &"coal", &"tool_wood", &"tool_iron", &"tool_steel", &"silver", &"gold"],
-        "wants": [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"meat", &"fish", &"honey", &"spirits", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas", &"clothes_wool", &"clothes_leather", &"firewood", &"leather"],
+        "wants": [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"meat", &"fish", &"crabs", &"honey", &"spirits", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas", &"clothes_wool", &"clothes_leather", &"firewood", &"leather"],
         "colors": [Color(0.38, 0.4, 0.46), Color(0.82, 0.8, 0.76), Color(0.3, 0.32, 0.38)],
     },
     &"herder": {
@@ -73,7 +73,7 @@ const PRICE_NOTE:float = 0.1;       # the barter window marks an item as dear or
 
 # What merchants bring, and what they ask for: all of the types' lists together (trade values are in Defs.TRADE_VALUE).
 const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"herbs", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"eggs", &"hazelnuts", &"radish", &"lettuce", &"fish", &"honey", &"spirits", &"pottery", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel", &"dates", &"coconuts", &"lingonberries"];
-const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure", &"herbs", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas"];
+const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure", &"herbs", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas", &"crabs"];
 
 var world     :World;
 var merchant  :Merchant = null;

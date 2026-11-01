@@ -626,8 +626,14 @@ func _finish_upgrade() -> void:
         return;
     upgrades_done[upgrading] = true;
     world.notify("%s: %s built." % [display_name(), def["upgrades"][upgrading]["name"]]);
+    var done:StringName = upgrading;
     upgrading = &"";
     work_done = def["work"];
+    on_upgrade_done(done);
+
+# What an upgrade adds to the look (or the behaviour) when it is finished or loaded: subclasses use it.
+func on_upgrade_done(_id:StringName) -> void:
+    pass;
 
 # Turns this finished building into another kind on the same footprint (a house rebuilt in stone). Residents, fuel and
 # settings stay; the look is made again and what it cost is now the new building's cost.
