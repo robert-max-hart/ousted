@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.8 | 2 Nov 2026 | Livelier citizens
+- Citizens move less like machines. They now have elbows and knees (new models), so a walk has bending knees, swinging forearms, a bobbing step with the shoulders turning against the hips, and a lean over the leg that carries them. Work swings have a wind-up, a pause at the top, a fast strike and a rebound, with the knees giving and the body turning into the blow (a heavy axe or pick is slower to lift than a hammer).
+- Everyone has their own pace, spring and starting moment, so a crowd no longer moves in step. Joints settle with a little overshoot and the hands and head trail the body. A tired citizen slumps, an unhappy one hangs their head, a happy one walks with more spring, children bounce, and they turn to face where they are going instead of snapping round. Standing about, they shift their weight and now and then glance round, stretch, scratch their head or put their hands on their hips. Eating pauses at the mouth.
+
 # 0.7.7 | 2 Nov 2026 | Fixes
 - Fixed: with the model detail set to Reduced, the new wild foods (lingonberries, prickly pears, dates, bananas and coconuts) failed to draw and the Stone House and Root Cellar had no model. Their reduced models now exist.
 

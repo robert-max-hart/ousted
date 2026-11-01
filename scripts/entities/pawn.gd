@@ -89,6 +89,7 @@ var _last_phase     :float = 0.0;             # where the swing was last frame (
 var _ill_mark       :Sprite3D;                # a green cross over a sick citizen
 var _idle_mark      :Sprite3D;                # a small icon over a citizen with nothing to do (UIIcons)
 var _anim_t         :float = 0.0;
+var _face_yaw       :float = 0.0;              # the way they are heading: the body turns to it over a moment, not all at once
 var _work_now       :bool = false;            # what the last frame did, for the animation
 var _move_now       :bool = false;
 var _eat_now        :StringName = &"";        # &"eat" or &"drink" while doing that (sitting to eat, bending to drink)
@@ -124,6 +125,7 @@ func setup(w:World, cell:Vector2i, rng:RandomNumberGenerator, taken_names:Array[
 func _build_look() -> void:
     var look:RandomNumberGenerator = RandomNumberGenerator.new();
     look.seed = look_seed;
+    _anim_t = float(look_seed % 997) * 0.77;          # everyone starts at their own moment of the cycles, so a crowd does not move in step
     _build_visual(look);
 
 func to_dict() -> Dictionary:
@@ -670,7 +672,7 @@ func _follow_path(move_dt:float) -> bool:
         var to:Vector2 = Vector2(c.x + 0.5 - position.x, c.y + 0.5 - position.z);
         var d:float = to.length();
         if d > 0.001:
-            rotation.y = atan2(to.x, to.y);
+            _face_yaw = atan2(to.x, to.y);
         var reach:float = spd * time;
         if d <= reach:
             position.x = c.x + 0.5;
@@ -764,6 +766,8 @@ func _animate(delta:float) -> void:
     _ill_mark.visible = illness > 0.0 and not indoors;
     _rig.set_stage(age, is_baby(), is_adult(), age >= Defs.OLD_AGE_EFFICIENCY[0][0]);
     _rig.set_mood(0.55 if is_baby() else mood);
+    _rig.set_energy(energy);
+    rotation.y = lerp_angle(rotation.y, _face_yaw, 1.0 - exp(-14.0 * delta));
     var moved:float = Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length();
     _last_pos = position;
     if moved < 1.5:          # (a jump, such as stepping out of a workplace, is not a stride)

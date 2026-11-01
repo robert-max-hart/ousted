@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://kyhhv62sv7rg"
+path="res://.godot/imported/forearm.obj-f74e4a57ae317612ff1c42ff136dac1d.mesh"
+
+[deps]
+
+files=["res://.godot/imported/forearm.obj-f74e4a57ae317612ff1c42ff136dac1d.mesh"]
+
+source_file="res://assets/models/citizens_low/forearm.obj"
+dest_files=["res://.godot/imported/forearm.obj-f74e4a57ae317612ff1c42ff136dac1d.mesh", "res://.godot/imported/forearm.obj-f74e4a57ae317612ff1c42ff136dac1d.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

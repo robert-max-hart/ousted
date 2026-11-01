@@ -11,7 +11,7 @@ extends Node;
 var _fails:int = 0;
 
 func _ready() -> void:
-    for part in ["torso_m", "torso_f", "head_0", "head_1", "head_2", "head_3", "head_4", "arm_l", "arm_r", "leg_l", "leg_r", "axe", "hammer", "pick", "hoe", "basket"]:
+    for part in ["torso_m", "torso_f", "head_0", "head_1", "head_2", "head_3", "head_4", "arm_l", "arm_r", "forearm", "leg_l", "leg_r", "shin", "axe", "hammer", "pick", "hoe", "basket"]:
         var mesh:Mesh = PawnRig.part(part);
         _expect("part %s loads" % part, mesh != null and mesh.get_surface_count() > 0);
         if mesh != null:
@@ -85,18 +85,36 @@ func _ready() -> void:
         rig.pose(PawnRig.Mode.SIT, 1.0, 1.0, &"", false);
     _expect("sitting puts the legs out in front", rig._leg_l.rotation.x < -1.2 and rig._leg_r.rotation.x < -1.2);
     _expect("and the hips on the ground", rig.position.y < -0.35);
-    var lowest:float = 0.0;
-    var highest:float = -9.0;
+    var low_reach:float = 9.0;
+    var high_reach:float = 0.0;
     for i in 60:
         rig.pose(PawnRig.Mode.EAT, i * 0.1, 1.0, &"", false);
-        lowest = maxf(lowest, rig._arm_r.rotation.x);
-        highest = maxf(highest, -rig._arm_r.rotation.x);
-    _expect("eating raises a hand to the mouth and lowers it again", highest > 1.8 and lowest > -1.0 and rig.position.y < -0.35);
+        var reach:float = -(rig._arm_r.rotation.x + rig._fore_r.rotation.x);          # how far the hand is folded up (shoulder and elbow)
+        low_reach = minf(low_reach, reach);
+        high_reach = maxf(high_reach, reach);
+    _expect("eating raises a hand to the mouth and lowers it again (%.2f to %.2f)" % [low_reach, high_reach], high_reach > 2.8 and low_reach < 1.3 and rig.position.y < -0.35);
     for i in 40:
         rig.pose(PawnRig.Mode.IDLE, 0.0, 1.0, &"", false);
     _expect("standing up lifts the hips again", rig.position.y > -0.05);
     rig.pose(PawnRig.Mode.DRINK, 0.3, 1.0, &"", false);
     _expect("drinking bends over", rig._upper.rotation.x > 0.4);
+    # jointed limbs: knees bend one way, elbows the other, in every pose
+    var worst_knee:float = 9.0;
+    var worst_elbow:float = -9.0;
+    for mode in [PawnRig.Mode.WALK, PawnRig.Mode.WORK, PawnRig.Mode.IDLE, PawnRig.Mode.SIT, PawnRig.Mode.EAT, PawnRig.Mode.DRINK, PawnRig.Mode.SLEEP]:
+        for i in 80:
+            rig.pose(mode, i * 0.11, 1.0, &"chop", i % 3 == 0, i * 0.3);
+            worst_knee = minf(worst_knee, minf(rig._knee_l.rotation.x, rig._knee_r.rotation.x));
+            worst_elbow = maxf(worst_elbow, maxf(rig._fore_l.rotation.x, rig._fore_r.rotation.x));
+    _expect("knees never bend backwards (%.2f) and elbows never bend backwards (%.2f)" % [worst_knee, worst_elbow], worst_knee > -0.02 and worst_elbow < 0.3);
+    _expect("the tool is held in the hand: it hangs from the forearm", rig._prop.get_parent() == rig._fore_r);
+    # joints settle on springs: a step to a new pose overshoots a little and ends on it
+    rig.pose(PawnRig.Mode.IDLE, 0.0, 1.0, &"", false);
+    var top:float = 0.0;
+    for i in 90:
+        rig.pose(PawnRig.Mode.SIT, 1.0, 0.5, &"", false, -1.0, 1.0 / 60.0);
+        top = minf(top, rig._leg_l.rotation.x);
+    _expect("a leg swings to the seated pose, past it a little (%.2f against -1.5) and back" % top, top < -1.5 and top > -1.75 and absf(rig._leg_l.rotation.x + 1.5) < 0.05);
     # the face follows the mood
     rig.set_mood(0.9);
     var happy:Mesh = rig._mouth.mesh;

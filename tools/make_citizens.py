@@ -6,8 +6,10 @@
 #       torso_m, torso_f      the body from belt to collar (f has a skirt)
 #       head_0 .. head_4      head and hair: short, long, bun, bald with
 #                             side hair, short with a beard
-#       arm_l, arm_r          sleeve, bare forearm and hand
-#       leg_l, leg_r          trousers and a boot
+#       arm_l, arm_r          the sleeve down to the elbow
+#       forearm               cuff, bare forearm and hand (origin at the elbow)
+#       leg_l, leg_r          the thigh, down to the knee
+#       shin                  lower trouser leg and boot (origin at the knee)
 #       axe, hammer, pick, hoe, basket   what they hold at work
 #     Each part has its origin at the joint it turns on (the hip pivot for
 #     the torso, the neck for a head, the shoulder for an arm, the hip for
@@ -125,22 +127,37 @@ def mouth(kind):
         m.box(0, cy - 0.082, 0.1405, 0.04, 0.006, 0.008, (0.95, 0.93, 0.9))              # a hint of teeth
     return m
 
+ELBOW = -0.26          # how far below the shoulder the elbow is
+KNEE = -0.2            # ... and the knee below the hip
+
 def arm(side):
-    """side -1 is the left arm (x negative), +1 the right. The shoulder is the origin; it hangs down."""
+    """side -1 is the left arm (x negative), +1 the right. The shoulder is the origin; it hangs down to the elbow, which bends (see forearm)."""
     m = Mesh()
-    x = 0.0
-    m.tcyl(0, -0.26, 0, 0.055, 0.062, 0.0, shirt(0.95), segs=9)                     # the sleeve
-    m.tcyl(0, -0.27, 0, 0.065, 0.065, -0.235, shirt(0.7), segs=9, top=False, bottom=False)   # a cuff-like roll at the end of it
-    m.tcyl(0, -0.46, 0, 0.042, 0.05, -0.255, skin(0.95), segs=8)                    # the forearm
-    m.ball(0, -0.5, 0.0, 0.052, 0.058, 0.05, skin(1.0), segs=8, rings=5)            # the hand
+    m.tcyl(0, ELBOW, 0, 0.055, 0.062, 0.0, shirt(0.95), segs=9)                     # the sleeve
+    m.ball(0, ELBOW, 0.0, 0.058, 0.055, 0.058, shirt(0.95), segs=8, rings=5)       # the elbow, so a bent arm has no gap
+    return m
+
+def forearm():
+    """The elbow is the origin; the cuff, the bare forearm and the hand hang down from it."""
+    m = Mesh()
+    m.tcyl(0, -0.01, 0, 0.065, 0.065, 0.025, shirt(0.7), segs=9, top=False, bottom=False)   # a cuff-like roll at the end of the sleeve
+    m.tcyl(0, -0.2, 0, 0.042, 0.05, 0.005, skin(0.95), segs=8)                      # the forearm
+    m.ball(0, -0.24, 0.0, 0.052, 0.058, 0.05, skin(1.0), segs=8, rings=5)           # the hand
     return m
 
 def leg(side):
-    """The hip is the origin; the leg hangs down to the sole 0.55 m below."""
+    """The hip is the origin; the thigh hangs down to the knee, which bends (see shin)."""
     m = Mesh()
-    m.tcyl(0, -0.39, 0, 0.056, 0.075, 0.0, trousers(0.95), segs=9)
-    m.frustum(0, -0.55, 0.025, 0.105, 0.2, 0.095, 0.15, 0.16, BOOT)                  # the boot, its toe forward
-    m.box(0, -0.545, 0.025, 0.11, 0.01, 0.205, (0.12, 0.09, 0.07))                   # the sole
+    m.tcyl(0, KNEE, 0, 0.0655, 0.075, 0.0, trousers(0.95), segs=9)
+    m.ball(0, KNEE, 0.0, 0.068, 0.066, 0.068, trousers(0.95), segs=8, rings=5)      # the knee, so a bent leg has no gap
+    return m
+
+def shin():
+    """The knee is the origin; the lower leg hangs down to the sole 0.35 m below."""
+    m = Mesh()
+    m.tcyl(0, -0.19, 0, 0.056, 0.0655, 0.0, trousers(0.95), segs=9)
+    m.frustum(0, -0.35, 0.025, 0.105, 0.2, 0.095, 0.15, 0.16, BOOT)                  # the boot, its toe forward
+    m.box(0, -0.345, 0.025, 0.11, 0.01, 0.205, (0.12, 0.09, 0.07))                   # the sole
     return m
 
 
@@ -190,7 +207,7 @@ def basket():
 
 for name, mesh in (("torso_m", torso(False)), ("torso_f", torso(True)),
                    ("head_0", head(0)), ("head_1", head(1)), ("head_2", head(2)), ("head_3", head(3)), ("head_4", head(4)),
-                   ("arm_l", arm(-1)), ("arm_r", arm(1)), ("leg_l", leg(-1)), ("leg_r", leg(1)),
+                   ("arm_l", arm(-1)), ("arm_r", arm(1)), ("forearm", forearm()), ("leg_l", leg(-1)), ("leg_r", leg(1)), ("shin", shin()),
                    ("mouth_happy", mouth("happy")), ("mouth_neutral", mouth("neutral")), ("mouth_sad", mouth("sad")),
                    ("axe", axe()), ("hammer", hammer()), ("pick", pick()), ("hoe", hoe()), ("basket", basket())):
     mesh.write(name, OUT)
