@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.2 | 2 Nov 2026 | Background music
+- Background music: now and then a folk-style piece for the season plays (a flute or lute tune over a lute and a soft drone, with a frame drum in spring, summer and autumn), then there is a quiet spell of a minute or two while the wind and birds carry on. Each season has two pieces and the same one never plays twice running. There is a Music volume slider in Settings (0 turns it off).
+
 # 0.7.1 | 1 Nov 2026 | Sickness, thunderstorms, new buildings and map events
 - Thunderstorms. Some warm rain spells (about three in ten on a temperate map, six in ten in the tropics, far fewer in the desert and the far north, and never in the cold) are storms: the sky goes dark, the rain comes down harder, lightning flashes with a bolt on the ground and thunder rolls after it. The weather reads "Thunderstorm" and the log says when one begins and ends. Citizens who have a home go indoors until it passes, unless you switch on the new Policies rule "Work through thunderstorms" (off by default). (There is no damage yet.)
 - Fixed: a citizen who had been resting at home (the sick, or now in a storm) kept being treated as indoors, and invisible, while doing the next job.

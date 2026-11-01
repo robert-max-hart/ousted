@@ -114,7 +114,7 @@ func _settle() -> void:
         return;
     visuals.process_mode = Node.PROCESS_MODE_INHERIT;
     for c in get_children():
-        if c is AmbientAudio:
+        if c is AmbientAudio or c is MusicPlayer:
             c.process_mode = Node.PROCESS_MODE_INHERIT;
     var total:int = maxi(1, terrain._dirty.size() + _grass._dirty.size() + _ground._dirty.size());
     for frame in 900:
@@ -194,6 +194,12 @@ func _ready() -> void:
     if _staged:
         ambient.process_mode = Node.PROCESS_MODE_DISABLED;
     add_child(ambient);
+    if not is_backdrop:
+        var music:MusicPlayer = MusicPlayer.new(self);
+        music.name = "Music";
+        if _staged:
+            music.process_mode = Node.PROCESS_MODE_DISABLED;
+        add_child(music);
     traders = Traders.new(self);
     _entities = Node3D.new();
     _entities.name = "Entities";
