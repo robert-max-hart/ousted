@@ -26,7 +26,7 @@ const TIPS:Array[String] = [
     "Merchants walk in from the edge of the map. Keep spare goods in the Trading Post to sell them quickly.",
     "Citizens sleep in houses when they have them. Shacks are a stopgap: build real homes.",
     "Children go to school if there is a teacher. Schooling makes them better workers for life.",
-    "Roads make citizens walk faster, and bridges let them cross the river without wading.",
+    "Paths make citizens walk faster (brick roads even more), and bridges let them cross the river without wading.",
     "A pasture needs only grass in summer. In the cold months the animals eat grain.",
     "The Soil, Water and Slope buttons on the top bar paint the ground to help you plan.",
     "Press Esc to open the menu, save the game or change settings.",

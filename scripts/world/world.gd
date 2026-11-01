@@ -81,8 +81,9 @@ var _entities   :Node3D;
 var wetness     :float = 0.5;       # 0..1 how wet the ground is (rain wets, warmth dries); trees grow on it
 var saplings    :Array[ResourceNode] = [];
 var road_work:Dictionary = {};              # cell -> work hours done: road cells staked out, waiting for builders and laborers
+var road_paid :Dictionary = {};            # cell -> true once the stone for a staked brick road cell has been laid
 var road_claimed:Dictionary = {};           # cell -> true while a citizen is working on it (not saved)
-var road_kind:Dictionary = {};              # cell -> Terrain.Overlay.ROAD or CHANNEL: what a staked or waiting cell becomes (missing: road)
+var road_kind:Dictionary = {};              # cell -> Terrain.Overlay.ROAD, BRICK or CHANNEL: what a staked or waiting cell becomes (missing: road)
 var irrigation_version:int = 0;             # bumped when channels are dug, filled in or flow changes (fields re-check their plots)
 var pending_roads:Dictionary = {};          # cell -> true: road cells waiting for a tree or rock to be cleared
 var death_log   :Array = [];        # {name, age, cause, when, profession}, oldest first
@@ -531,8 +532,8 @@ func can_place(def_id:StringName, origin:Vector2i, size:Vector2i, relocating:boo
                     return "The shore is too steep here";
             if occupant[idx(c)] != null:
                 return "Something is already built here";
-            if terrain.get_overlay(c) == Terrain.Overlay.ROAD:
-                return "A road is in the way";
+            if Terrain.is_paved(terrain.get_overlay(c)):
+                return "A path is in the way";
             if terrain.get_overlay(c) == Terrain.Overlay.CHANNEL or terrain.get_overlay(c) == Terrain.Overlay.CHANNEL_WET:
                 return "A channel is in the way";
     if bridge:
@@ -838,9 +839,11 @@ func _refresh_nav(c:Vector2i) -> void:
             weight = 1.6;
     if terrain.overlay[i] == Terrain.Overlay.ROAD:
         weight = 0.6;
+    elif terrain.overlay[i] == Terrain.Overlay.BRICK:
+        weight = 0.4;        # twice as fast as open ground, a third quicker than a path
     if _nav_snow_level > 0 and not solid and not (terrain.is_water(c) and not (b != null and is_bridge(c))):
         var snow:float = _nav_snow_level / float(NAV_SNOW_STEPS);          # snow slows open ground a lot and roads and bridges a little, so roads win more
-        var roadlike:bool = terrain.overlay[i] == Terrain.Overlay.ROAD or (b != null and is_bridge(c));
+        var roadlike:bool = Terrain.is_paved(terrain.overlay[i]) or (b != null and is_bridge(c));
         weight /= lerpf(1.0, Pawn.SNOW_ROAD_MULT if roadlike else Pawn.SNOW_SPEED_MULT, snow);
     if fires != null and fires.is_wild_cell(c):
         weight += Fires.NAV_WEIGHT;       # citizens go round flames
@@ -890,13 +893,17 @@ func _on_hour(h:int) -> void:
         for b in buildings:
             if b.is_complete() and b.def.has("school_capacity"):
                 Sfx.at(&"bell", b.global_position + Vector3(0, 2.0, 0), 0.0, -4.0, 55.0);      # the school bell, at the start and the end of lessons
+    if h == int(Defs.CHAPEL_FROM) and Defs.is_service_day(GameClock.day_index()):
+        for b in buildings:
+            if b.is_complete() and b.def.get("chapel", false):
+                Sfx.at(&"chapel_bell", b.global_position + Vector3(0, 3.0, 0), 0.0, -2.0, 70.0);      # the call to the service
     jobs.reconcile();
     _update_nav_snow();
     families.on_hour();
     illness.on_hour();
     fires.on_hour();
     for b in buildings:
-        if b.def.get("tavern", false):
+        if b.def.get("tavern", false) or b.def.get("chapel", false):
             b.update_windows();
     for b in buildings.duplicate():
         if b.def.get("temporary", false) and b.is_complete() and b.is_empty():
@@ -1060,8 +1067,8 @@ func remove_channel(c:Vector2i) -> void:
 func update_irrigation() -> void:
     RoadWork.update_irrigation(self);
 
-func set_road(c:Vector2i, on:bool) -> void:
-    RoadWork.set_road(self, c, on);
+func set_road(c:Vector2i, on:bool, kind:int = Terrain.Overlay.ROAD) -> void:
+    RoadWork.set_road(self, c, on, kind);
 
 func water_reach() -> PackedFloat32Array:
     return WaterReach.water_reach(self);

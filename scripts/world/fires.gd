@@ -164,7 +164,7 @@ func dryness() -> float:
 # How easily a cell catches (0 for water, roads and bare rock) and how long it burns, as {"catch", "hours"}; empty when it cannot burn.
 func flammability(c:Vector2i) -> Dictionary:
     var t:Terrain = world.terrain;
-    if not t.in_bounds(c) or t.is_water(c) or t.get_overlay(c) == Terrain.Overlay.ROAD:
+    if not t.in_bounds(c) or t.is_water(c) or Terrain.is_paved(t.get_overlay(c)):
         return {};
     var i:int = world.idx(c);
     var b:Building = world.occupant[i];

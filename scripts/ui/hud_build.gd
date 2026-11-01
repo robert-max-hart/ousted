@@ -151,12 +151,17 @@ static func _build_toolbar(hud:HUD, root:Control) -> void:
             b.add_theme_constant_override("h_separation", 5);
             b.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.BUILD, id));
             hud._tool_btns[String(id)] = b;
-        if Defs.BUILD_CATEGORIES[ci][0] == "Civic":
-            var rb:Button = hud._tool_button(hud._build_row, group, "Road", PlayerTools.MODE_HINTS[PlayerTools.Mode.ROAD]);
+        if Defs.BUILD_CATEGORIES[ci][0] == "Paths":
+            var rb:Button = hud._tool_button(hud._build_row, group, "Path", PlayerTools.MODE_HINTS[PlayerTools.Mode.ROAD]);
             rb.icon = UIIcons.building(&"road");
             rb.add_theme_constant_override("h_separation", 5);
             rb.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.ROAD, &""));
             hud._tool_btns[str(PlayerTools.Mode.ROAD)] = rb;
+            var bb:Button = hud._tool_button(hud._build_row, group, "Road", "Brick road: citizens walk twice as fast on it as on open ground. Takes work and %d stone a tile." % Defs.BRICK_ROAD_COST);
+            bb.icon = UIIcons.building(&"brick_road");
+            bb.add_theme_constant_override("h_separation", 5);
+            bb.pressed.connect(tools.set_mode.bind(PlayerTools.Mode.ROAD, PlayerTools.BRICK_ID));
+            hud._tool_btns[HUD.ROAD_BRICK_KEY] = bb;
             hud._road_cat = ci;
     (hud._tool_btns[str(PlayerTools.Mode.SELECT)] as Button).set_pressed_no_signal(true);
     hud._apply_category();

@@ -375,6 +375,12 @@ const BUILDINGS:Dictionary = {
         ],
         "desc": "A place to spend the evening. From 5 in the evening adults come for a pint and some company, an hour and a half at a time, up to 10 at once, and leave a little happier (a very small lift that lasts a day) even when there is nothing to drink. With spirits in the tavern's store they also drink one, for the full happiness boost of spirits. Laborers fill the store from storage up to the level you set (it is not filled while the Policies rule on treats is off, so spirits kept for trading are left alone). A good tavern costs a good deal to build.",
     },
+    &"chapel": {
+        "wall": &"stone", "name": "Chapel", "size": Vector2i(3, 4), "cost": {&"wood": 30, &"stone": 40}, "work": 40.0,
+        "shape": "house", "height": 2.0, "color": Color(0.64, 0.62, 0.58), "roof": Color(0.36, 0.34, 0.4),
+        "chapel": true, "patrons": 20,
+        "desc": "A place to gather. Every 8th day, in the morning, the bell rings and about 6 in 10 adults come to a service (up to 20 inside), a couple of hours, led by no one. Those who attend feel better for a few days, and anyone grieving a recent death has that grief halved. The sick and the children stay away. No one has to work here and nothing needs stocking.",
+    },
     &"tailor": {
         "indoor_work": true, "wall": &"planks", "name": "Tailor's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
         "shape": "house", "decor": "loom", "height": 1.7, "color": Color(0.58, 0.46, 0.34), "roof": Color(0.4, 0.3, 0.42),
@@ -490,10 +496,11 @@ const BUILD_CATEGORIES:Array = [
     ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
-    ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"trading_post", &"graveyard", &"bridge"]],
+    ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"chapel", &"trading_post", &"graveyard"]],
+    ["Paths", [&"bridge"]],        # plus the Path and Road tools (HudBuild)
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"graveyard", &"bridge", &"fishing_hut"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -753,6 +760,20 @@ const TAVERN_FROM      :float = 17.0;       # the hours citizens go
 const TAVERN_TO        :float = 20.0;
 const TAVERN_STAY      :float = 1.5;
 const TAVERN_SHARE     :int = 55;           # percent of citizens who go on a given evening
+
+# The chapel (M8): a service every CHAPEL_EVERY days, led by no one, in the morning.
+const CHAPEL_EVERY     :int = 8;            # service days: the last of every 8 (day index 7, 15, ...)
+const CHAPEL_FROM      :float = 8.0;        # the hours citizens set out
+const CHAPEL_TO        :float = 9.5;
+const CHAPEL_STAY      :float = 2.0;
+const CHAPEL_SHARE     :int = 60;           # percent of adults who go
+const CHAPEL_MOOD      :float = 0.1;        # "Attended service"
+const CHAPEL_MOOD_HOURS:float = 72.0;       # how long it lasts
+const CHAPEL_GRIEF_DAYS:int = 8;            # grief begun within this many days is halved by a service
+const CHAPEL_GRIEF_MULT:float = 0.5;
+
+static func is_service_day(day:int) -> bool:
+    return day % CHAPEL_EVERY == CHAPEL_EVERY - 1;
 const MOOD_BASE         :float = 0.65;
 const MOOD_HOURS        :float = 12.0;    # how quickly happiness follows its target (a time constant)
 const MOOD_SLOW_BELOW   :float = 0.4;     # under this, work gets slower, down to MOOD_SLOW_MIN at zero
@@ -813,6 +834,9 @@ static func teacher_multiplier(teaching_xp:float, general_xp:float) -> float:
 
 const CHANNEL_WORK_HOURS:float = 0.8;   # labor-hours to dig one irrigation channel cell
 const CHANNEL_RANGE:int = 2;            # plots this close to a channel that is connected to water stay moist
+const BRICK_ROAD_ITEM:StringName = &"stone";     # a brick road takes this, BRICK_ROAD_COST of it a cell (hauled to the cell)
+const BRICK_ROAD_COST:int = 1;
+const BRICK_WORK_HOURS:float = 0.6;      # labor-hours to lay one brick road cell
 const ROAD_WORK_HOURS:float = 0.4;       # labor-hours to lay one road cell (roads need work, no materials)
 
 # --------------------------------

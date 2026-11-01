@@ -7,7 +7,8 @@ class_name Pawn extends Node3D;
 
 const WALK_SPEED        :float = 3.0;      # metres per real second at 1x
 const WADE_SPEED_MULT   :float = 0.5;       # in shallow water
-const ROAD_SPEED_MULT   :float = 1.5;
+const ROAD_SPEED_MULT   :float = 1.5;       # on a path (earth)
+const BRICK_SPEED_MULT  :float = 2.0;       # on a brick road: twice the path's gain over open ground
 const SNOW_SPEED_MULT   :float = 0.6;       # on open ground under full snow cover (the speed falls away as the snow deepens)
 const SNOW_ROAD_MULT    :float = 0.9;       # on a road or bridge, which feet keep trodden, under full snow cover
 const COLD_DAMAGE_BELOW:float = 0.2;      # warmth under this starts hurting health, more the lower it gets
@@ -18,7 +19,7 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
-const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"flee", &"fire", &"camp", &"cool"];
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"chapel", &"flee", &"fire", &"camp", &"cool"];
 const FIRE_KINDS        :Array[StringName] = [&"flee", &"fire"];
 const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul", &"flee", &"fire", &"cool"];
 
@@ -48,6 +49,8 @@ var treat_until :float = 0.0;              # game hour it wears off
 var treat_ready :float = 0.0;              # game hour from which they may want another
 var tavern_day  :int = -1;                 # the day they last went to the tavern
 var tavern_until:float = 0.0;              # game hour the lift from the evening out wears off
+var chapel_day  :int = -1;                 # the service day they last decided about
+var chapel_until:float = 0.0;              # game hour the lift from a service wears off
 var illness     :float = 0.0;              # how sick: 0 is well, 1 is gravely ill (see Illness)
 var bucket      :bool = false;             # carrying a bucket of water to a fire (not saved)
 var burned_until:float = 0.0;              # game hour until which a death counts as burns (Fires)
@@ -138,7 +141,7 @@ func to_dict() -> Dictionary:
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
         "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
         "treat_item": treat_item, "treat_mood": treat_mood, "treat_until": treat_until, "treat_ready": treat_ready,
-        "tavern_day": tavern_day, "tavern_until": tavern_until, "illness": illness, "overheat": overheat, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
+        "tavern_day": tavern_day, "tavern_until": tavern_until, "chapel_day": chapel_day, "chapel_until": chapel_until, "illness": illness, "overheat": overheat, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
         "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
@@ -171,6 +174,8 @@ func restore(w:World, d:Dictionary) -> void:
     mood = d.get("mood", Defs.MOOD_BASE);
     tavern_day = d.get("tavern_day", -1);
     tavern_until = d.get("tavern_until", 0.0);
+    chapel_day = d.get("chapel_day", -1);
+    chapel_until = d.get("chapel_until", 0.0);
     illness = d.get("illness", 0.0);
     overheat = d.get("overheat", 0.0);
     immune_until = d.get("immune_until", 0.0);
@@ -364,9 +369,29 @@ func tavern_due() -> bool:
             return true;
     return false;
 
+# An adult who has not yet decided about this service day, in its morning hours, with a chapel standing.
+func chapel_due() -> bool:
+    var h:float = GameClock.hour();
+    var day:int = GameClock.day_index();
+    if not is_adult() or chapel_day == day or not Defs.is_service_day(day) or illness > 0.0 or h < Defs.CHAPEL_FROM or h >= Defs.CHAPEL_TO or energy < 0.3:
+        return false;
+    for b in world.buildings:
+        if b.def.get("chapel", false) and b.is_complete():
+            return true;
+    return false;
+
+# A service halves the grief for any death in the last few days, once for each.
+func pray() -> void:
+    for g in grief:
+        if g["start"] >= GameClock.total_hours - Defs.CHAPEL_GRIEF_DAYS * GameClock.HOURS_PER_DAY and not g.get("prayed", false):
+            g["amount"] *= Defs.CHAPEL_GRIEF_MULT;
+            g["prayed"] = true;
+
 func _should_interrupt() -> bool:
     if world.fires != null and world.fires.wild_burning() and not FIRE_KINDS.has(task.kind) and world.fire_tasks.wants(self):
         return true;          # a fire close by: run, or go and fight it (FireTasks)
+    if carry_amount == 0 and chapel_due() and task.kind != &"chapel":
+        return true;          # the bell rings on a service day (see NeedsTasks.chapel_task)
     if carry_amount == 0 and tavern_due() and task.kind != &"tavern":
         return true;          # the tavern opens: whoever is about their work comes along (once a day, see NeedsTasks.tavern_task)
     if Weather.is_storming() and not world.policies.is_on(&"storm_work") and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind) and world.shelter_for(self) != null:
@@ -437,6 +462,8 @@ func happiness_factors() -> Array:
         f.append(["Too hot", -Heat.mood_loss(self)]);
     if GameClock.total_hours < tavern_until:
         f.append(["Evening at the tavern", Defs.TAVERN_MOOD]);
+    if GameClock.total_hours < chapel_until:
+        f.append(["Attended service", Defs.CHAPEL_MOOD]);
     if kinds >= 2:
         f.append(["Varied diet", 0.05 if kinds == 2 else 0.1]);
     if treat_boost_now() > 0.0:
@@ -656,8 +683,9 @@ func _plan_path(step:Dictionary) -> bool:
 # slows everything dry, less on roads and bridges (see Weather.snow_depth).
 func ground_speed(c:Vector2i) -> float:
     var snow:float = Weather.snow_depth;
-    if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD:
-        return ROAD_SPEED_MULT * lerpf(1.0, SNOW_ROAD_MULT, snow);
+    var o:int = world.terrain.get_overlay(c);
+    if o == Terrain.Overlay.ROAD or o == Terrain.Overlay.BRICK:
+        return (ROAD_SPEED_MULT if o == Terrain.Overlay.ROAD else BRICK_SPEED_MULT) * lerpf(1.0, SNOW_ROAD_MULT, snow);
     if world.terrain.is_water(c):
         return 1.0 * lerpf(1.0, SNOW_ROAD_MULT, snow) if world.is_bridge(c) else WADE_SPEED_MULT;
     return lerpf(1.0, SNOW_SPEED_MULT, snow);
@@ -813,7 +841,7 @@ func step_sound() -> StringName:
         return &"step_deck";
     if world.terrain.is_water(c):
         return &"step_wade";
-    if world.terrain.get_overlay(c) == Terrain.Overlay.ROAD:
+    if Terrain.is_paved(world.terrain.get_overlay(c)):
         return &"step_road";
     return &"step_grass";
 

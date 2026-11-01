@@ -37,6 +37,8 @@ static func stake_road(world:World, c:Vector2i) -> void:
 static func cancel_road(world:World, c:Vector2i) -> void:
     world.pending_roads.erase(c);
     world.road_kind.erase(c);
+    if world.road_paid.erase(c):
+        world.deposit(Defs.BRICK_ROAD_ITEM, Defs.BRICK_ROAD_COST, Vector3(c.x + 0.5, 0.0, c.y + 0.5));         # the stone laid for it comes back
     if world.road_work.erase(c):
         world.road_claimed.erase(c);
         world.terrain.set_overlay(c, Terrain.Overlay.NONE);
@@ -46,18 +48,29 @@ static func work_road(world:World, c:Vector2i, dh:float) -> bool:
     if not world.road_work.has(c):
         return true;
     world.road_work[c] += dh;
-    var channel:bool = world.road_kind.get(c, Terrain.Overlay.ROAD) == Terrain.Overlay.CHANNEL;
-    if world.road_work[c] < (Defs.CHANNEL_WORK_HOURS if channel else Defs.ROAD_WORK_HOURS):
+    var kind:int = world.road_kind.get(c, Terrain.Overlay.ROAD);
+    var channel:bool = kind == Terrain.Overlay.CHANNEL;
+    if world.road_work[c] < RoadWork.work_hours(kind):
         return false;
     world.road_work.erase(c);
     world.road_kind.erase(c);
+    world.road_paid.erase(c);
     world.terrain.set_overlay(c, Terrain.Overlay.NONE);
     if channel:
         world.terrain.set_overlay(c, Terrain.Overlay.CHANNEL);
         RoadWork.update_irrigation(world);
     else:
-        RoadWork.set_road(world, c, true);
+        RoadWork.set_road(world, c, true, kind);
     return true;
+
+static func work_hours(kind:int) -> float:
+    if kind == Terrain.Overlay.CHANNEL:
+        return Defs.CHANNEL_WORK_HOURS;
+    return Defs.BRICK_WORK_HOURS if kind == Terrain.Overlay.BRICK else Defs.ROAD_WORK_HOURS;
+
+# Whether a staked cell still needs its stone carried to it (a brick road takes one stone a cell; paths and channels none).
+static func needs_stone(world:World, c:Vector2i) -> bool:
+    return world.road_kind.get(c, Terrain.Overlay.ROAD) == Terrain.Overlay.BRICK and not world.road_paid.has(c);
 
 static func is_channel(world:World, c:Vector2i) -> bool:
     var o:int = world.terrain.get_overlay(c) if world.terrain.in_bounds(c) else Terrain.Overlay.NONE;
@@ -95,10 +108,10 @@ static func update_irrigation(world:World) -> void:
         world.terrain.set_overlay(c, Terrain.Overlay.CHANNEL_WET if wet.has(c) else Terrain.Overlay.CHANNEL);
     world.irrigation_version += 1;
 
-static func set_road(world:World, c:Vector2i, on:bool) -> void:
+static func set_road(world:World, c:Vector2i, on:bool, kind:int = Terrain.Overlay.ROAD) -> void:
     if on and not RoadWork.can_road(world, c):
         return;
-    if not on and world.terrain.get_overlay(c) != Terrain.Overlay.ROAD:
+    if not on and not Terrain.is_paved(world.terrain.get_overlay(c)):
         return;
-    world.terrain.set_overlay(c, Terrain.Overlay.ROAD if on else Terrain.Overlay.NONE);
+    world.terrain.set_overlay(c, kind if on else Terrain.Overlay.NONE);
     world._refresh_nav(c);

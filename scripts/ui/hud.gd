@@ -25,7 +25,8 @@ var _toast      :Label;
 var _toast_tween:Tween;
 var _tool_row   :HFlowContainer;
 var _harvest_opts:HBoxContainer;        # trees / stone / iron check boxes, shown while the Harvest tool is chosen
-var _road_cat   :int = -1;               # the category the Road tool button lives in
+const ROAD_BRICK_KEY:String = "road_brick";       # _tool_btns key of the brick Road button (the Path button uses str(Mode.ROAD))
+var _road_cat   :int = -1;               # the category the Path and Road tool buttons live in
 var _open_cat   :int = -1;               # index into Defs.BUILD_CATEGORIES, or -1 when none is open
 var _jobs_rows  :Array[Label] = [];
 var _jobs_flags :Array[Label] = [];     # a red ! on professions whose buildings have empty positions
@@ -561,6 +562,8 @@ func _on_filter_toggled(on:bool, item:StringName) -> void:
 func _on_mode_changed(mode:int) -> void:
     _harvest_opts.visible = mode == PlayerTools.Mode.HARVEST;
     var key:String = World.instance.tools.build_id if mode == PlayerTools.Mode.BUILD else str(mode);
+    if mode == PlayerTools.Mode.ROAD and World.instance.tools.build_id == PlayerTools.BRICK_ID:
+        key = ROAD_BRICK_KEY;
     for k in _tool_btns:
         (_tool_btns[k] as Button).set_pressed_no_signal(k == key);
     if mode == PlayerTools.Mode.BUILD:       # picking a building any other way opens its category
@@ -700,6 +703,7 @@ func _apply_category() -> void:
             (_tool_btns[String(id)] as Button).visible = shown;
     if _tool_btns.has(str(PlayerTools.Mode.ROAD)):
         (_tool_btns[str(PlayerTools.Mode.ROAD)] as Button).visible = _open_cat == _road_cat;
+        (_tool_btns[ROAD_BRICK_KEY] as Button).visible = _open_cat == _road_cat;
 
 
 func menu_open() -> bool:

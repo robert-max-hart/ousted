@@ -9,6 +9,8 @@ class_name PlayerTools extends Node3D;
 signal mode_changed(mode:int);
 signal selection_changed(obj:Variant);
 
+const BRICK_ID:StringName = &"brick";      # build_id of the Road tool when it lays brick roads (empty: earth paths)
+
 enum Mode { SELECT, BUILD, HARVEST, ROAD, DEMOLISH, FORAGE, CANCEL, EXPAND, CHANNEL, PLANT };
 
 const MODE_HINTS:Dictionary = {
@@ -16,11 +18,11 @@ const MODE_HINTS:Dictionary = {
     Mode.BUILD:    "Click to place. R rotates. Right-click to stop building.",
     Mode.HARVEST:  "Drag over trees and rocks to mark them for harvest.",
     Mode.FORAGE:   "Drag over berries, mushrooms and hazel groves to mark them for picking. Foragers and idle laborers pick marked ones when they are in season.",
-    Mode.ROAD:     "Drag to lay a road (hold Shift for a straight diagonal line). Roads speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
+    Mode.ROAD:     "Drag to lay a path (hold Shift for a straight diagonal line). Paths speed up walking and take work, no materials. Trees and rocks in the way are marked for clearing first.",
     Mode.CHANNEL:  "Drag to dig an irrigation channel. One that connects to a river or lake carries water: plots within 2 cells of it stay moist, drought or not. Digging takes work, no materials.",
-    Mode.DEMOLISH: "Drag to demolish buildings, roads and channels.",
+    Mode.DEMOLISH: "Drag to demolish buildings, paths, roads and channels.",
     Mode.EXPAND:   "Click on the ground beside it to grow it there. Right-click to stop.",
-    Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and roads waiting to be laid.",
+    Mode.CANCEL:   "Drag to cancel what is still planned: buildings not yet built (materials come back in full), harvest and forage marks, and paths and roads waiting to be laid.",
     Mode.PLANT:    "Click a cell, or drag over an area, to mark where trees should be planted (one every other cell at most). Laborers plant them, no materials needed.",
 };
 const PICK_PIXELS   :float = 22.0;
@@ -122,6 +124,8 @@ func set_mode(m:int, id:StringName = &"") -> void:
                 Defs.BUILDINGS[id]["name"], _min_side(), _min_side(), FIELD_MAX_SIDE];
     else:
         hint = MODE_HINTS[m];
+        if m == Mode.ROAD and id == BRICK_ID:
+            hint = "Drag to lay a brick road (hold Shift for a straight diagonal line). Citizens walk twice as fast on it as on open ground. It takes work and %d stone a tile, carried from a store. Trees and rocks in the way are marked for clearing first." % Defs.BRICK_ROAD_COST;
     error = "";
     _dragging = false;
     mode_changed.emit(mode);
@@ -304,8 +308,9 @@ func _on_release() -> void:
                         marked += 1;
             error = "" if marked > 0 else "No tree can be planted there.";
         Mode.ROAD:
+            var kind:int = Terrain.Overlay.BRICK if build_id == BRICK_ID else Terrain.Overlay.ROAD;
             for c in _road_cells():
-                w.plan_road(c);
+                w.plan_road(c, kind);
         Mode.CHANNEL:
             for c in _road_cells():
                 w.plan_road(c, Terrain.Overlay.CHANNEL);

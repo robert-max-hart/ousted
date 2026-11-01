@@ -45,7 +45,7 @@ static func _load(id:StringName, dirs:Array = DIRS) -> Texture2D:
 const BY_LABEL:Dictionary = {
     "Select": &"arrow", "Harvest": &"axe", "Forage": &"basket", "Plant trees": &"sapling", "Channel": &"trench",
     "Demolish": &"hammer", "Cancel": &"cross",
-    "Housing": &"house", "Storage": &"crate", "Food": &"wheat", "Industry": &"anvil", "Civic": &"flag",
+    "Housing": &"house", "Storage": &"crate", "Food": &"wheat", "Industry": &"anvil", "Civic": &"flag", "Paths": &"path",
     "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet",
     "Soil": &"soil", "Water": &"drop", "Slope": &"slope",
     "Laborer": &"person", "Builder": &"hammer", "Farmer": &"wheat", "Woodcutter": &"axe", "Miner": &"pick",

@@ -3,6 +3,12 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.11 | 2 Nov 2026 | Paths, brick roads and the chapel
+- New Paths tab in the build bar: the Path tool (the old Road tool, renamed), the new Road tool and Bridge.
+- Brick roads: citizens walk twice as fast on them as on open ground, a third quicker than on a path. Each tile takes one stone, carried from a store, and a little more work than a path.
+- Cancelling a brick road tile that already has its stone gives the stone back.
+- New Chapel (Civic, wood 30 and stone 40): every 8th day the bell rings and about 6 in 10 adults go to a morning service. They feel better for 3 days, and anyone grieving a recent death has that grief halved. No priest, nothing to stock.
+
 # 0.7.10 | 2 Nov 2026 | Crab pots
 - A new Fishing Hut upgrade: Crab Pots (10 iron and 3 wood). Three iron-bound pots appear on the pier and fill with crabs by themselves, about a crab a day for a hut with half its circle on the water (more where there is more water, fewer where another hut shares it), and nothing while the water is frozen. A farmer collects them like honey and carries them to storage. Crabs are a new food: richer than fish, spoil fast (3 days), and merchants pay well for them.
 

@@ -108,6 +108,9 @@ func choose_task(p:Pawn) -> Task:
             return t;
 
     if not night and p.is_adult():
+        t = needs.chapel_task(p);
+        if t != null:
+            return t;
         t = needs.tavern_task(p);
         if t != null:
             return t;
@@ -559,13 +562,17 @@ func _repair_task(p:Pawn) -> Task:
             b.repairers = maxi(0, b.repairers - 1);
     return t;
 
-# Lays a staked road cell (World.road_work): the nearest one nobody is working on.
+# Lays a staked road cell (World.road_work): the nearest one nobody is working on. A brick road cell first needs its stone
+# (Defs.BRICK_ROAD_COST) carried from a store; such cells wait while there is none.
 func _road_task(p:Pawn) -> Task:
     var best:Vector2i = Vector2i.ZERO;
     var best_d:float = INF;
     var pc:Vector2 = Vector2(p.position.x, p.position.z);
+    var stone:bool = Stock.available(Defs.BRICK_ROAD_ITEM) >= Defs.BRICK_ROAD_COST;
     for c in world.road_work:
         if world.road_claimed.has(c) or p.has_failed(c):
+            continue;
+        if RoadWork.needs_stone(world, c) and not stone:
             continue;
         var d:float = pc.distance_squared_to(Vector2(c) + Vector2(0.5, 0.5));
         if d < best_d:
@@ -574,12 +581,40 @@ func _road_task(p:Pawn) -> Task:
     if best_d == INF:
         return null;
     var cell:Vector2i = best;
+    var kind:int = world.road_kind.get(cell, Terrain.Overlay.ROAD);
+    var src:Building = null;
+    if RoadWork.needs_stone(world, cell):
+        src = world.nearest_storage_with(Defs.BRICK_ROAD_ITEM, p.position);
+        if src == null or src.reserve_out(Defs.BRICK_ROAD_ITEM, Defs.BRICK_ROAD_COST) < Defs.BRICK_ROAD_COST:
+            return null;
     world.road_claimed[cell] = true;
-    var t:Task = Task.new(&"road", "Digging a channel" if world.road_kind.get(cell, Terrain.Overlay.ROAD) == Terrain.Overlay.CHANNEL else "Laying road");
+    var label:String = "Digging a channel" if kind == Terrain.Overlay.CHANNEL else ("Laying a brick road" if kind == Terrain.Overlay.BRICK else "Laying a path");
+    var t:Task = Task.new(&"road", label);
     t.job = Profession.BUILDER;
+    var st:Dictionary = {"picked": false, "laid": false};
+    if src != null:
+        t.target = src;
+        t.move_rect(src.rect(), src.is_walkable(), "Fetching stone for the road");
+        t.act(func(pw:Pawn) -> bool:
+            pw.set_carry(Defs.BRICK_ROAD_ITEM, src.take_reserved(Defs.BRICK_ROAD_ITEM, Defs.BRICK_ROAD_COST));
+            st["picked"] = true;
+            return true);
     t.move_cell(cell, "Walking to the work");
+    if src != null:
+        t.act(func(pw:Pawn) -> bool:
+            pw.clear_carry();
+            if world.road_work.has(cell):
+                world.road_paid[cell] = true;
+            st["laid"] = true;
+            return true);
     t.work(func(_pw:Pawn, dh:float) -> bool:
         return world.work_road(cell, dh));
+    t.on_cancel = func(pw:Pawn) -> void:
+        if src != null and not st["picked"] and World.alive(src):
+            src.release_out(Defs.BRICK_ROAD_ITEM, Defs.BRICK_ROAD_COST);
+        elif src != null and st["picked"] and not st["laid"]:
+            pw.clear_carry();
+            world.deposit(Defs.BRICK_ROAD_ITEM, Defs.BRICK_ROAD_COST, pw.position);
     t.on_end = func(_pw:Pawn) -> void:
         world.road_claimed.erase(cell);
     return t;

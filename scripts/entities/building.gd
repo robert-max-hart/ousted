@@ -798,7 +798,8 @@ func update_windows() -> void:
     if _window_mat == null:
         return;
     var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty()) \
-        or (state == State.COMPLETE and def.get("tavern", false) and GameClock.hour() >= Defs.TAVERN_FROM - 1.0 and GameClock.hour() < 23.0);
+        or (state == State.COMPLETE and def.get("tavern", false) and GameClock.hour() >= Defs.TAVERN_FROM - 1.0 and GameClock.hour() < 23.0) \
+        or (state == State.COMPLETE and def.get("chapel", false) and Defs.is_service_day(GameClock.day_index()) and GameClock.hour() >= Defs.CHAPEL_FROM - 1.0 and GameClock.hour() < Defs.CHAPEL_TO + Defs.CHAPEL_STAY);
     _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
 
 

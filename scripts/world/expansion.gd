@@ -44,8 +44,8 @@ static func block_reason(w:World, b:Building, r:Rect2i) -> String:
                 return "Can't build on water";
             if w.occupant[w.idx(c)] != null:
                 return "Something is already built here";
-            if w.terrain.get_overlay(c) == Terrain.Overlay.ROAD:
-                return "A road is in the way";
+            if Terrain.is_paved(w.terrain.get_overlay(c)):
+                return "A path is in the way";
     var hr:Vector2 = w.terrain.rect_height_range(r);
     if hr.y - hr.x > World.MAX_BUILD_SLOPE * 2.0:
         return "Ground is too steep";

@@ -286,7 +286,7 @@ Decisions and why:
 **M8 scope (Additional features).** Collected from the playtest notes, nothing here is scheduled:
 - **Health and disease (pinned 2026-10-31, look into the scope first):** ill citizens that spread illness between a house, a workplace or a school, slower work and deaths, a place to treat them (an Herbalist's Hut), and a quarantine policy. See `docs/scenario_ideas.md`, "The Plague Year".
 - **Happiness and daily life:** a tavern (and other happiness buildings, tied to honey and spirits), a **downside to drinking** spirits, **decorative items** (which, whether they affect happiness), **fires** (cold homeless citizens build little fires, maybe real ones that spread).
-- **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, other catches and boats for fishing and smoking or salting fish, a tannery step for leather, jewelry or coins from gold and silver, finite ore veins, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
+- **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, other catches and boats for fishing and smoking or salting fish, a tannery step for leather, jewelry or coins from gold and silver, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
 - **World and weather:** overheating as well as cold, more weather (thunderstorms), shrinking buildings and growing others in place, expansion while a building is paused.
 - **Known issue to chase, not a feature:** laborers sometimes get stuck hauling in a loop (needs a repro or a save).
 

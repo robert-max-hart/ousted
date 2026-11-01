@@ -99,12 +99,40 @@ func tavern_task(p:Pawn) -> Task:
             pw.go_outside();
     return t;
 
-func _patrons(b:Building) -> int:
+func _patrons(b:Building, kind:StringName = &"tavern") -> int:
     var n:int = 0;
     for q in world.pawns:
-        if q.task != null and q.task.kind == &"tavern" and is_same(q.task.target, b):
+        if q.task != null and q.task.kind == kind and is_same(q.task.target, b):
             n += 1;
     return n;
+
+# The morning service on a service day (Defs.is_service_day): about 6 in 10 adults go to the nearest chapel with room, stay
+# a couple of hours, and come out lifted for a few days, with the grief for any recent death halved.
+func chapel_task(p:Pawn) -> Task:
+    if not p.chapel_due():
+        return null;
+    var today:int = GameClock.day_index();
+    p.chapel_day = today;         # decided for this service day, whatever comes of it
+    if hash(Vector3i(p.get_instance_id() % 100003, today, 7)) % 100 >= Defs.CHAPEL_SHARE:
+        return null;
+    var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_complete() and x.def.get("chapel", false) and not p.has_failed(x) and _patrons(x, &"chapel") < x.def.get("patrons", 20));
+    if b == null:
+        return null;
+    var t:Task = Task.new(&"chapel", "Going to the service", false);
+    t.target = b;
+    t.move_rect(b.rect(), false);
+    t.act(func(pw:Pawn) -> bool:
+        pw.go_inside(b, false);
+        return true);
+    t.work_for(Defs.CHAPEL_STAY, "At the service", func(pw:Pawn) -> void:
+        pw.chapel_until = GameClock.total_hours + Defs.CHAPEL_MOOD_HOURS;
+        pw.pray();
+        pw.go_outside());
+    t.on_cancel = func(pw:Pawn) -> void:
+        if pw.indoors and is_same(pw.shelter, b):
+            pw.go_outside();
+    return t;
 
 # A citizen with no clothes on fetches a set from storage and puts it on (the best there is).
 func dress_task(p:Pawn) -> Task:

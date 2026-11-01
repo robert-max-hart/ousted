@@ -81,7 +81,7 @@ LOW = meshlib.DETAIL < 1.0          # the reduced set leaves out the smallest de
 
 def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, windows=3, side_windows=0, shutters=False, timber=False,
             logs=False, quoins=False, footing=0.2, step=True, overhang=0.2, thickness=0.08, home=False, chimney=False,
-            sign=False, awning=False, small=False):
+            sign=False, awning=False, small=False, tower=False):
     bx, bz = sx - 0.5, sz - 0.5
     hx, hz = bx / 2, bz / 2
     apex = h * pitch
@@ -162,6 +162,14 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
     if awning:
         face(body, [v(-hx + 0.2, shift + h * 0.55, hz + 0.02), v(hx - 0.2, shift + h * 0.55, hz + 0.02), v(hx - 0.2, shift + h * 0.45, hz + 0.5), v(-hx + 0.2, shift + h * 0.45, hz + 0.5)], v(0, 0.6, 0.8), (0.75, 0.3, 0.28))
         face(body, [v(-hx + 0.2, shift + h * 0.55, hz + 0.02), v(hx - 0.2, shift + h * 0.55, hz + 0.02), v(hx - 0.2, shift + h * 0.45, hz + 0.5), v(-hx + 0.2, shift + h * 0.45, hz + 0.5)], v(0, -0.6, -0.8), (0.6, 0.22, 0.2))
+    if tower:                                   # a bell tower over the door: it stands inside the footprint, taller than the ridge
+        tw, th = 1.0, h + apex + 0.6
+        body.box(0, shift + th / 2, hz - tw / 2, tw, th, tw, shade(1.05))
+        for k in range(4 if not LOW else 0):    # string courses, and the bell openings near the top
+            body.box(0, shift + 0.5 + k * 0.45, hz - tw / 2, tw + 0.06, 0.05, tw + 0.06, STONE_BASE)
+        for sgn in (-1, 1):
+            body.box(sgn * (tw / 2 + 0.01), shift + th - 0.4, hz - tw / 2, 0.04, 0.5, 0.32, DARK_TIMBER)
+        body.box(0, shift + th - 0.4, hz + 0.01, 0.32, 0.5, 0.04, DARK_TIMBER)
     body.write("building_%s_body" % name, OUT)
 
     # the roof: two sloping slabs with eaves, the ridge cap, barge boards on the gable edges
@@ -177,6 +185,17 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
     for sgn in ((-1, 1) if not LOW else ()):                                               # barge boards, front and back
         for side in (-1, 1):
             roof.limb(v(side * (rx + 0.01), h - 0.06, sgn * (rz + 0.01)), v(0, h + apex + 0.02, sgn * (rz + 0.01)), 0.045, 0.045, shade(0.6), segs=4)
+    if tower:                                   # the spire: a four-sided pyramid on the tower
+        tw, th = 1.0, h + apex + 0.6
+        cz = hz - tw / 2
+        r_ = tw / 2 + 0.08
+        apex_pt = v(0, th + 1.1, cz)
+        ring = [v(-r_, th, cz - r_), v(r_, th, cz - r_), v(r_, th, cz + r_), v(-r_, th, cz + r_)]
+        for i in range(4):
+            a, b = ring[i], ring[(i + 1) % 4]
+            mid = (a[0] + b[0]) / 2 - 0.0, (a[2] + b[2]) / 2 - cz
+            face(roof, [a, b, apex_pt], v(mid[0], 0.5, mid[1]), shade(1.0 if i % 2 == 0 else 0.88))
+        roof.box(0, th + 1.2, cz, 0.05, 0.3, 0.05, IRON)
     roof.write("building_%s_roof" % name, OUT)
 
     # the door
@@ -300,6 +319,8 @@ cottage("pottery", 3, 3, 1.5, 0.55, "stone", windows=2, quoins=True, footing=0.0
 cottage("herbalist", 3, 3, 1.5, 0.6, "plaster", windows=2, shutters=True, timber=True, sign=True, footing=0.08)
 # tavern: a big timber-framed inn with a hanging sign and a lit window row
 cottage("tavern", 4, 3, 2.0, 0.6, "planks", windows=3, side_windows=1, shutters=True, timber=True, sign=True, home=True, footing=0.15)
+# chapel: a small stone church with a bell tower and spire over the door
+cottage("chapel", 3, 4, 2.0, 0.6, "stone", windows=0, side_windows=2, quoins=True, home=True, footing=0.0, door_w=0.9, tower=True)
 # apiary: a low shed
 cottage("apiary", 2, 2, 0.7, 0.25, "planks", windows=0, footing=0.0, step=False, overhang=0.15, thickness=0.05, door_w=0.4)
 

@@ -9,7 +9,7 @@ class_name Terrain extends Node3D;
 signal changed(rect:Rect2i);
 signal ground_changed(rect:Rect2i);       # the ground's look changed: sculpting or a road, field or site laid or removed
 
-enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET, ORCHARD };      # (new ids go last: saves keep the numbers)
+enum Overlay { NONE, ROAD, TILLED, SITE, GRAVE, ROAD_SITE, CHANNEL, CHANNEL_WET, ORCHARD, BRICK };      # (new ids go last: saves keep the numbers)
 
 # The map's side in cells. A new game picks one of MAP_SIZES (see set_size) before the World is built, a loaded
 # game takes the saved one; SIZE and CHUNKS are read like constants everywhere.
@@ -32,6 +32,7 @@ const MIN_HEIGHT        :float = -6.0;
 const COLOR_SAND        :Color = Color(0.6, 0.54, 0.38);
 const COLOR_ROCK        :Color = Color(0.47, 0.44, 0.39);
 const COLOR_ROAD        :Color = Color(0.56, 0.46, 0.33);
+const COLOR_BRICK       :Color = Color(0.58, 0.31, 0.22);       # a brick road: fired red-brown
 const COLOR_TILLED      :Color = Color(0.36, 0.25, 0.16);
 const COLOR_GRAVE       :Color = Color(0.24, 0.33, 0.2);        # a graveyard: mossy, mown grass
 const COLOR_SITE        :Color = Color(0.62, 0.52, 0.34);      # a field being dug: pale, bare soil
@@ -590,13 +591,15 @@ func _cell_color(c:Vector2i) -> Color:
     var col:Color;
     if slope_view and not is_water(c):
         return slope_color(relief(c));
-    if water_view and water_source.is_valid() and overlay[index(c)] != Overlay.ROAD and not is_water(c):
+    if water_view and water_source.is_valid() and not is_paved(overlay[index(c)]) and not is_water(c):
         return water_color(water_source.call(index(c)));
-    if soil_view and soil_source.is_valid() and overlay[index(c)] != Overlay.ROAD and overlay[index(c)] != Overlay.CHANNEL and overlay[index(c)] != Overlay.CHANNEL_WET and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
+    if soil_view and soil_source.is_valid() and not is_paved(overlay[index(c)]) and overlay[index(c)] != Overlay.CHANNEL and overlay[index(c)] != Overlay.CHANNEL_WET and not is_water(c) and cell_height(c) >= WATER_LEVEL + 0.35 and cell_slope(c) <= 1.4:
         return soil_color(soil_source.call(index(c)));
     match overlay[index(c)]:
         Overlay.ROAD:
             col = COLOR_ROAD;
+        Overlay.BRICK:
+            col = COLOR_BRICK;
         Overlay.SITE:
             col = COLOR_SITE;
         Overlay.ORCHARD:
@@ -627,6 +630,10 @@ func _cell_color(c:Vector2i) -> Color:
 
 # The vertex colour's alpha is how well snow lies on the ground (read by shaders/terrain.gdshader): packed roads and
 # ploughed fields hold less, a channel none.
+# A laid path or brick road (the overlays citizens walk faster on).
+static func is_paved(o:int) -> bool:
+    return o == Overlay.ROAD or o == Overlay.BRICK;
+
 const SNOW_HOLD_ROAD :float = 0.25;
 const SNOW_HOLD_FIELD:float = 0.5;
 const SNOW_SHORE     :float = 0.3;      # metres above the water over which snow fades in: none lies on the bed or at the waterline
@@ -635,7 +642,7 @@ func _snow_hold(o:int) -> float:
     match o:
         Overlay.CHANNEL, Overlay.CHANNEL_WET:
             return 0.0;
-        Overlay.ROAD:
+        Overlay.ROAD, Overlay.BRICK:
             return SNOW_HOLD_ROAD;
         Overlay.TILLED, Overlay.SITE:
             return SNOW_HOLD_FIELD;
@@ -710,6 +717,10 @@ func _build_chunk(ci:int) -> void:
                 for j in 4:       # packed earth is mottled: each corner a little lighter or darker
                     var speck:float = float((((x * 2 + (j & 1)) * 73856093) ^ ((z * 2 + (j >> 1)) * 19349663)) & 1023) / 1023.0;
                     colors[v + j] = Color(own.r * (0.95 + speck * 0.1), own.g * (0.95 + speck * 0.1), own.b * (0.96 + speck * 0.08), SNOW_HOLD_ROAD);
+            elif overlay[index(cell)] == Overlay.BRICK:
+                for j in 4:       # bricks vary a little from course to course
+                    var fired:float = float((((x * 2 + (j & 1)) * 19349663) ^ ((z * 2 + (j >> 1)) * 83492791)) & 1023) / 1023.0;
+                    colors[v + j] = Color(own.r * (0.93 + fired * 0.1), own.g * (0.93 + fired * 0.1), own.b * (0.94 + fired * 0.08), SNOW_HOLD_ROAD);
             elif overlay[index(cell)] == Overlay.TILLED or overlay[index(cell)] == Overlay.SITE:
                 for j in 4:       # ploughed ground: a ridge along each row's top edge and a furrow along its bottom, with some mottling
                     var crumb:float = float((((x * 2 + (j & 1)) * 83492791) ^ ((z * 2 + (j >> 1)) * 2654435761)) & 1023) / 1023.0;

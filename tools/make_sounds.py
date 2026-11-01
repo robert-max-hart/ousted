@@ -413,5 +413,8 @@ for i in (1, 2):
 write("ambient/fire.wav", fire_crackle())
 write("sfx/fire_alarm.wav", fade_edges(fire_alarm()))
 
+# the chapel bell: a low, slow toll, three strokes (added last so earlier random draws stay the same)
+write("sfx/chapel_bell.wav", fade_edges(normalise(mix(*[delay(bell(420, 2.2, ((1.0, 1.0), (2.0, 0.5), (2.76, 0.3), (4.1, 0.12))), k * 1.1) for k in range(3)]), 0.5)))
+
 total = sum(1 for _, _, fs in os.walk(ROOT) for f in fs if f.endswith(".wav"))
 print("wrote", total, "sound files to", os.path.normpath(ROOT))
