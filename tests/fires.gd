@@ -153,9 +153,11 @@ func _ready() -> void:
         fires.cells.erase(e);
     stone.burning = false;
     stone.health = 1.0;
+    GameRules.fires = 0;               # (no spreading: the burning house could otherwise relight itself from the grass round it)
     _expect("a stone house ignites too, with difficulty", fires.ignite(stone.rect().position));
     for h in 6:
         fires.on_hour();
+    GameRules.fires = 2;
     _expect("a stone house comes through scorched (%.2f, burning %s)" % [stone.health, stone.burning], World.alive(stone) and stone.health < 1.0 and stone.health > 0.7 and not stone.burning);
     var scorched:float = stone.health;
     stone.on_day();
@@ -279,7 +281,10 @@ func _ready() -> void:
     var scorched_at:Vector2i = TestSite.spot(world, Vector2i(3, 3), o - TestSite.anchor(world) + Vector2i(22, 14));
     var scorched_house:Building = world.place_building(&"stone_house", scorched_at, Vector2i(3, 3), true);
     scorched_house.health = 0.5;
-    _expect("a scorched building wants repair, a whole one does not", scorched_house.needs_repair() and not stone.needs_repair() or stone.health >= Building.REPAIR_BELOW);
+    _expect("a scorched building wants repair", scorched_house.needs_repair());
+    scorched_house.health = 1.0;
+    _expect("a whole one does not", not scorched_house.needs_repair());
+    scorched_house.health = 0.5;
     var fixer:Pawn = world.pawns[2];
     fixer.clear_carry();
     fixer.end_task(false);

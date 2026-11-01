@@ -54,6 +54,9 @@ func choose_task(p:Pawn) -> Task:
         if t == null and p.warmth < 0.35:
             wants = true;
             t = needs.warm_task(p);
+        if t == null and p.overheat > Heat.SEEK_SHADE:
+            wants = true;
+            t = needs.cool_task(p);
         if t != null:
             return t;
         if wants:
@@ -87,6 +90,9 @@ func choose_task(p:Pawn) -> Task:
 
     if Weather.is_storming() and not world.policies.is_on(&"storm_work") and world.shelter_for(p) != null:
         return needs.stay_home_task(p);       # a thunderstorm keeps everyone at home
+
+    if Heat.siesta_due(p):
+        return needs.stay_home_task(p);       # the worst of the midday heat keeps everyone indoors
 
     if p.is_adult():
         t = needs.care_task(p);

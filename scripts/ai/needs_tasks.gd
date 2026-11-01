@@ -324,3 +324,63 @@ func _camp_site(anchor:Vector2i) -> Vector2i:
                 best_score = score;
                 best = c;
     return best;
+
+# --------------------------------
+# Cooling off
+
+const COOL_SEARCH_R :int = 14;        # cells: how far they look for shade
+
+# Too hot: go to the nearest shade (their home, a well, or the foot of a tree) and rest there until they are cool again.
+func cool_task(p:Pawn) -> Task:
+    var rested:Callable = func(pw:Pawn, _dh:float) -> bool:
+        return pw.overheat <= Heat.SHADE_UNTIL or Weather.temperature < Heat.FROM - 4.0;
+    if Heat.cooling_spot(p):
+        var here:Task = Task.new(&"cool", "Resting in the shade", false);
+        here.work(rested, "Resting in the shade");
+        return here;
+    var here_c:Vector2 = Vector2(p.cell());
+    var home:Building = world.shelter_for(p);
+    var well:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_complete() and x.def.get("water", false));
+    var tree:Vector2i = _nearest_tree(p.cell());
+    var home_d:float = INF if home == null else Vector2(home.center_cell()).distance_to(here_c);
+    var well_d:float = INF if well == null else Vector2(well.center_cell()).distance_to(here_c);
+    var tree_d:float = INF if tree == Fires.NO_CELL else Vector2(tree).distance_to(here_c);
+    var t:Task = Task.new(&"cool", "Going to cool off", false);
+    if home_d <= well_d and home_d <= tree_d and home != null:
+        t.target = home;
+        t.move_rect(home.rect());
+        t.act(func(pw:Pawn) -> bool:
+            pw.go_inside(home, false);
+            return true);
+    elif well_d <= tree_d and well != null:
+        t.target = well;
+        t.move_rect(well.rect(), well.is_walkable());
+    elif tree != Fires.NO_CELL:
+        t.move_cell(_beside_cell(tree));
+    else:
+        return null;
+    t.work(rested, "Cooling off");
+    t.on_end = func(pw:Pawn) -> void:
+        pw.go_outside();
+    return t;
+
+func _nearest_tree(from:Vector2i) -> Vector2i:
+    for r in range(1, COOL_SEARCH_R + 1):
+        for dz in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if maxi(absi(dx), absi(dz)) != r:
+                    continue;
+                var c:Vector2i = from + Vector2i(dx, dz);
+                if world.terrain.in_bounds(c):
+                    var rn:ResourceNode = world.node_at[world.idx(c)];
+                    if rn != null and rn.is_tree() and _beside_cell(c) != Fires.NO_CELL:
+                        return c;
+    return Fires.NO_CELL;
+
+# A walkable cell next to a tree (they stand in its shade), or NO_CELL.
+func _beside_cell(c:Vector2i) -> Vector2i:
+    for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+        if world.nav.is_walkable(c + d):
+            return c + d;
+    return Fires.NO_CELL;

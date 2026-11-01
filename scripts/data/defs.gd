@@ -805,6 +805,10 @@ const POLICIES:Dictionary = {
         "name": "Work through thunderstorms", "default": false,
         "desc": "Citizens keep working outdoors while a thunderstorm rages. Off, everyone with a home goes indoors until it passes. (Lightning does no harm yet, so the only cost of working on is, later, what a storm will do.)",
     },
+    &"heat_work": {
+        "name": "Work through the heat", "default": false,
+        "desc": "Citizens keep working outdoors in the worst of the midday heat (from 38 C). Off, everyone with a home rests indoors from 11:00 to 17:00 while it lasts. Either way a citizen who gets too hot goes to cool off in the shade.",
+    },
     &"child_labor": {
         "name": "Child labor", "default": true,
         "desc": "Children (5 to 17) with no school to attend work as laborers at half speed. Forbidden, they stay home instead.",

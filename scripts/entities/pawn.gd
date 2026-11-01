@@ -18,9 +18,9 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
-const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"flee", &"fire", &"camp"];
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"flee", &"fire", &"camp", &"cool"];
 const FIRE_KINDS        :Array[StringName] = [&"flee", &"fire"];
-const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul", &"flee", &"fire"];
+const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul", &"flee", &"fire", &"cool"];
 
 const MALE_NAMES        :Array[String] = ["Aldric", "Bram", "Cedric", "Dunstan", "Edwin", "Godric", "Hal", "Osric", "Rowan", "Wystan", "Alden", "Tobin"];
 const FEMALE_NAMES      :Array[String] = ["Aelwen", "Bryony", "Cerys", "Edith", "Elfreda", "Hilda", "Isolde", "Maud", "Rowena", "Wren", "Tamsin", "Agnes"];
@@ -51,6 +51,7 @@ var tavern_until:float = 0.0;              # game hour the lift from the evening
 var illness     :float = 0.0;              # how sick: 0 is well, 1 is gravely ill (see Illness)
 var bucket      :bool = false;             # carrying a bucket of water to a fire (not saved)
 var burned_until:float = 0.0;              # game hour until which a death counts as burns (Fires)
+var overheat    :float = 0.0;              # 0 comfortable to 1 heatstroke (Heat)
 var immune_until:float = 0.0;              # game hour until which they cannot catch it again
 var care_until  :float = 0.0;              # game hour a healer's visit runs out
 var care_quality:float = 0.0;              # 1 when the healer had herbs, 0 when they only sat with them
@@ -135,7 +136,7 @@ func to_dict() -> Dictionary:
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
         "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
         "treat_item": treat_item, "treat_mood": treat_mood, "treat_until": treat_until, "treat_ready": treat_ready,
-        "tavern_day": tavern_day, "tavern_until": tavern_until, "illness": illness, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
+        "tavern_day": tavern_day, "tavern_until": tavern_until, "illness": illness, "overheat": overheat, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
         "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
@@ -169,6 +170,7 @@ func restore(w:World, d:Dictionary) -> void:
     tavern_day = d.get("tavern_day", -1);
     tavern_until = d.get("tavern_until", 0.0);
     illness = d.get("illness", 0.0);
+    overheat = d.get("overheat", 0.0);
     immune_until = d.get("immune_until", 0.0);
     care_until = d.get("care_until", 0.0);
     care_quality = d.get("care_quality", 0.0);
@@ -271,7 +273,7 @@ func stage_name() -> String:
 
 # How fast this citizen works compared with a prime-age adult.
 func work_efficiency() -> float:
-    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp) * mood_efficiency() * Illness.work_factor(self);
+    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp) * mood_efficiency() * Illness.work_factor(self) * Heat.work_factor(self);
 
 # Unhappy citizens work a little slower.
 func mood_efficiency() -> float:
@@ -307,7 +309,7 @@ func _update_needs(dh:float) -> void:
         return;
     var need_mult:float = Defs.BABY_NEED_MULT if is_baby() else 1.0;      # a carer feeds a baby (see Families)
     hunger = maxf(0.0, hunger - dh * need_mult / HUNGER_HOURS);
-    thirst = maxf(0.0, thirst - dh * need_mult / THIRST_HOURS);
+    thirst = maxf(0.0, thirst - dh * need_mult * Heat.thirst_mult(self) / THIRST_HOURS);
     if is_baby():
         energy = 1.0;
     elif sleeping:
@@ -344,6 +346,7 @@ func _update_needs(dh:float) -> void:
     if warmth < COLD_DAMAGE_BELOW:
         damage += (1.0 - warmth / COLD_DAMAGE_BELOW) / 24.0;
     damage += Illness.tick(self, dh);
+    damage += Heat.tick(self, dh);
     if damage > 0.0:
         health = maxf(0.0, health - damage * dh);
     else:
@@ -366,8 +369,10 @@ func _should_interrupt() -> bool:
         return true;          # the tavern opens: whoever is about their work comes along (once a day, see NeedsTasks.tavern_task)
     if Weather.is_storming() and not world.policies.is_on(&"storm_work") and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind) and world.shelter_for(self) != null:
         return true;          # a thunderstorm: whoever is out at their work goes home (see JobManager.choose_task)
+    if Heat.siesta_due(self) and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind):
+        return true;          # the worst of the midday heat: whoever is out at their work goes home (see JobManager.choose_task)
     if GameClock.total_hours >= _need_block_until:
-        if thirst < 0.2 or warmth < 0.2 or energy < 0.08:
+        if thirst < 0.2 or warmth < 0.2 or energy < 0.08 or overheat > Heat.CRITICAL:
             return true;
         if hunger < 0.15 and Stock.best_food() != &"":
             return true;
@@ -389,6 +394,8 @@ func _death_cause() -> String:
         return "exposure";
     if GameClock.total_hours < burned_until:
         return "burns";
+    if overheat >= 0.85:
+        return "heatstroke";
     if illness > 0.0:
         return "illness";
     return "poor health";
@@ -424,6 +431,8 @@ func happiness_factors() -> Array:
             kinds += 1;
     if illness > 0.0:
         f.append(["Ill", -0.2 * illness]);
+    if Heat.mood_loss(self) > 0.0:
+        f.append(["Too hot", -Heat.mood_loss(self)]);
     if GameClock.total_hours < tavern_until:
         f.append(["Evening at the tavern", Defs.TAVERN_MOOD]);
     if kinds >= 2:
@@ -721,6 +730,7 @@ func info_text() -> String:
     s += "Thirst  %s\n" % _bar(thirst);
     s += "Energy  %s\n" % _bar(energy);
     s += "Warmth  %s\n" % _bar(warmth);
+    s += Heat.describe(self);
     s += "Health  %s\n" % _bar(health);
     s += Illness.describe(self);
     if not is_baby():
