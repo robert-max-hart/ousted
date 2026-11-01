@@ -8,9 +8,9 @@ class_name JobManager extends TaskBase;
 
 # GATHERER is retired (laborers harvest what is marked, food included); the slot stays so old saves and the
 # experience of the "gathering" job keep their numbers, and reconcile() turns any left into laborers.
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN, FISHERMAN };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN, FISHERMAN, HEALER };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan", "Fisherman"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan", "Fisherman", "Healer"];
 const MAX_BUILDERS_PER_SITE :int = 4;
 const PRIORITY_WEIGHT       :float = 1.0e6;     # one build priority step outweighs any distance on the map
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
@@ -22,6 +22,7 @@ var burial:BurialTasks;
 var herd:HerdTasks;
 var trade:TradeTasks;
 var production:ProductionTasks;
+var health:HealthTasks;
 var targets:Dictionary = {};       # profession -> how many citizens the player wants in it
 
 func _init(w:World) -> void:
@@ -32,6 +33,7 @@ func _init(w:World) -> void:
     herd = HerdTasks.new(w);
     trade = TradeTasks.new(w);
     production = ProductionTasks.new(w);
+    health = HealthTasks.new(w);
 
 func choose_task(p:Pawn) -> Task:
     var t:Task = null;
@@ -66,10 +68,16 @@ func choose_task(p:Pawn) -> Task:
         world.drop_pile(p.carry_item, p.carry_amount, p.cell());    # nowhere to put it
         p.clear_carry();
 
+    if Illness.must_rest(p) and not night:
+        return needs.stay_home_task(p);       # the sick rest at home (a healer visits them there)
+
     if night or p.energy < 0.15:
         t = needs.sleep_task(p);
         if t != null:
             return t;
+
+    if Weather.is_storming() and not world.policies.is_on(&"storm_work") and world.shelter_for(p) != null:
+        return needs.stay_home_task(p);       # a thunderstorm keeps everyone at home
 
     if p.is_adult():
         t = needs.care_task(p);
@@ -81,6 +89,11 @@ func choose_task(p:Pawn) -> Task:
 
     if not night and p.wants_treat():
         t = needs.treat_task(p);
+        if t != null:
+            return t;
+
+    if not night and p.is_adult():
+        t = needs.tavern_task(p);
         if t != null:
             return t;
 
@@ -132,6 +145,8 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.FISHERMAN:
             return [production.fisherman_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.HEALER:
+            return [health.heal_task, production.supply_inputs_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.ARTISAN:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:

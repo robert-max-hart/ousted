@@ -78,8 +78,8 @@ func _update_targets() -> void:
     var night:bool = hour >= 21.0 or hour < 4.5;
     var calm:float = 1.0 - clampf(Weather.intensity * 1.4, 0.0, 1.0);
     var warm:float = clampf((Weather.temperature - 4.0) / 8.0, 0.0, 1.0);
-    targets[&"wind"] = clampf(0.25 + 0.45 * rain + 0.35 * snow + 0.15 * float(Weather.temperature < 0.0), 0.0, 1.0);
-    targets[&"rain"] = rain;
+    targets[&"wind"] = clampf(0.25 + 0.45 * rain + 0.35 * snow + 0.15 * float(Weather.temperature < 0.0) + 0.25 * Weather.storm_level, 0.0, 1.0);
+    targets[&"rain"] = clampf(rain * (1.0 + 0.25 * Weather.storm_level), 0.0, 1.0);
     targets[&"water"] = clampf(_look_at_water() * 3.0, 0.0, 1.0) * (1.0 - 0.5 * rain);
     targets[&"birds"] = (calm * warm) if (day and not Climate.is_dormant()) else 0.0;
     targets[&"crickets"] = (calm * clampf((Weather.temperature - 9.0) / 6.0, 0.0, 1.0)) if (night and not Climate.is_dormant()) else 0.0;

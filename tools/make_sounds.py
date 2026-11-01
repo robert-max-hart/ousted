@@ -172,6 +172,25 @@ def treefall(i):
     leaves = delay(env_exp(bandpass(noise(0.6), 2500, 7000), 0.3, 0.05), 1.05)
     return normalise(mix(shaped, gain(crack, 0.8), thump, gain(leaves, 0.5)), 0.8)
 
+def thunder(i):
+    """A crack, then a long rolling rumble that swells and dies away (about 4 s; two takes differ in length and rolls)."""
+    sec = 3.6 + 0.8 * i
+    n = n_samples(sec)
+    rumble = lowpass(noise(sec), 220 + 40 * i)
+    rolls = [rng.uniform(0.3, 1.8) for _ in range(3)]
+    shaped = []
+    for k, x in enumerate(rumble):
+        t = k / RATE
+        env = min(1.0, t / 0.25) * math.exp(-t * (0.7 + 0.1 * i))
+        swell = 0.55 + 0.45 * math.sin(t * 5.0 + rolls[0]) * math.sin(t * 2.3 + rolls[1])
+        shaped.append(x * env * swell * 3.0)
+    crack = env_exp(highpass(noise(0.3), 700), 0.06, 0.001)
+    boom = env_exp(lowpass(noise(1.2), 160), 0.5, 0.02)
+    return normalise(mix(shaped, gain(crack, 0.5), gain(boom, 1.2)), 0.85)
+
+for i in (1, 2):
+    write("sfx/thunder_%d.wav" % i, fade_edges(thunder(i)))
+
 for name, fn, count in (("chop", chop, 3), ("hammer", hammer, 3), ("pick", pick, 3), ("dig", dig, 2), ("rustle", rustle, 2), ("anvil", anvil, 2)):
     for i in range(1, count + 1):
         write("sfx/%s_%d.wav" % (name, i), fade_edges(fn(i)))

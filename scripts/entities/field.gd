@@ -429,7 +429,7 @@ func _pests_day() -> void:
             growing.append(i);
     if growing.is_empty():
         return;
-    var chance:float = PEST_OUTBREAK * guard * (1.0 + PEST_SAME_CROP * _same_crop_fields_near());
+    var chance:float = PEST_OUTBREAK * guard * GameRules.pest_share() * (1.0 + PEST_SAME_CROP * _same_crop_fields_near());
     if world.rng.randf() < chance:
         var pick:int = growing[world.rng.randi_range(0, growing.size() - 1)];
         if pests[pick] <= 0.0:

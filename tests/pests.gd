@@ -71,6 +71,13 @@ func _ready() -> void:
     _expect("outbreaks happen (%d in 600 days)" % plain, plain > 5);
     _expect("a scarecrow cuts them a lot (%d vs %d)" % [guarded, plain], guarded * 2 < plain);
     f.upgrades_done.erase(&"scarecrow");
+    # the Pests slider scales them
+    GameRules.pests = 0;
+    var none:int = _outbreaks(f, 600);
+    GameRules.pests = 4;
+    var many:int = _outbreaks(f, 600);
+    GameRules.pests = 2;
+    _expect("no pests at None (%d) and more at Extreme (%d against %d)" % [none, many, plain], none == 0 and many > plain);
     # the same crop in a nearby field makes an outbreak likelier
     var g:Field = world.place_building(&"field", o + Vector2i(10, 0), Vector2i(6, 6), true) as Field;
     g.set_crop(&"beans");

@@ -206,7 +206,7 @@ func done(id:StringName) -> bool:
 
 func _has_building(def_id:StringName, finished_only:bool) -> bool:
     for b in world.buildings:
-        if b.def_id == def_id and (not finished_only or b.is_complete()):
+        if (b.def_id == def_id or b.def.get("counts_as", &"") == def_id) and (not finished_only or b.is_complete()):
             return true;
     return false;
 

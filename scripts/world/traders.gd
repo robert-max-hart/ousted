@@ -32,7 +32,7 @@ const LUXURIES:Array[StringName] = [&"honey", &"spirits", &"pottery", &"clothes_
 const TYPES:Dictionary = {
     &"grain": {
         "name": "grain merchant", "weight": 3.0, "seeds": 1.0, "animals": 0.3, "sells": Vector2i(3, 5), "asks": Vector2i(3, 5), "mult": Vector2(0.8, 1.5),
-        "brings": [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"radish", &"lettuce"],
+        "brings": [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"radish", &"lettuce", &"herbs"],
         "wants": [&"tool_wood", &"tool_iron", &"wood", &"stone", &"iron", &"firewood", &"wool", &"clothes_wool", &"clothes_leather", &"pottery", &"manure", &"spirits"],
         "colors": [Color(0.78, 0.62, 0.2), Color(0.93, 0.87, 0.7), Color(0.5, 0.42, 0.2)],
     },
@@ -45,13 +45,13 @@ const TYPES:Dictionary = {
     &"herder": {
         "name": "herder", "weight": 2.0, "seeds": 0.5, "animals": 1.0, "sells": Vector2i(2, 4), "asks": Vector2i(3, 5), "mult": Vector2(0.9, 1.6),
         "brings": [&"wool", &"leather", &"meat", &"eggs", &"clothes_wool", &"clothes_leather", &"honey"],
-        "wants": [&"wheat", &"barley", &"beans", &"manure", &"firewood", &"wood", &"tool_wood", &"tool_iron", &"pottery", &"spirits", &"coal"],
+        "wants": [&"wheat", &"barley", &"beans", &"manure", &"firewood", &"wood", &"tool_wood", &"tool_iron", &"pottery", &"spirits", &"coal", &"herbs"],
         "colors": [Color(0.3, 0.5, 0.3), Color(0.93, 0.87, 0.7), Color(0.4, 0.3, 0.2)],
     },
     &"luxury": {
         "name": "fine goods caravan", "weight": 1.5, "seeds": 0.15, "animals": 0.0, "sells": Vector2i(3, 4), "asks": Vector2i(4, 6), "mult": Vector2(1.0, 1.6),
-        "brings": [&"honey", &"spirits", &"pottery", &"clothes_fine", &"clothes_wool", &"clothes_leather", &"silver", &"gold"],
-        "wants": [&"honey", &"spirits", &"pottery", &"clothes_fine", &"silver", &"gold", &"wool", &"leather", &"clothes_wool", &"clothes_leather"],
+        "brings": [&"honey", &"herbs", &"spirits", &"pottery", &"clothes_fine", &"clothes_wool", &"clothes_leather", &"silver", &"gold"],
+        "wants": [&"honey", &"herbs", &"spirits", &"pottery", &"clothes_fine", &"silver", &"gold", &"wool", &"leather", &"clothes_wool", &"clothes_leather"],
         "colors": [Color(0.5, 0.22, 0.5), Color(0.9, 0.78, 0.35), Color(0.34, 0.16, 0.38)],
     },
 };
@@ -72,8 +72,8 @@ const SEASON_PRICE:Dictionary = {
 const PRICE_NOTE:float = 0.1;       # the barter window marks an item as dear or cheap when its season moves it this far from normal
 
 # What merchants bring, and what they ask for: all of the types' lists together (trade values are in Defs.TRADE_VALUE).
-const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"eggs", &"hazelnuts", &"radish", &"lettuce", &"fish", &"honey", &"spirits", &"pottery", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel"];
-const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure"];
+const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"herbs", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"eggs", &"hazelnuts", &"radish", &"lettuce", &"fish", &"honey", &"spirits", &"pottery", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel"];
+const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure", &"herbs"];
 
 var world     :World;
 var merchant  :Merchant = null;
@@ -128,6 +128,8 @@ func on_day() -> void:
         return;
     if trading_post() == null or GameClock.day_index() - last_visit_day < MIN_GAP_DAYS:
         return;
+    if world.policies.is_on(&"quarantine") and world.illness.ill_count() > 0:
+        return;         # merchants are turned away while anyone is ill
     if world.rng.randf() < daily_chance():
         start_visit();
 
@@ -191,6 +193,7 @@ func _spawn(from:Vector2i, route:Array[Vector2i], st:int) -> void:
 
 func _on_arrived() -> void:
     visit["arrived"] = true;
+    world.illness.on_merchant_arrival();
     Sfx.ui(&"merchant");
     world.notify("The %s has reached the Trading Post. They will stay %d days." % [type_name(), visit["days_left"]]);
 

@@ -49,7 +49,7 @@ const BY_LABEL:Dictionary = {
     "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet",
     "Soil": &"soil", "Water": &"drop", "Slope": &"slope",
     "Laborer": &"person", "Builder": &"hammer", "Farmer": &"wheat", "Woodcutter": &"axe", "Miner": &"pick",
-    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish",
+    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"cross",
 };
 
 static func for_label(label:String) -> StringName:
@@ -66,7 +66,7 @@ static func has(id:StringName) -> bool:
     return texture(id) != null;
 
 # The stock icons: the top bar's figures and the idle mark.
-const STOCK_IDS:Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron", &"food", &"pop", &"idle", &"homeless"];
+const STOCK_IDS:Array[StringName] = [&"wood", &"firewood", &"coal", &"stone", &"iron", &"food", &"pop", &"idle", &"homeless", &"ill"];
 
 # Every button glyph that ships (the icon sheet test draws these).
 const IDS:Array[StringName] = [

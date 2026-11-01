@@ -24,7 +24,7 @@ func _ready() -> void:
     for kind in Defs.RESOURCE_NODES:
         var d:Dictionary = Defs.RESOURCE_NODES[kind];
         if d.get("forage", false):
-            ok = ok and d.has("fruit_seasons") and d.has("regrow_days") and d.get("regrows", false) and Defs.is_food(d["item"]);
+            ok = ok and d.has("fruit_seasons") and d.has("regrow_days") and d.get("regrows", false) and (Defs.is_food(d["item"]) or d["item"] == &"herbs");
     _expect("every forageable has seasons, a respawn rate and a food item", ok);
     # respawn per kind and season
     var th:Building = world.town_hall;

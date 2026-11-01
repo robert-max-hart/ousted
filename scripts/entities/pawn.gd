@@ -16,7 +16,7 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
-const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury"];
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern"];
 const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul"];
 
 const MALE_NAMES        :Array[String] = ["Aldric", "Bram", "Cedric", "Dunstan", "Edwin", "Godric", "Hal", "Osric", "Rowan", "Wystan", "Alden", "Tobin"];
@@ -43,6 +43,12 @@ var treat_item  :StringName = &"";         # the treat whose boost is running (n
 var treat_mood  :float = 0.0;              # that boost
 var treat_until :float = 0.0;              # game hour it wears off
 var treat_ready :float = 0.0;              # game hour from which they may want another
+var tavern_day  :int = -1;                 # the day they last went to the tavern
+var tavern_until:float = 0.0;              # game hour the lift from the evening out wears off
+var illness     :float = 0.0;              # how sick: 0 is well, 1 is gravely ill (see Illness)
+var immune_until:float = 0.0;              # game hour until which they cannot catch it again
+var care_until  :float = 0.0;              # game hour a healer's visit runs out
+var care_quality:float = 0.0;              # 1 when the healer had herbs, 0 when they only sat with them
 var _unhappy_hours:float = 0.0;            # in a row, below Defs.LEAVE_BELOW
 
 # needs, 0..1 (1 = fully satisfied)
@@ -74,6 +80,7 @@ var _failed         :Dictionary = {};       # target -> game hour it can be retr
 var _need_block_until:float = -1.0;
 var _rig            :PawnRig;                 # the body: limbs, tools and carried goods, posed from _animate (visual only)
 var _last_phase     :float = 0.0;             # where the swing was last frame (a strike sounds when it passes the bottom)
+var _ill_mark       :Sprite3D;                # a green cross over a sick citizen
 var _idle_mark      :Sprite3D;                # a small icon over a citizen with nothing to do (UIIcons)
 var _anim_t         :float = 0.0;
 var _work_now       :bool = false;            # what the last frame did, for the animation
@@ -123,6 +130,7 @@ func to_dict() -> Dictionary:
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
         "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
         "treat_item": treat_item, "treat_mood": treat_mood, "treat_until": treat_until, "treat_ready": treat_ready,
+        "tavern_day": tavern_day, "tavern_until": tavern_until, "illness": illness, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
         "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
@@ -153,6 +161,12 @@ func restore(w:World, d:Dictionary) -> void:
     pair_ready_hour = d.get("pair_ready_hour", 0.0);
     conceive_ready_hour = d.get("conceive_ready_hour", 0.0);
     mood = d.get("mood", Defs.MOOD_BASE);
+    tavern_day = d.get("tavern_day", -1);
+    tavern_until = d.get("tavern_until", 0.0);
+    illness = d.get("illness", 0.0);
+    immune_until = d.get("immune_until", 0.0);
+    care_until = d.get("care_until", 0.0);
+    care_quality = d.get("care_quality", 0.0);
     treat_item = d.get("treat_item", &"");
     treat_mood = d.get("treat_mood", 0.0);
     treat_until = d.get("treat_until", 0.0);
@@ -185,6 +199,8 @@ func _process(delta:float) -> void:
         if task == null:
             status = "Idle";
             return;
+        if indoors and task.kind != &"stay_home":
+            go_outside();          # (staying home leaves the citizen inside: any other task starts from the doorstep)
     _run_task(delta * GameClock.speed(), dh);
     position.y = world.stand_y(position.x, position.z);
 
@@ -250,7 +266,7 @@ func stage_name() -> String:
 
 # How fast this citizen works compared with a prime-age adult.
 func work_efficiency() -> float:
-    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp) * mood_efficiency();
+    return (Defs.age_efficiency(age) if is_adult() else Defs.CHILD_EFFICIENCY) * (1.0 + general_xp) * mood_efficiency() * Illness.work_factor(self);
 
 # Unhappy citizens work a little slower.
 func mood_efficiency() -> float:
@@ -319,12 +335,27 @@ func _update_needs(dh:float) -> void:
         damage += 1.0 / 18.0;
     if warmth < COLD_DAMAGE_BELOW:
         damage += (1.0 - warmth / COLD_DAMAGE_BELOW) / 24.0;
+    damage += Illness.tick(self, dh);
     if damage > 0.0:
         health = maxf(0.0, health - damage * dh);
     else:
         health = minf(1.0, health + dh / 48.0);
 
+# An adult who has not yet decided about the tavern tonight, in its hours, with a tavern standing, empty-handed.
+func tavern_due() -> bool:
+    var h:float = GameClock.hour();
+    if not is_adult() or tavern_day == GameClock.day_index() or illness > 0.0 or h < Defs.TAVERN_FROM or h >= Defs.TAVERN_TO or energy < 0.3:
+        return false;
+    for b in world.buildings:
+        if b.def.get("tavern", false) and b.is_complete():
+            return true;
+    return false;
+
 func _should_interrupt() -> bool:
+    if carry_amount == 0 and tavern_due() and task.kind != &"tavern":
+        return true;          # the tavern opens: whoever is about their work comes along (once a day, see NeedsTasks.tavern_task)
+    if Weather.is_storming() and not world.policies.is_on(&"storm_work") and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind) and world.shelter_for(self) != null:
+        return true;          # a thunderstorm: whoever is out at their work goes home (see JobManager.choose_task)
     if GameClock.total_hours >= _need_block_until:
         if thirst < 0.2 or warmth < 0.2 or energy < 0.08:
             return true;
@@ -346,6 +377,8 @@ func _death_cause() -> String:
         return "starvation";
     if warmth < COLD_DAMAGE_BELOW:
         return "exposure";
+    if illness > 0.0:
+        return "illness";
     return "poor health";
 
 func happiness() -> float:
@@ -377,6 +410,10 @@ func happiness_factors() -> Array:
     for item in Defs.ITEMS:
         if Defs.is_food(item) and Stock.amount(item) > 0:
             kinds += 1;
+    if illness > 0.0:
+        f.append(["Ill", -0.2 * illness]);
+    if GameClock.total_hours < tavern_until:
+        f.append(["Evening at the tavern", Defs.TAVERN_MOOD]);
     if kinds >= 2:
         f.append(["Varied diet", 0.05 if kinds == 2 else 0.1]);
     if treat_boost_now() > 0.0:
@@ -663,6 +700,7 @@ func info_text() -> String:
     s += "Energy  %s\n" % _bar(energy);
     s += "Warmth  %s\n" % _bar(warmth);
     s += "Health  %s\n" % _bar(health);
+    s += Illness.describe(self);
     if not is_baby():
         s += "Happy   %s\n" % _bar(happiness());
         for f in happiness_factors():
@@ -690,7 +728,8 @@ func _animate(delta:float) -> void:
     _work_now = false;
     _move_now = false;
     _eat_now = &"";
-    _idle_mark.visible = is_idle();
+    _idle_mark.visible = is_idle() and illness <= 0.0;
+    _ill_mark.visible = illness > 0.0 and not indoors;
     _rig.set_stage(age, is_baby(), is_adult(), age >= Defs.OLD_AGE_EFFICIENCY[0][0]);
     _rig.set_mood(0.55 if is_baby() else mood);
     var moved:float = Vector2(position.x - _last_pos.x, position.z - _last_pos.z).length();
@@ -795,6 +834,16 @@ func _build_visual(rng:RandomNumberGenerator) -> void:
     _idle_mark.position = Vector3(0, 1.65, 0);
     _idle_mark.visible = false;
     add_child(_idle_mark);
+    _ill_mark = Sprite3D.new();       # a green cross over the sick
+    _ill_mark.texture = UIIcons.texture(&"ill");
+    _ill_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED;
+    _ill_mark.pixel_size = 0.02;
+    _ill_mark.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR;
+    _ill_mark.shaded = false;
+    _ill_mark.no_depth_test = true;
+    _ill_mark.position = Vector3(0, 1.65, 0);
+    _ill_mark.visible = false;
+    add_child(_ill_mark);
     _rig.set_carry(carry_item, carry_amount);
 
 func _update_carry_visual() -> void:

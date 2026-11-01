@@ -132,6 +132,21 @@ def make_mushrooms():
     picked.write("mushroom_picked", OUT)
 
 
+def make_herbs():
+    # a low clump of grey-green leaves with a few spikes of lilac flowers
+    herb = Mesh()
+    for k in range(7):
+        a = k * 2.4
+        herb.limb(v(0, 0, 0), v(math.cos(a) * 0.17, 0.3 + 0.05 * (k % 3), math.sin(a) * 0.17), 0.018, 0.012, (0.46, 0.62, 0.4), segs=4)
+        herb.ball(math.cos(a) * 0.19, 0.3 + 0.05 * (k % 3), math.sin(a) * 0.19, 0.07, 0.035, 0.07, (0.5, 0.68, 0.44), segs=5, rings=3)
+    for k in range(4):
+        a = k * 1.7 + 0.5
+        x, z = math.cos(a) * 0.08, math.sin(a) * 0.08
+        herb.limb(v(x, 0, z), v(x, 0.46 + 0.04 * k, z), 0.012, 0.008, (0.4, 0.55, 0.34), segs=4)
+        herb.ball(x, 0.5 + 0.04 * k, z, 0.035, 0.07, 0.035, (0.66, 0.5, 0.82), segs=5, rings=3)
+    herb.write("herb_ripe", OUT)
+
+
 # --------------------------------
 # Orchard trees: (trunk height, trunk radius, crown blobs [(x, y, z, rx, ry, rz)], fruit (count, rx, ry))
 
@@ -173,5 +188,6 @@ make_ore()
 make_shrubs()
 make_hazel()
 make_mushrooms()
+make_herbs()
 make_orchard()
 print("wrote", len([f for f in os.listdir(OUT) if f.endswith(".obj")]), "plant parts")

@@ -210,6 +210,52 @@ def cottage(name, sx, sz, h, pitch, wall, roof_kind="tiles", door_w=None, window
 
 # house: plaster walls, timber, shutters, a brick chimney and lit windows
 cottage("house", 3, 3, 1.7, 0.55, "plaster", windows=2, side_windows=1, shutters=True, timber=True, home=True, chimney=True)
+# stone house: the same plan in dressed stone with corner quoins, a darker slate roof, no timber frame
+cottage("stone_house", 3, 3, 1.7, 0.55, "stone", windows=2, side_windows=1, shutters=True, quoins=True, home=True, chimney=True, footing=0.0)
+# root cellar: a stone front wall with an arched door set into a grassy mound over a low stone kerb
+def root_cellar(name, sx, sz, h):
+    bx, bz = sx - 0.5, sz - 0.5
+    hx, hz = bx / 2, bz / 2
+    shift = -h / 2
+    aw, spring = 0.5, 0.42                               # the arch: half-width and the height it springs from
+    ah = lambda x: spring + math.sqrt(max(0.0, aw * aw - x * x))
+    step = 0.1 if not LOW else 0.2
+    body = Mesh()
+    cols = int(round(2 * hx / step))
+    for i in range(cols):                                # the front wall, in columns so the arch can be cut out of it
+        x = -hx + (i + 0.5) * step
+        lo = ah(x) if abs(x) < aw else 0.0
+        if h - lo > 0.01:
+            body.box(x, shift + (lo + h) / 2, hz, step + 0.001, h - lo, 0.26, shade(1.0))
+    ring = int(round(2 * (aw + 0.14) / step))
+    for i in range(ring):                                # the arch ring: pale stones standing proud of the wall
+        x = -(aw + 0.14) + (i + 0.5) * step
+        top = ah(x) if abs(x) < aw else spring
+        if abs(x) >= aw:
+            body.box(x, shift + spring / 2 + 0.02, hz + 0.03, step, spring + 0.04, 0.3, QUOIN)
+        elif abs(x) < aw:
+            body.box(x, shift + top + 0.07, hz + 0.03, step + 0.001, 0.14, 0.3, QUOIN if i % 2 == 0 else shade(0.9))
+    for sx_ in (-1, 1):                                  # the low kerb the mound sits on: side walls and the back
+        body.box(sx_ * hx, shift + 0.22, 0, 0.24, 0.44, bz, shade(0.95))
+    body.box(0, shift + 0.22, -hz, bx, 0.44, 0.24, shade(0.95))
+    body.box(0, shift + 0.05, hz + 0.32, 2 * aw + 0.6, 0.1, 0.42, STONE_BASE)       # a step
+    body.write("building_%s_body" % name, OUT)
+    roof = Mesh()                                        # the mound: a grassy dome, tallest over the back, running into the wall
+    roof.ball(0, 0.36, -0.12, hx + 0.04, h + 0.15 - 0.36, hz + 0.12, shade(1.0), segs=16, rings=8, wobble=0.015)
+    roof.write("building_%s_roof" % name, OUT)
+    door = Mesh()                                        # an arched door, cut to the same curve, with two iron bands and a handle
+    dcols = int(round(2 * aw / 0.1))
+    for i in range(dcols):
+        x = -aw + (i + 0.5) * 0.1
+        top = ah(x)
+        door.box(x, top / 2, hz + 0.045, 0.101, top, 0.06, DOOR)
+    for yb in ((0.3, 0.7) if not LOW else ()):
+        w = 2 * math.sqrt(max(0.0, aw * aw - max(0.0, yb - spring) ** 2)) if yb > spring else 2 * aw
+        door.box(0, yb, hz + 0.085, w - 0.04, 0.05, 0.02, IRON)
+    door.box(aw * 0.55, 0.5, hz + 0.1, 0.07, 0.07, 0.04, (0.7, 0.6, 0.3))
+    door.write("building_%s_door" % name, OUT)
+
+root_cellar("root_cellar", 3, 3, 1.3)
 # shack: bare planks, a shallow roof, no frills
 cottage("shack", 2, 2, 1.3, 0.3, "planks", windows=0, footing=0.0, step=False, overhang=0.12, thickness=0.05, home=False)
 # forager's hut: a steep thatched roof coming down low, a round-ended look
@@ -225,6 +271,10 @@ cottage("tailor", 3, 3, 1.7, 0.55, "planks", windows=2, timber=True, sign=True, 
 # distillery and potter: stone workshops
 cottage("still", 3, 3, 1.6, 0.55, "stone", windows=1, quoins=True, footing=0.0, door_w=0.9)
 cottage("pottery", 3, 3, 1.5, 0.55, "stone", windows=2, quoins=True, footing=0.0, door_w=0.9)
+# herbalist: a small plaster cottage with shutters and a hanging sign
+cottage("herbalist", 3, 3, 1.5, 0.6, "plaster", windows=2, shutters=True, timber=True, sign=True, footing=0.08)
+# tavern: a big timber-framed inn with a hanging sign and a lit window row
+cottage("tavern", 4, 3, 2.0, 0.6, "planks", windows=3, side_windows=1, shutters=True, timber=True, sign=True, home=True, footing=0.15)
 # apiary: a low shed
 cottage("apiary", 2, 2, 0.7, 0.25, "planks", windows=0, footing=0.0, step=False, overhang=0.15, thickness=0.05, door_w=0.4)
 

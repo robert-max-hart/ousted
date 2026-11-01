@@ -16,12 +16,15 @@ var _snow       :CPUParticles3D;
 var _water_mat  :ShaderMaterial;
 var snow_cover :float = 0.0;            # how much of the ground is under snow, 0 to 1: it builds in snowfall and melts in warm weather
 var edge_clouds:MapEdgeClouds;         # the cloud bank and cloud sea round the map's edge
+var _flash      :float = 0.0;          # a lightning flash fading out (0 to 1)
+var _bolt       :MeshInstance3D;
 var _fx_clock:float = 0.0;           # advances with the game's speed (World.fx_speed), so the water stops when paused
 
 func _init(w:World) -> void:
     world = w;
 
 func _process(delta:float) -> void:
+    _flash = maxf(0.0, _flash - delta * 6.0);
     _update_lighting();
     _update_precip();
     _update_water(delta);
@@ -234,7 +237,8 @@ func _update_lighting() -> void:
     var b:Array = LIGHT_KEYS[k + 1];
     var t:float = smoothstep(0.0, 1.0, (h - a[0]) / (b[0] - a[0]));
     var wet:float = Weather.intensity;
-    var gloom:float = lerpf(1.0, 0.4, wet);
+    var storm:float = Weather.storm_level;
+    var gloom:float = lerpf(1.0, 0.4, wet) * lerpf(1.0, 0.6, storm);        # a thunderstorm is darker still
 
     # the sun crosses the sky by day and the moon by night; each light has its own energy curve (SUN_KEYS, MOON_KEYS), and the
     # curves overlap at dusk and dawn, so one fades out while the other fades in and nothing ever swaps places
@@ -249,7 +253,7 @@ func _update_lighting() -> void:
     var sun_now:Array = _keyed(SUN_KEYS, h);
     var moon_now:Array = _keyed(MOON_KEYS, h);
     _sun.light_color = sun_now[0];
-    _sun.light_energy = sun_now[1] * gloom;
+    _sun.light_energy = sun_now[1] * gloom + _flash * 0.8;
     _moon.light_energy = moon_now[1] * gloom;
     _sun.visible = _sun.light_energy > 0.005;
     _moon.visible = _moon.light_energy > 0.005;
@@ -258,12 +262,14 @@ func _update_lighting() -> void:
     var horizon:Color = (a[6] as Color).lerp(b[6], t);
     top = top.lerp(RAIN_GREY * top.get_luminance() * 2.0, 0.6 * wet);
     horizon = horizon.lerp(RAIN_GREY * horizon.get_luminance() * 1.4, 0.6 * wet);
+    top = top.darkened(0.35 * storm).lerp(Color(0.9, 0.93, 1.0), 0.7 * _flash);             # (and a flash lights the whole sky)
+    horizon = horizon.darkened(0.3 * storm).lerp(Color(0.9, 0.93, 1.0), 0.6 * _flash);
     _sky.sky_top_color = top;
     _sky.sky_horizon_color = horizon;
     _sky.ground_horizon_color = horizon;
     _sky.ground_bottom_color = horizon.darkened(0.5);
     _env.ambient_light_color = (a[3] as Color).lerp(b[3], t);
-    _env.ambient_light_energy = lerpf(a[4], b[4], t) * lerpf(1.0, 0.72, wet);       # rain and snow dim the sky light too, not only the sun
+    _env.ambient_light_energy = lerpf(a[4], b[4], t) * lerpf(1.0, 0.72, wet) * lerpf(1.0, 0.85, storm) + _flash * 2.2;       # rain and snow dim the sky light too, not only the sun; a flash lights up the ground
     _env.fog_light_color = horizon;
     if edge_clouds != null:
         edge_clouds.set_tint(horizon);
@@ -319,6 +325,7 @@ func setup_weather_fx(host:Node3D = null) -> void:
         _rain.preprocess = _rain.lifetime;
         _snow.preprocess = _snow.lifetime;
     Weather.weather_changed.connect(_on_weather_changed);
+    Weather.lightning.connect(_on_lightning);
     _on_weather_changed();
 
 const RAIN_ALPHA :float = 0.45;
@@ -330,7 +337,7 @@ func _on_weather_changed() -> void:
     if _rain == null:
         return;
     var snow_f:float = Weather.snow_fraction();
-    var rain_n:int = maxi(1, int(RAIN_PARTICLES * (1.0 - snow_f)));
+    var rain_n:int = maxi(1, int(RAIN_PARTICLES * (1.0 - snow_f) * (1.7 if Weather.storm else 1.0)));
     var snow_n:int = maxi(1, int(SNOW_PARTICLES * snow_f));
     if absi(rain_n - _rain.amount) > 50:
         _rain.amount = rain_n;
@@ -349,5 +356,64 @@ func _update_precip() -> void:
     _snow.emitting = wet > 0.01 and snow_f > 0.0;
     var rain_mat:StandardMaterial3D = (_rain.mesh as BoxMesh).material as StandardMaterial3D;
     var snow_mat:StandardMaterial3D = (_snow.mesh as BoxMesh).material as StandardMaterial3D;
-    rain_mat.albedo_color.a = RAIN_ALPHA * wet;
+    rain_mat.albedo_color.a = RAIN_ALPHA * wet * (1.0 + 0.35 * Weather.storm_level);
     snow_mat.albedo_color.a = SNOW_ALPHA * wet;
+
+# --------------------------------
+# Lightning
+
+const BOLT_REACH :float = 26.0;        # metres round the point the camera looks at
+const BOLT_SECONDS:float = 0.22;
+
+# A flash (twice, a moment apart), a bolt standing on the ground near the view, and the thunder after the time sound takes to arrive.
+func _on_lightning(strength:float) -> void:
+    if _fx_host == null or not is_inside_tree():
+        return;
+    _flash = strength;
+    var at:Vector3 = _fx_host.global_position;
+    var spot:Vector2 = Vector2(at.x, at.z) + Vector2(randf_range(-BOLT_REACH, BOLT_REACH), randf_range(-BOLT_REACH, BOLT_REACH));
+    var ground:float = world.terrain.height_at(spot.x, spot.y) if world.terrain != null else 0.0;
+    _show_bolt(Vector3(spot.x, ground, spot.y));
+    get_tree().create_timer(0.12).timeout.connect(func() -> void: _flash = maxf(_flash, strength * 0.7));
+    var distance:float = at.distance_to(Vector3(spot.x, ground, spot.y));
+    var delay:float = clampf(distance / 90.0, 0.2, 1.6);           # (the speed of sound, much sped up)
+    get_tree().create_timer(delay).timeout.connect(func() -> void: Sfx.ui(&"thunder"));
+
+# A jagged white line from the clouds to the ground, shown for a fraction of a second.
+func _show_bolt(ground:Vector3) -> void:
+    if _bolt == null:
+        _bolt = MeshInstance3D.new();
+        _bolt.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
+        var m:StandardMaterial3D = StandardMaterial3D.new();
+        m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED;
+        m.albedo_color = Color(0.92, 0.95, 1.0);
+        m.cull_mode = BaseMaterial3D.CULL_DISABLED;
+        _bolt.material_override = m;
+        _bolt.mesh = ImmediateMesh.new();
+        add_child(_bolt);
+    var mesh:ImmediateMesh = _bolt.mesh as ImmediateMesh;
+    mesh.clear_surfaces();
+    var top:float = ground.y + 70.0;
+    var path:Array[Vector3] = [];
+    var steps:int = 10;
+    var start:Vector3 = Vector3(ground.x + randf_range(-6.0, 6.0), top, ground.z + randf_range(-6.0, 6.0));
+    for i in range(steps + 1):
+        var t:float = float(i) / steps;
+        var q:Vector3 = start.lerp(ground, t);
+        if i > 0 and i < steps:
+            q += Vector3(randf_range(-2.5, 2.5), 0.0, randf_range(-2.5, 2.5)) * (1.0 - t * 0.4);
+        path.append(q);
+    mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES);        # two crossed ribbons, so the bolt shows from every side
+    for side in [Vector3.RIGHT, Vector3.BACK]:
+        for i in range(steps):
+            var w0:float = lerpf(0.45, 0.18, float(i) / steps);
+            var w1:float = lerpf(0.45, 0.18, float(i + 1) / steps);
+            var a:Vector3 = path[i];
+            var b:Vector3 = path[i + 1];
+            for v in [a - side * w0, a + side * w0, b + side * w1, a - side * w0, b + side * w1, b - side * w1]:
+                mesh.surface_add_vertex(v);
+    mesh.surface_end();
+    _bolt.visible = true;
+    get_tree().create_timer(BOLT_SECONDS).timeout.connect(func() -> void:
+        if is_instance_valid(_bolt):
+            _bolt.visible = false);

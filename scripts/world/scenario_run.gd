@@ -47,7 +47,7 @@ func progress(world:World, i:int) -> Vector2i:
         &"building":
             var n:int = 0;
             for b in world.buildings:
-                if b.def_id == g["id"] and b.is_complete():
+                if (b.def_id == g["id"] or b.def.get("counts_as", &"") == g["id"]) and b.is_complete():
                     n += 1;
             return Vector2i(n, target);
         &"trade":

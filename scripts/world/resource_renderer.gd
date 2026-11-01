@@ -264,6 +264,9 @@ func _make_plant_layers(trunk_color:Color) -> void:
     var ripe:ArrayMesh = ArrayMesh.new();
     _add_surface(ripe, _plant("mushroom_ripe"), plain);
     _layers[&"mushroom"] = ChunkedLayer.new(self, ripe);
+    var herb:ArrayMesh = ArrayMesh.new();
+    _add_surface(herb, _plant("herb_ripe"), plain);
+    _layers[&"herb"] = ChunkedLayer.new(self, herb);
     var picked:ArrayMesh = ArrayMesh.new();            # picked: just the stumps left in the ground
     _add_surface(picked, _plant("mushroom_picked"), plain);
     _layers[PICKED_MUSHROOM] = ChunkedLayer.new(self, picked);

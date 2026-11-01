@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dvm8xp4d5yu3b"
+path="res://.godot/imported/building_herbalist_body.obj-d5ef08b90de546a07d93909f792289be.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_herbalist_body.obj-d5ef08b90de546a07d93909f792289be.mesh"]
+
+source_file="res://assets/models/buildings/building_herbalist_body.obj"
+dest_files=["res://.godot/imported/building_herbalist_body.obj-d5ef08b90de546a07d93909f792289be.mesh", "res://.godot/imported/building_herbalist_body.obj-d5ef08b90de546a07d93909f792289be.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

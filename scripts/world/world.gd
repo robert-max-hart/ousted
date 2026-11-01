@@ -49,6 +49,7 @@ var seeds       :Seeds = Seeds.new();       # the crops that can be sown (starti
 var ledger      :Ledger = Ledger.new();
 var traders     :Traders;                  # merchant visits (needs a Trading Post)
 var families    :Families;
+var illness     :Illness;
 var bodies      :Array[Body] = [];
 var child_labor_share:float = 0.0;   # share of the children working right now (0 when the policy forbids it)
 var _next_body_id:int = 1;
@@ -210,6 +211,7 @@ func _ready() -> void:
     add_child(_ground);
     jobs = JobManager.new(self);
     families = Families.new(self);
+    illness = Illness.new(self);
     policies.changed.connect(jobs.on_policy_changed);
 
     await _step(0.5, "Restoring your colony" if loading else "Planting the forests");
@@ -258,6 +260,8 @@ func _ready() -> void:
     GameClock.day_changed.connect(_on_day);
     GameClock.season_changed.connect(_on_season);
     Weather.drought_changed.connect(_on_drought);
+    Weather.storm_changed.connect(_on_storm);
+    Weather.snap_changed.connect(_on_snap);
     _apply_season(GameClock.season());
     if awaiting_start:
         tools.begin_start_mode();
@@ -319,6 +323,8 @@ func _spawn_nature() -> void:
                 add_node(&"rock", c);             # loose surface stone on open ground (twice what it was originally)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
                 add_node(&"mushroom", c);         # damp patches among the trees
+            elif slope < 1.0 and f > -0.1 and f < 0.3 and r > 0.486 and r < 0.514:
+                add_node(&"herb", c);             # healing herbs in the meadows at the forest edge
             elif slope < 1.0 and f > -0.3 and f <= -0.1 and r > 0.6 and r < 0.64:
                 add_node(&"hazel", c);            # groves on the open ground beside the woods
     renderer.mark_dirty();
@@ -424,6 +430,19 @@ func _on_drought(on:bool) -> void:
     notify("A drought begins: no rain, and the ground dries fast. Fields away from water need watering." if on else "The drought has broken.");
     if on:
         Sfx.ui(&"drought");
+
+func _on_snap(dir:int, on:bool) -> void:
+    if is_backdrop:
+        return;
+    if on:
+        notify("A heat wave begins: it is much hotter than the season, food spoils faster and the ground dries out." if dir > 0 else "A cold snap begins: it is much colder than the season. Mind the fuel, and young crops may be caught by frost.");
+    else:
+        notify("The heat wave has passed." if dir > 0 else "The cold snap has passed.");
+
+func _on_storm(on:bool) -> void:
+    if is_backdrop:
+        return;
+    notify("A thunderstorm rolls in. Citizens go indoors until it passes." if on else "The thunderstorm has passed.");
 
 func _update_wetness() -> void:
     wetness += 0.03 * Weather.intensity;
@@ -833,6 +852,10 @@ func _on_hour(h:int) -> void:
                 Sfx.at(&"bell", b.global_position + Vector3(0, 2.0, 0), 0.0, -4.0, 55.0);      # the school bell, at the start and the end of lessons
     jobs.reconcile();
     families.on_hour();
+    illness.on_hour();
+    for b in buildings:
+        if b.def.get("tavern", false):
+            b.update_windows();
     for b in buildings.duplicate():
         if b.def.get("temporary", false) and b.is_complete() and b.is_empty():
             remove_building(b, false);      # the supply cart, once emptied
@@ -902,6 +925,7 @@ func _on_day(_d:int) -> void:
     for b in buildings:
         b.on_day();
     families.on_day();
+    illness.on_day();
     if _spoiled_today >= 5:
         notify(_spoilage_report());
     _spoiled_today = 0;

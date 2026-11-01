@@ -40,7 +40,7 @@ func forager_task(p:Pawn) -> Task:
             var only:StringName = kind;
             t = harvest_node_task(p, func(rn:ResourceNode) -> bool:
                 return rn.is_forageable() and rn.is_mature() and in_radius(b, rn.cell) and b.settings.get("forage_%s" % rn.kind, true) \
-                    and (only == &"" or rn.kind == only));
+                    and (only == &"" or rn.kind == only) and (rn.kind != &"herb" or herbs_wanted(b)));
             if t != null:
                 break;
         if t == null and b.has_upgrade(&"cultivation"):
@@ -88,7 +88,7 @@ func fisherman_task(p:Pawn) -> Task:
         return t;
     return null;
 
-const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel"];
+const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel", &"herb"];
 
 # The wild foods a hut's foragers try in turn: each is "pick only this kind", and &"" at the end means anything
 # switched on (the nearest). The hut's "Pick first" choice is Nearest, What we have least of, or one food.
@@ -96,7 +96,7 @@ func _forage_order(b:Building) -> Array[StringName]:
     var order:Array[StringName] = [];
     var pref:int = b.settings.get("forage_pref", 0);
     if pref == 1:
-        var kinds:Array[StringName] = FORAGE_KINDS.filter(func(k:StringName) -> bool: return b.settings.get("forage_%s" % k, true));
+        var kinds:Array[StringName] = FORAGE_KINDS.filter(func(k:StringName) -> bool: return k != &"herb" and b.settings.get("forage_%s" % k, true));
         kinds.sort_custom(func(a:StringName, c:StringName) -> bool:
             return Stock.amount(Defs.RESOURCE_NODES[a]["item"]) < Stock.amount(Defs.RESOURCE_NODES[c]["item"]));
         order.append_array(kinds);
@@ -104,6 +104,11 @@ func _forage_order(b:Building) -> Array[StringName]:
         order.append(FORAGE_KINDS[pref - 2]);
     order.append(&"");
     return order;
+
+# Herbs are picked only while the colony holds fewer than the hut's cap (0 = no cap).
+func herbs_wanted(b:Building) -> bool:
+    var cap:int = b.production_cap(&"herbs");
+    return cap <= 0 or Stock.amount(&"herbs") < cap;
 
 const SOW_PER_KIND:int = 18;       # a hut sows no more of a kind than this within its radius
 

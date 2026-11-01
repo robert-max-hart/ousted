@@ -255,7 +255,7 @@ static func _build_model(b:Building, bh:float, body_mat:Material = null, roof_ma
     var roof:Mesh = BuildingVisuals._model(b, "roof");
     if roof != null:
         if roof_mat == null:
-            roof_mat = SurfaceTextures.roof_material(b.def.get("roof", Color.DARK_RED), true);
+            roof_mat = SurfaceTextures.snowy_material(b.def.get("roof_texture", &"shingle"), b.def.get("roof", Color.DARK_RED), true);
         b.set_roof(b._add_mesh(roof, roof_mat, Vector3.ZERO));
     var door:Mesh = BuildingVisuals._model(b, "door");
     if door != null:

@@ -69,6 +69,43 @@ func treat_task(p:Pawn) -> Task:
             s.release_out(item, 1);
     return t;
 
+# An evening at the tavern: adults go once a day (about half of them on a given evening) between 17:00 and 20:00, spend an
+# hour and a half there and come out a little happier; with spirits in the tavern's store, one who is ready for a treat drinks one.
+func tavern_task(p:Pawn) -> Task:
+    var today:int = GameClock.day_index();
+    if not p.tavern_due():
+        return null;
+    p.tavern_day = today;         # decided for tonight, whatever comes of it
+    if hash(Vector2i(p.get_instance_id() % 100003, today)) % 100 >= Defs.TAVERN_SHARE:
+        return null;              # not tonight
+    var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_complete() and x.def.get("tavern", false) and not p.has_failed(x) and _patrons(x) < x.def.get("patrons", 10));
+    if b == null:
+        return null;
+    var t:Task = Task.new(&"tavern", "Going to the tavern", false);
+    t.target = b;
+    t.move_rect(b.rect(), false);
+    t.act(func(pw:Pawn) -> bool:
+        pw.go_inside(b, false);
+        return true);
+    t.work_for(Defs.TAVERN_STAY, "At the tavern", func(pw:Pawn) -> void:
+        pw.tavern_until = GameClock.total_hours + Defs.TAVERN_MOOD_HOURS;
+        if world.policies.is_on(&"treats") and b.input_amount(&"spirits") > 0 and pw.wants_treat():
+            b.take_input(&"spirits", 1);
+            pw.enjoy_treat(&"spirits", Defs.ITEMS[&"spirits"]["treat"]);
+        pw.go_outside());
+    t.on_cancel = func(pw:Pawn) -> void:
+        if pw.indoors and is_same(pw.shelter, b):
+            pw.go_outside();
+    return t;
+
+func _patrons(b:Building) -> int:
+    var n:int = 0;
+    for q in world.pawns:
+        if q.task != null and q.task.kind == &"tavern" and is_same(q.task.target, b):
+            n += 1;
+    return n;
+
 # A citizen with no clothes on fetches a set from storage and puts it on (the best there is).
 func dress_task(p:Pawn) -> Task:
     var item:StringName = Stock.best_clothing();

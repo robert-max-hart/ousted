@@ -9,7 +9,7 @@ class_name SurfaceTextures extends RefCounted;
 
 const SIZE          :int = 128;
 const METRES        :float = 2.5;          # world size one tile covers
-const KINDS         :Array[StringName] = [&"planks", &"stone", &"plaster", &"shingle"];
+const KINDS         :Array[StringName] = [&"planks", &"stone", &"plaster", &"shingle", &"turf"];
 
 static var _cache   :Dictionary = {};
 
@@ -106,5 +106,8 @@ static func _pixel(kind:StringName, x:int, y:int) -> Color:
             var shade2:float = 0.74 + _h(tile, row2, 5) * 0.24;
             var edge:float = 0.6 if y % 16 > 12 else 1.0;     # shadow under each course
             return _grey((shade2 - grain) * edge * (0.7 if tx == 0 else 1.0));
+        &"turf":
+            var blade:float = _h(x / 2, y / 3, 7) * 0.22 + _h(x, y, 8) * 0.1;      # short grass: flecks of light and dark
+            return _grey(0.86 - blade + (0.1 if _h(x / 4, y / 4, 9) > 0.8 else 0.0));
         _:
             return _grey(0.92 - _h(x / 2, y / 2, 6) * 0.1 - grain);

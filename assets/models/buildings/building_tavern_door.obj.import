@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://bm7mhapl5l4bv"
+path="res://.godot/imported/building_tavern_door.obj-ce71eff805dc4f14405f9fea1e64016c.mesh"
+
+[deps]
+
+files=["res://.godot/imported/building_tavern_door.obj-ce71eff805dc4f14405f9fea1e64016c.mesh"]
+
+source_file="res://assets/models/buildings/building_tavern_door.obj"
+dest_files=["res://.godot/imported/building_tavern_door.obj-ce71eff805dc4f14405f9fea1e64016c.mesh", "res://.godot/imported/building_tavern_door.obj-ce71eff805dc4f14405f9fea1e64016c.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

@@ -298,11 +298,17 @@ func is_empty() -> bool:
 func spoil_mult() -> float:
     return def.get("spoil_mult", 1.0);
 
+# The air temperature in here: a cellar keeps near its ground temperature all year.
+func storage_temp() -> float:
+    if not def.has("ground_temp"):
+        return Weather.temperature;
+    return def["ground_temp"] + (Weather.temperature - def["ground_temp"]) * def.get("ground_share", 0.25);
+
 # Spoils stored food for `hours` game hours at the current temperature. Returns units lost (and adds them, by item, to tally).
 # Units promised to a pawn who is on the way to collect them are spared.
 func spoil_tick(hours:float, tally:Dictionary = {}) -> int:
     var lost:int = 0;
-    var k:float = Defs.spoil_temp_factor(Weather.temperature) * spoil_mult() * hours;
+    var k:float = Defs.spoil_temp_factor(storage_temp()) * spoil_mult() * hours;
     for item in stored.keys():
         var rate:float = Defs.spoil_per_hour(item);
         if rate <= 0.0 or Defs.ITEMS[item].get("outside_only", false):
@@ -395,6 +401,15 @@ func has_inputs(recipe:Dictionary) -> bool:
 # Input units still wanted for the recipes that are switched on and under their cap.
 func inputs_wanted() -> Dictionary:
     var want:Dictionary = {};
+    if is_complete() and def.get("keep_inputs", false):
+        if def.has("policy") and not world.policies.is_on(def["policy"]):
+            return want;
+        for in_item in def["inputs"]:       # a store that is simply kept stocked (the herbalist's herbs, the tavern's spirits)
+            var level:int = settings.get("keep_%s" % in_item, def["inputs"][in_item]);
+            var short:int = level - input_amount(in_item) - input_incoming.get(in_item, 0);
+            if short > 0:
+                want[in_item] = short;
+        return want;
     if not is_complete() or not def.has("recipes"):
         return want;
     for item in def["recipes"]:
@@ -601,10 +616,52 @@ func _finish_upgrade() -> void:
         Expansion.finish(world, self);
         work_done = work_required();
         return;
+    var becomes:StringName = def["upgrades"][upgrading].get("becomes", &"");
+    if becomes != &"":
+        world.notify("%s: %s built." % [display_name(), def["upgrades"][upgrading]["name"]]);
+        upgrading = &"";
+        convert_to(becomes);
+        return;
     upgrades_done[upgrading] = true;
     world.notify("%s: %s built." % [display_name(), def["upgrades"][upgrading]["name"]]);
     upgrading = &"";
     work_done = def["work"];
+
+# Turns this finished building into another kind on the same footprint (a house rebuilt in stone). Residents, fuel and
+# settings stay; the look is made again and what it cost is now the new building's cost.
+func convert_to(id:StringName) -> void:
+    def_id = id;
+    def = Defs.BUILDINGS[id];
+    upgrades_done = {};
+    upgrading = &"";
+    delivered = def["cost"].duplicate();
+    for c in def.get("controls", []):
+        if not settings.has(c["id"]):
+            settings[c["id"]] = c["default"];
+    fuel = mini(fuel, def.get("fuel_capacity", 0));
+    fuel_coal = mini(fuel_coal, fuel);
+    name = "%s_%d_%d" % [def_id, origin.x, origin.y];
+    for child in get_children():
+        if child != _site_label:
+            remove_child(child);
+            child.queue_free();
+    if has_meta(&"decor_modelled"):
+        remove_meta(&"decor_modelled");
+    _body = null;
+    _roof = null;
+    _door = null;
+    _chimney = null;
+    if GameClock.speed_changed.is_connected(_on_clock_speed):
+        GameClock.speed_changed.disconnect(_on_clock_speed);
+    _smoke = null;
+    _window_mat = null;
+    _decor = [];
+    _windows = [];
+    _fence = null;
+    _build_visual();
+    work_done = work_required();
+    _update_visual();
+    update_site_label();
 
 # Whether this building handles the item yet (a mine needs Deep Shafts before it digs coal).
 func item_unlocked(item:StringName) -> bool:
@@ -667,7 +724,7 @@ func _burn_fuel(hours:float) -> void:
     if residents.is_empty() or Weather.temperature >= Defs.HEATING_BELOW:
         return;
     var cold:float = (Defs.HEATING_BELOW - Weather.temperature) / Defs.HEATING_BELOW;
-    _burn_acc += cold * Defs.FIREWOOD_PER_DAY_AT_0C / GameClock.HOURS_PER_DAY * hours;
+    _burn_acc += cold * Defs.FIREWOOD_PER_DAY_AT_0C * def.get("fuel_use", 1.0) / GameClock.HOURS_PER_DAY * hours;
     var whole:int = floori(_burn_acc + 0.0001);
     if whole > 0:
         _burn_acc -= whole;
@@ -711,7 +768,8 @@ func update_smoke() -> void:
 func update_windows() -> void:
     if _window_mat == null:
         return;
-    var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty());
+    var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty()) \
+        or (state == State.COMPLETE and def.get("tavern", false) and GameClock.hour() >= Defs.TAVERN_FROM - 1.0 and GameClock.hour() < 23.0);
     _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
 
 
@@ -761,7 +819,7 @@ func restore_dict(d:Dictionary) -> void:
 func help_text() -> String:
     var s:String = def.get("desc", "");
     if def.has("spoil_mult"):
-        s += "\nFood keeps %s here." % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "longer" if spoil_mult() < 1.0 else "for less time");
+        s += "\nFood keeps %s here." % ("twice as long" if is_equal_approx(spoil_mult(), 0.5) else "much longer" if spoil_mult() < 0.4 else "longer" if spoil_mult() < 1.0 else "for less time");
     return s;
 
 func info_text() -> String:

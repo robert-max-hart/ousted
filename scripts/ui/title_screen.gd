@@ -28,8 +28,7 @@ var _rules_box  :VBoxContainer;       # the custom rules, folded away until aske
 var _start_pick :OptionButton;
 var _settlers_pick:OptionButton;
 var _supplies_pick:OptionButton;
-var _merchants_pick:OptionButton;
-var _droughts_check:CheckBox;
+var _event_sliders:Dictionary = {};      # rule id -> HSlider (the Map events section)
 var _realism_check:CheckBox;
 var _diff_btns  :Dictionary = {};        # difficulty id -> Button
 var _diff_text  :Label;
@@ -307,6 +306,7 @@ func _build_new_game_panel(stack:VBoxContainer) -> void:
     _climate_warn.add_theme_color_override("font_color", Color(1.0, 0.6, 0.4));
     col.add_child(_climate_warn);
     _show_climate_text();
+    _build_events(col);
     _build_rules(col);
     var seed_row:HBoxContainer = HBoxContainer.new();
     col.add_child(seed_row);
@@ -352,7 +352,49 @@ func _setup_row(col:Container, text:String, control:Control) -> void:
 func _show_river_text() -> void:
     _river_text.text = Terrain.RIVER_STYLES[_river_pick.get_selected_id()]["desc"];
 
-# Realism mode and a folded "Custom rules" block (settlers, supplies, merchants, droughts) on top of the preset.
+# The Map events section: a slider for how often each kind of event strikes, from none to extreme.
+func _build_events(col:Container) -> void:
+    var head:Label = Label.new();
+    head.text = "Map events";
+    head.add_theme_color_override("font_color", Color(1, 1, 1, 0.7));
+    col.add_child(head);
+    _event_slider(col, &"droughts", "Droughts", GameRules.EVENT_NAMES, GameRules.droughts, "Dry spells with no rain, extra heat and fast-drying ground. A desert has many, a tropical map few.");
+    _event_slider(col, &"storms", "Thunderstorms", GameRules.EVENT_NAMES, GameRules.storms, "How many warm rain spells are thunderstorms (darkness, lightning, and citizens go indoors). Tropical maps have most, deserts and the far north few.");
+    _event_slider(col, &"rain", "Rainfall", GameRules.RAIN_NAMES, GameRules.rain, "How often rain (and snow) spells start. Fields and the ground depend on it; with none, water comes only from the river, wells and channels.");
+    _event_slider(col, &"heat", "Heat waves", GameRules.EVENT_NAMES, GameRules.heat, "Days a good deal hotter than the season: food spoils faster, the ground dries out. Most in the desert, fewest in the north.");
+    _event_slider(col, &"cold", "Cold snaps", GameRules.EVENT_NAMES, GameRules.cold, "Days a good deal colder than the season: heating burns more fuel, and frost may catch young crops. Never in the tropics.");
+    _event_slider(col, &"pests", "Pests", GameRules.EVENT_NAMES, GameRules.pests, "How often pests get into growing crops (farmers pick them off; a scarecrow helps)");
+    _event_slider(col, &"illness", "Illness", GameRules.ILLNESS_NAMES, GameRules.illness, "How often sickness starts and how readily it spreads");
+    _event_slider(col, &"merchants", "Merchants", GameRules.MERCHANT_NAMES, GameRules.merchants, "How often traders come to the Trading Post");
+
+# One row: a name, a stepped slider and what its position is called.
+func _event_slider(col:Container, id:StringName, label:String, names:Array[String], value:int, tip:String) -> void:
+    var slider:HSlider = HSlider.new();
+    slider.min_value = 0;
+    slider.max_value = names.size() - 1;
+    slider.step = 1;
+    slider.value = value;
+    slider.tick_count = names.size();
+    slider.ticks_on_borders = true;
+    slider.focus_mode = Control.FOCUS_NONE;
+    slider.tooltip_text = tip;
+    slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER;
+    var shown:Label = Label.new();
+    shown.custom_minimum_size.x = 72;
+    shown.text = names[value];
+    slider.value_changed.connect(func(v:float) -> void: shown.text = names[int(v)]);
+    var row:HBoxContainer = HBoxContainer.new();
+    var l:Label = Label.new();
+    l.text = label;
+    l.custom_minimum_size.x = 165;
+    row.add_child(l);
+    slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    row.add_child(slider);
+    row.add_child(shown);
+    col.add_child(row);
+    _event_sliders[id] = slider;
+
+# Realism mode and a folded "Custom rules" block (settlers and supplies) on top of the preset.
 @warning_ignore("integer_division")
 func _build_rules(col:Container) -> void:
     _realism_check = CheckBox.new();
@@ -362,7 +404,7 @@ func _build_rules(col:Container) -> void:
     var toggle:Button = Button.new();
     toggle.text = "Custom rules...";
     toggle.toggle_mode = true;
-    toggle.tooltip_text = "Settlers, starting supplies, merchants and droughts";
+    toggle.tooltip_text = "What the settlers start with";
     col.add_child(toggle);
     _rules_box = VBoxContainer.new();
     _rules_box.add_theme_constant_override("separation", 6);
@@ -386,16 +428,6 @@ func _build_rules(col:Container) -> void:
         _supplies_pick.add_item("%s (%d%%)" % [GameRules.SUPPLY_NAMES[i], roundi(GameRules.SUPPLY_SHARES[i] * 100.0)]);
     _supplies_pick.select(2);
     _setup_row(_rules_box, "Supplies", _supplies_pick);
-    _merchants_pick = OptionButton.new();
-    for n in GameRules.MERCHANT_NAMES:
-        _merchants_pick.add_item(n);
-    _merchants_pick.select(2);
-    _setup_row(_rules_box, "Merchants", _merchants_pick);
-    _droughts_check = CheckBox.new();
-    _droughts_check.text = "Droughts";
-    _droughts_check.button_pressed = true;
-    _droughts_check.tooltip_text = "Dry spells with no rain, extra heat and fast-drying ground";
-    _rules_box.add_child(_droughts_check);
 
 func _show_climate_text() -> void:
     var d:Dictionary = Climate.DEFS[_climate_pick.get_selected_id()];
@@ -442,8 +474,14 @@ func _on_start() -> void:
     GameRules.start = _start_pick.selected;
     GameRules.settlers = GameRules.SETTLERS[_settlers_pick.selected];
     GameRules.supplies = _supplies_pick.selected;
-    GameRules.merchants = _merchants_pick.selected;
-    GameRules.droughts = _droughts_check.button_pressed;
+    GameRules.merchants = int((_event_sliders[&"merchants"] as HSlider).value);
+    GameRules.illness = int((_event_sliders[&"illness"] as HSlider).value);
+    GameRules.droughts = int((_event_sliders[&"droughts"] as HSlider).value);
+    GameRules.storms = int((_event_sliders[&"storms"] as HSlider).value);
+    GameRules.rain = int((_event_sliders[&"rain"] as HSlider).value);
+    GameRules.heat = int((_event_sliders[&"heat"] as HSlider).value);
+    GameRules.cold = int((_event_sliders[&"cold"] as HSlider).value);
+    GameRules.pests = int((_event_sliders[&"pests"] as HSlider).value);
     GameRules.realism = _realism_check.button_pressed;
     _launch();
 
@@ -457,7 +495,10 @@ func _on_tutorial() -> void:
     Terrain.river_style = Terrain.RiverStyle.WINDING;
     Climate.current = Climate.Id.TEMPERATE;
     GameRules.reset();
-    GameRules.droughts = false;
+    GameRules.droughts = 0;
+    GameRules.storms = 0;
+    GameRules.heat = 0;
+    GameRules.cold = 0;
     GameRules.merchants = 1;
     Tutorial.active = true;
     _launch();

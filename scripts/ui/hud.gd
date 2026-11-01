@@ -257,6 +257,8 @@ func _refresh_all() -> void:
     _set_stock(&"idle", idle, idle > 0);
     var homeless:int = w.families.homeless_count();
     _set_stock(&"homeless", homeless, homeless > 0);
+    var sick:int = w.illness.ill_count();
+    _set_stock(&"ill", sick, sick > 0);
     var merchant_note:String = w.traders.top_text();
     _merchant_label.visible = merchant_note != "";
     _merchant_label.text = merchant_note;

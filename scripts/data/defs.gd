@@ -21,6 +21,7 @@ const ITEMS:Dictionary = {
     &"wheat":   {"name": "Wheat",   "color": Color(0.9, 0.78, 0.35), "food": true, "nutrition": 0.45, "spoil_days": 120.0},
     &"firewood": {"name": "Firewood", "color": Color(0.72, 0.5, 0.26), "spoil_days": 60.0, "outside_only": true, "heat": 1},
     &"beans":   {"name": "Beans",   "color": Color(0.45, 0.6, 0.3),  "food": true, "nutrition": 0.4, "spoil_days": 90.0},
+    &"herbs":   {"name": "Healing herbs", "color": Color(0.5, 0.68, 0.44), "spoil_days": 40.0},
     &"mushrooms": {"name": "Mushrooms", "color": Color(0.7, 0.55, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 4.0},
     &"hazelnuts": {"name": "Hazelnuts", "color": Color(0.65, 0.5, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 150.0},
     &"radish":  {"name": "Radishes", "color": Color(0.85, 0.25, 0.3),  "food": true, "nutrition": 0.18, "spoil_days": 20.0},
@@ -77,11 +78,17 @@ const ITEMS:Dictionary = {
 # indoor_work: the workers of this building go inside (and out of sight) while they work at it; others work beside it
 # worker_slots, profession: how many citizens of that profession work here
 # decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut, wood, shack); roof_pitch: roof height over wall height (default 0.55)
+# roof_texture: texture of the roof model (shingle by default; turf for a cellar's mound)
 # wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
 # fuel_capacity: housing that burns firewood to stay warm; this is how much it can hold
+# fuel_use: multiplies how much fuel a house burns (default 1.0; a stone house keeps its heat and burns half)
+# counts_as: another building this one counts as for goals and the tutorial (a stone house is a house)
+# becomes:  (in an upgrade) the building turns into this one when the upgrade is finished
 # spoil_mult: multiplies how fast stored food spoils here (default 1.0; lower is better)
+# ground_temp / ground_share: a cellar's own temperature: ground_temp plus ground_share of how far the air is from it (the
+#           ground stays cool in summer and is not frozen in winter; default is the air temperature)
 # capacity: total units a storage building holds
 # food_only: storage that only accepts food items
 # water:    citizens can drink here
@@ -130,7 +137,24 @@ const BUILDINGS:Dictionary = {
             {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
             {"id": "fuel_target", "type": "cap", "label": "Keep fuel stocked", "default": 20, "step": 5},
         ],
-        "desc": "Shelter for up to 6 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5.",
+        "upgrades": {
+            &"stone": {
+                "name": "Stone House", "cost": {&"stone": 20, &"iron": 4}, "work": 28.0, "becomes": &"stone_house",
+                "desc": "Rebuild the walls in stone: the house turns into a Stone House, which burns half the fuel. The residents stay.",
+            },
+        },
+        "desc": "Shelter for up to 6 citizens. Burns firewood to keep them warm when it is cold. When it is short of fuel and storage has no firewood, it burns raw wood, which gives 3 firewood's worth where splitting it would give 5. Can be upgraded to a Stone House.",
+    },
+    &"stone_house": {
+        "wall": &"stone", "name": "Stone House", "size": Vector2i(3, 3), "cost": {&"wood": 12, &"stone": 24, &"iron": 4}, "work": 40.0,
+        "shape": "house", "height": 1.7, "color": Color(0.58, 0.57, 0.55), "roof": Color(0.36, 0.3, 0.28),
+        "beds": 6, "fuel_capacity": 60, "fuel_use": 0.5, "counts_as": &"house",
+        "controls": [
+            {"id": "heating", "type": "toggle", "label": "Heating", "default": true},
+            {"id": "fuel_type", "type": "choice", "label": "Burn", "options": ["Firewood", "Coal", "Either"], "default": 0},
+            {"id": "fuel_target", "type": "cap", "label": "Keep fuel stocked", "default": 30, "step": 5},
+        ],
+        "desc": "Shelter for up to 6 citizens in thick stone walls that hold the heat: it burns half the fuel of a wooden house and stores 60. Costs a good deal of stone and some iron.",
     },
     &"well": {
         "wall": &"stone", "name": "Well", "size": Vector2i(2, 2), "cost": {&"stone": 10, &"wood": 2}, "work": 12.0,
@@ -155,6 +179,12 @@ const BUILDINGS:Dictionary = {
         "shape": "silo", "height": 1.8, "color": Color(0.66, 0.55, 0.36), "roof": Color(0.45, 0.32, 0.2),
         "storage": true, "capacity": 300, "food_only": true, "spoil_mult": 0.5,
         "desc": "Stores food only. Holds 300 units. Item filters can be set in the inspector.",
+    },
+    &"root_cellar": {
+        "name": "Root Cellar", "size": Vector2i(3, 3), "cost": {&"wood": 6, &"stone": 16}, "work": 18.0, "wall": &"stone",
+        "shape": "house", "height": 1.3, "roof_texture": &"turf", "color": Color(0.5, 0.47, 0.42), "roof": Color(0.5, 0.62, 0.34),
+        "storage": true, "capacity": 150, "food_only": true, "spoil_mult": 0.3, "ground_temp": 9.0, "ground_share": 0.25,
+        "desc": "Stores food only. Holds 150 units, half as much as a granary. Dug into the ground, it stays cool through the summer, so food keeps about three times as long as in the open and far better than in a granary in hot weather. In deep winter, when a granary freezes its contents and almost nothing spoils, the cellar stays just above freezing and food spoils a little.",
     },
     &"woodcutter": {
         "name": "Woodcutter", "size": Vector2i(3, 3), "cost": {&"wood": 10, &"stone": 2}, "work": 10.0,
@@ -183,7 +213,9 @@ const BUILDINGS:Dictionary = {
             {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true},
             {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true},
             {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true},
-            {"id": "forage_pref", "type": "choice", "label": "Pick first", "options": ["Nearest", "What we have least of", "Berries", "Mushrooms", "Hazelnuts"], "default": 0},
+            {"id": "forage_herb", "type": "toggle", "label": "Gather healing herbs", "default": true},
+            {"id": "forage_pref", "type": "choice", "label": "Pick first", "options": ["Nearest", "What we have least of", "Berries", "Mushrooms", "Hazelnuts", "Herbs"], "default": 0},
+            {"id": "cap_herbs", "type": "cap", "label": "Stop at herb stock", "item": &"herbs", "default": 24, "step": 4},
             {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 120, "step": 20},
             {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation"},
             {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation"},
@@ -195,7 +227,7 @@ const BUILDINGS:Dictionary = {
                 "desc": "Foragers with nothing to pick sow new patches of the wild foods you switch on, near the hut. Wild patches also spread by themselves, only slowly.",
             },
         },
-        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
+        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts and healing herbs, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
     },
     &"fishing_hut": {
         "name": "Fishing Hut", "size": Vector2i(3, 4), "cost": {&"wood": 14}, "work": 10.0,
@@ -293,6 +325,22 @@ const BUILDINGS:Dictionary = {
             {"id": "keep", "type": "cap", "label": "Keep at most (slaughter the rest)", "default": 0, "step": 2, "zero_label": "Off"},
         ],
         "desc": "A fenced run for one kind of animal, chosen in the inspector (chickens, sheep or cows; it can be changed while it is empty). It starts empty: buy animals from a merchant and a citizen leads them here. They give eggs, wool or milk, breed while there is room, and leave manure that farmers spread on poor fields. In the cold months they need grain. A herd over the keep-at-most level has the surplus slaughtered for meat and leather.",
+    },
+    &"herbalist": {
+        "indoor_work": true, "wall": &"plaster", "name": "Herbalist's Hut", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 10.0,
+        "shape": "house", "height": 1.5, "color": Color(0.7, 0.68, 0.55), "roof": Color(0.35, 0.45, 0.3),
+        "worker_slots": 1, "profession": "HEALER", "healing": true,
+        "inputs": {&"herbs": 8}, "keep_inputs": true,
+        "desc": "The healer visits sick citizens at home and tends them for an hour and a half. A tended citizen recovers faster and loses less health for a day. With healing herbs from the hut's store the care is much better (herbs are picked by foragers and brought here); with none the healer can still sit with the sick, but it helps little. The hut keeps up to 8 herbs. Resting at home helps too.",
+    },
+    &"tavern": {
+        "wall": &"planks", "name": "Tavern", "size": Vector2i(4, 3), "cost": {&"wood": 40, &"stone": 20, &"iron": 4}, "work": 36.0,
+        "shape": "house", "height": 2.0, "color": Color(0.62, 0.44, 0.3), "roof": Color(0.42, 0.26, 0.2),
+        "tavern": true, "patrons": 10, "inputs": {&"spirits": 8}, "keep_inputs": true, "policy": &"treats",
+        "controls": [
+            {"id": "keep_spirits", "type": "cap", "label": "Spirits kept here", "item": &"spirits", "default": 8, "step": 2, "zero_label": "None"},
+        ],
+        "desc": "A place to spend the evening. From 5 in the evening adults come for a pint and some company, an hour and a half at a time, up to 10 at once, and leave a little happier (a very small lift that lasts a day) even when there is nothing to drink. With spirits in the tavern's store they also drink one, for the full happiness boost of spirits. Laborers fill the store from storage up to the level you set (it is not filled while the Policies rule on treats is off, so spirits kept for trading are left alone). A good tavern costs a good deal to build.",
     },
     &"tailor": {
         "indoor_work": true, "wall": &"planks", "name": "Tailor's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 16, &"stone": 2}, "work": 12.0,
@@ -395,14 +443,14 @@ const PLOTS_PER_FARMER:int = 64;
 
 # The build toolbar groups buildings into these categories (a name and the buildings in it, in menu order).
 const BUILD_CATEGORIES:Array = [
-    ["Housing", [&"house"]],
-    ["Storage", [&"stockpile", &"granary"]],
+    ["Housing", [&"house", &"stone_house"]],
+    ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
-    ["Civic", [&"town_hall", &"well", &"school", &"trading_post", &"graveyard", &"bridge"]],
+    ["Civic", [&"town_hall", &"well", &"school", &"herbalist", &"tavern", &"trading_post", &"graveyard", &"bridge"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"well", &"stockpile", &"granary", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"graveyard", &"bridge", &"fishing_hut"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"graveyard", &"bridge", &"fishing_hut"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -498,7 +546,7 @@ const CROPS:Dictionary = {
 # A merchant pays a share of this for goods they want and charges a margin on their own.
 const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
-    &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3,
+    &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3, &"herbs": 4,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3, &"cherries": 3, &"peaches": 3, &"plums": 3, &"walnuts": 4, &"pecans": 5,
     &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
@@ -579,6 +627,8 @@ const RESOURCE_NODES:Dictionary = {
               "forage": true, "fruit_seasons": [0, 1], "regrow_days": 1, "spread_chance": 0.006, "max_total": 220},
     &"mushroom": {"name": "Mushrooms", "item": &"mushrooms", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking", "regrows": true,
               "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2, "spread_chance": 0.008, "max_total": 170},
+    &"herb": {"name": "Healing Herbs", "item": &"herbs", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking herbs", "regrows": true,
+              "forage": true, "fruit_seasons": [0, 1, 2], "regrow_days": 3, "spread_chance": 0.004, "max_total": 90},
     &"hazel": {"name": "Hazel Grove", "item": &"hazelnuts", "amount": 6, "work": 0.5, "solid": false, "verb": "Gathering nuts", "regrows": true,
               "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.004, "max_total": 125},
 };
@@ -643,6 +693,12 @@ const RELOCATE_COST_MULT:float = 0.5;
 
 # Happiness, grief and burial (decided 2026-10-25). Happiness is a stored value that moves toward a target made of
 # named factors (Pawn.happiness_factors); the numbers are my picks to tune.
+const TAVERN_MOOD      :float = 0.04;       # the lift from an evening at the tavern, even with nothing to drink
+const TAVERN_MOOD_HOURS:float = 20.0;       # how long it lasts
+const TAVERN_FROM      :float = 17.0;       # the hours citizens go
+const TAVERN_TO        :float = 20.0;
+const TAVERN_STAY      :float = 1.5;
+const TAVERN_SHARE     :int = 55;           # percent of citizens who go on a given evening
 const MOOD_BASE         :float = 0.65;
 const MOOD_HOURS        :float = 12.0;    # how quickly happiness follows its target (a time constant)
 const MOOD_SLOW_BELOW   :float = 0.4;     # under this, work gets slower, down to MOOD_SLOW_MIN at zero
@@ -716,6 +772,14 @@ const POLICIES:Dictionary = {
     &"treats": {
         "name": "Citizens enjoy treats", "default": true,
         "desc": "Citizens now and then eat a treat from storage (honey) for a happiness boost that lasts several days; they only want another once it has worn off. Off, treats are kept for trading.",
+    },
+    &"quarantine": {
+        "name": "Quarantine the sick", "default": false,
+        "desc": "Sick citizens stay home until they recover (no work, school or visits), and merchants are turned away while anyone in the colony is ill. It slows the spread beyond the household, at the cost of the lost work and trade.",
+    },
+    &"storm_work": {
+        "name": "Work through thunderstorms", "default": false,
+        "desc": "Citizens keep working outdoors while a thunderstorm rages. Off, everyone with a home goes indoors until it passes. (Lightning does no harm yet, so the only cost of working on is, later, what a storm will do.)",
     },
     &"child_labor": {
         "name": "Child labor", "default": true,
