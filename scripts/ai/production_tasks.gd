@@ -88,6 +88,79 @@ func fisherman_task(p:Pawn) -> Task:
         return t;
     return null;
 
+# A Hunting Lodge: a hunter walks out among the trees of the lodge's circle and hunts at the lodge's rate (the game left in
+# the woods, see Wildlife) until a deer falls, skins it (quick with an iron or steel tool, slow without) and carries the
+# meat to the lodge's store, with the leather. The progress towards the next deer stays on the lodge.
+func hunter_task(p:Pawn) -> Task:
+    var sites:Array[Building] = [];
+    for b in world.buildings:
+        if b is HuntingLodge and b.is_complete() and b.production_allowed(&"food") and Stock.has_room_for(&"meat") and (b as HuntingLodge).free_space() > 0 and (b as HuntingLodge).hunt_rate() > 0.0:
+            sites.append(b);
+    sites.sort_custom(func(a:Building, c:Building) -> bool:
+        return a.position.distance_squared_to(p.position) < c.position.distance_squared_to(p.position));
+    for b in sites:
+        if workers_at(b) >= b.def.get("worker_slots", 1) or p.has_failed(b):
+            continue;
+        var lodge:HuntingLodge = b as HuntingLodge;
+        var spot:Vector2i = lodge.hunt_spot(p.get_instance_id() % 9973);
+        if spot.x < 0:
+            continue;
+        var st:Dictionary = {"killed": false, "skinned": 0.0, "delivered": false};
+        var t:Task = Task.new(&"hunt", "Hunting");
+        t.job = JobManager.Profession.HUNTER;
+        t.target = lodge;
+        t.workplace = lodge;
+        t.move_cell(spot, "Going hunting");
+        var hunt:Callable = func(_pw:Pawn, dh:float) -> bool:
+            if not World.alive(lodge):
+                return true;
+            var rate:float = lodge.hunt_rate();
+            if rate <= 0.0:
+                return true;                  # the woods have run dry: try another day
+            var progress:float = lodge.dig_progress.get(&"deer", 0.0) + dh * rate;
+            if progress < 1.0:
+                lodge.dig_progress[&"deer"] = progress;
+                return false;
+            if world.wildlife.take(lodge.circle_center(), lodge.work_radius()):
+                lodge.dig_progress[&"deer"] = progress - 1.0;
+                st["killed"] = true;
+            else:
+                lodge.dig_progress[&"deer"] = 0.0;
+            return true;
+        t.work(hunt, "Hunting");
+        var skin:Callable = func(pw:Pawn, dh:float) -> bool:
+            if not st["killed"]:
+                return true;
+            st["skinned"] += dh * HuntingLodge.skin_speed(pw.tool_bonus());
+            if st["skinned"] < HuntingLodge.SKIN_HOURS:
+                return false;
+            pw.set_carry(&"meat", HuntingLodge.DEER_MEAT);
+            return true;
+        t.work(skin, "Skinning the deer");
+        t.move_rect(lodge.rect(), lodge.is_walkable(), "Carrying the deer home");
+        t.act(func(pw:Pawn) -> bool:
+            if st["killed"]:
+                ProductionTasks._deliver_deer(world, lodge, pw);
+                st["delivered"] = true;
+            return true);
+        t.on_cancel = func(pw:Pawn) -> void:
+            if st["killed"] and not st["delivered"] and st["skinned"] >= HuntingLodge.SKIN_HOURS:
+                ProductionTasks._deliver_deer(world, null, pw);         # the carcass is not lost: what was skinned goes into storage
+        return t;
+    return null;
+
+# Puts a skinned deer's meat (carried) and leather into the lodge's store, or the nearest store if it is full or gone.
+static func _deliver_deer(world:World, lodge:HuntingLodge, pw:Pawn) -> void:
+    var meat:int = pw.carry_amount if pw.carry_item == &"meat" else 0;
+    pw.clear_carry();
+    var items:Dictionary = {&"meat": meat, &"leather": HuntingLodge.DEER_LEATHER};
+    for item in items:
+        var left:int = items[item];
+        if World.alive(lodge):
+            left -= lodge.store(item, left);
+        if left > 0:
+            world.deposit(item, left, pw.position);
+
 const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel", &"herb", &"lingon", &"cactus", &"date", &"banana", &"coconut"];       # (the order of the hut's "Pick first" options)
 
 # The wild foods a hut's foragers try in turn: each is "pick only this kind", and &"" at the end means anything

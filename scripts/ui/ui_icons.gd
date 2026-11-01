@@ -49,7 +49,7 @@ const BY_LABEL:Dictionary = {
     "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet",
     "Soil": &"soil", "Water": &"drop", "Slope": &"slope",
     "Laborer": &"person", "Builder": &"hammer", "Farmer": &"wheat", "Woodcutter": &"axe", "Miner": &"pick",
-    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"cross",
+    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"cross", "Hunter": &"bow",
 };
 
 static func for_label(label:String) -> StringName:
@@ -73,5 +73,5 @@ const IDS:Array[StringName] = [
     &"arrow", &"axe", &"basket", &"sapling", &"trench", &"hammer", &"cross",
     &"house", &"crate", &"wheat", &"anvil", &"flag",
     &"people", &"person", &"scroll", &"tablet", &"drop", &"slope", &"soil",
-    &"pick", &"book", &"fish", &"spool",
+    &"pick", &"book", &"fish", &"spool", &"bow",
 ];

@@ -875,6 +875,7 @@ func _work_sound() -> StringName:
         JobManager.Profession.FISHERMAN: return &"cast";
         JobManager.Profession.TEACHER: return &"gesture";
         JobManager.Profession.HEALER: return &"tend";
+        JobManager.Profession.HUNTER: return &"rustle";
         JobManager.Profession.BUILDER: return &"hammer";
         JobManager.Profession.FARMER: return &"dig";
         JobManager.Profession.MINER: return &"pick";

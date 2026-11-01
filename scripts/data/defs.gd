@@ -265,6 +265,22 @@ const BUILDINGS:Dictionary = {
         },
         "desc": "Fishermen catch fish from the water around the hut and carry them to storage. The door faces the shore and the pier at the back must run out over the water (turn it with R); fishermen work at the end of the pier. The more of the circle is water, the better the catch; two huts whose circles overlap share the water and both catch less. Fish spoil quickly.",
     },
+    &"hunting_lodge": {
+        "wall": &"planks", "name": "Hunting Lodge", "size": Vector2i(4, 3), "cost": {&"wood": 24, &"stone": 6}, "work": 20.0,
+        "shape": "house", "height": 1.8, "color": Color(0.5, 0.36, 0.24), "roof": Color(0.36, 0.3, 0.24),
+        "hunting": true, "radius": 16.0, "worker_slots": 2, "profession": "HUNTER",
+        "storage": true, "capacity": 40, "accepts_items": [&"meat", &"leather"],
+        "controls": [
+            {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 150, "step": 20},
+        ],
+        "upgrades": {
+            &"snares": {
+                "name": "Snares", "cost": {&"iron": 6, &"wood": 4}, "work": 12.0,
+                "desc": "Wire snares on stakes round the lodge. Rabbits are caught by themselves, a couple a day in thick woods (less where another lodge's snares share the ground), and go straight into the lodge's store: a rabbit is a little meat, and every third pelt is a leather. Snow buries them.",
+            },
+        },
+        "desc": "Hunters go out among the trees of the circle round the lodge, bring down a deer and skin it, and carry the meat and leather back to the lodge, which is a small store for both. The game is limited: it is more plentiful in thick woods and in a temperate climate, every deer taken is gone until the woods breed more, and lodges whose circles overlap share it. Skinning is slow without an iron or steel tool.",
+    },
     &"mine": {
         "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
         "shape": "mine", "height": 1.6, "color": Color(0.5, 0.48, 0.45), "roof": Color(0.36, 0.28, 0.2),
@@ -494,13 +510,13 @@ const PLOTS_PER_FARMER:int = 64;
 const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house", &"stone_house"]],
     ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
-    ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut"]],
+    ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut", &"hunting_lodge"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
     ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"chapel", &"trading_post", &"graveyard"]],
     ["Paths", [&"bridge"]],        # plus the Path and Road tools (HudBuild)
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut", &"hunting_lodge"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold

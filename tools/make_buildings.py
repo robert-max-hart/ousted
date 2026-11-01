@@ -321,6 +321,8 @@ cottage("herbalist", 3, 3, 1.5, 0.6, "plaster", windows=2, shutters=True, timber
 cottage("tavern", 4, 3, 2.0, 0.6, "planks", windows=3, side_windows=1, shutters=True, timber=True, sign=True, home=True, footing=0.15)
 # chapel: a small stone church with a bell tower and spire over the door
 cottage("chapel", 3, 4, 2.0, 0.6, "stone", windows=0, side_windows=2, quoins=True, home=True, footing=0.0, door_w=0.9, tower=True)
+# hunting lodge: a log cabin at the woods' edge, with a drying-rack sign
+cottage("hunting_lodge", 4, 3, 1.8, 0.5, "planks", windows=2, logs=True, footing=0.1, sign=True, home=True)
 # apiary: a low shed
 cottage("apiary", 2, 2, 0.7, 0.25, "planks", windows=0, footing=0.0, step=False, overhang=0.15, thickness=0.05, door_w=0.4)
 

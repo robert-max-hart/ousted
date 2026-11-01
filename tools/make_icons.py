@@ -86,6 +86,10 @@ i=new("soil"); i.R(.08,.6,.84,.3,BROWN); i.R(.08,.6,.84,.07,MID); i.R(.47,.3,.06
 i=new("pick"); i.L(V(.26,.92),V(.68,.3),.11,BROWN); i.P([V(.1,.4),V(.3,.14),V(.62,.1),V(.9,.3),V(.78,.32),V(.58,.24),V(.36,.28),V(.2,.46)],LIGHT)
 i=new("book"); i.P([V(.08,.2),V(.48,.28),V(.48,.88),V(.08,.8)],LIGHT); i.P([V(.92,.2),V(.52,.28),V(.52,.88),V(.92,.8)],MID); i.L(V(.16,.38),V(.4,.44),.05,DARK); i.L(V(.16,.54),V(.4,.6),.05,DARK)
 i=new("fish"); i.E(.44,.5,.34,.22,BLUE); i.P([V(.7,.5),V(.94,.26),V(.94,.74)],BLUE); i.E(.28,.44,.04,.05,DARK)
+i=new("bow")
+_o=[(.26+.5*math.cos(math.radians(a)), .5+.42*math.sin(math.radians(a))) for a in range(-70,71,14)]
+_n=[(.26+.4*math.cos(math.radians(a)), .5+.36*math.sin(math.radians(a))) for a in range(70,-71,-14)]
+i.P([V(*q) for q in _o+_n],BROWN); i.L(_o[0],_o[-1],.03,LIGHT); i.L(V(.1,.5),V(.92,.5),.05,MID); i.P([V(.96,.5),V(.8,.4),V(.8,.6)],LIGHT)
 i=new("spool"); i.R(.2,.14,.6,.12,LIGHT); i.R(.2,.74,.6,.12,LIGHT); i.R(.28,.26,.44,.48,RED); i.L(V(.28,.38),V(.72,.34),.05,(.7,.25,.2)); i.L(V(.28,.54),V(.72,.5),.05,(.7,.25,.2))
 
 stock={}

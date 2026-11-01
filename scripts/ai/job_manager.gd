@@ -8,9 +8,9 @@ class_name JobManager extends TaskBase;
 
 # GATHERER is retired (laborers harvest what is marked, food included); the slot stays so old saves and the
 # experience of the "gathering" job keep their numbers, and reconcile() turns any left into laborers.
-enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN, FISHERMAN, HEALER };
+enum Profession { LABORER, BUILDER, FARMER, GATHERER, WOODCUTTER, MINER, BLACKSMITH, TEACHER, FORAGER, ARTISAN, FISHERMAN, HEALER, HUNTER };
 
-const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan", "Fisherman", "Healer"];
+const PROFESSION_NAMES      :Array[String] = ["Laborer", "Builder", "Farmer", "Gatherer", "Woodcutter", "Miner", "Blacksmith", "Teacher", "Forager", "Artisan", "Fisherman", "Healer", "Hunter"];
 const MAX_BUILDERS_PER_SITE :int = 4;
 const PRIORITY_WEIGHT       :float = 1.0e6;     # one build priority step outweighs any distance on the map
 const FOOD_PER_PAWN_LOW     :int = 15;     # laborers forage when stock falls below this per pawn
@@ -163,6 +163,8 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.blacksmith_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.FISHERMAN:
             return [production.fisherman_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+        Profession.HUNTER:
+            return [production.hunter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.HEALER:
             return [health.heal_task, production.supply_inputs_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.ARTISAN:

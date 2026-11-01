@@ -27,7 +27,7 @@ static func serialize(world:World) -> Dictionary:
         "seed": world.world_seed, "rules": GameRules.to_dict(), "scenario": world.scenario.to_dict() if world.scenario != null else {}, "map": {"size": Terrain.SIZE, "river": Terrain.river_style, "climate": Climate.current, "hills": Terrain.hills_level}, "rng_state": world.rng.state, "wetness": world.wetness,
         "clock": GameClock.save_state(), "weather": Weather.save_state(),
         "heights": world.terrain.heights, "overlay": world.terrain.overlay, "soil": world.soil_fertility,
-        "road_paid": world.road_paid.keys(), "road_kind": world.road_kind.keys().map(func(c:Vector2i) -> Array: return [c, world.road_kind[c]]), "pending_roads": world.pending_roads.keys(), "tree_orders": world.tree_orders.keys(), "road_work": world.road_work.keys().map(func(c:Vector2i) -> Array: return [c, world.road_work[c]]), "seeds": world.seeds.to_array(), "deaths": world.death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": world.jobs.targets, "policies": world.policies.to_dict(), "ledger": world.ledger.to_dict(), "traders": world.traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": world._next_body_id, "fires": world.fires.to_array(),
+        "road_paid": world.road_paid.keys(), "road_kind": world.road_kind.keys().map(func(c:Vector2i) -> Array: return [c, world.road_kind[c]]), "pending_roads": world.pending_roads.keys(), "tree_orders": world.tree_orders.keys(), "road_work": world.road_work.keys().map(func(c:Vector2i) -> Array: return [c, world.road_work[c]]), "seeds": world.seeds.to_array(), "deaths": world.death_log, "ageing_days_per_year": Defs.ageing_days_per_year, "targets": world.jobs.targets, "policies": world.policies.to_dict(), "ledger": world.ledger.to_dict(), "traders": world.traders.to_dict(), "nodes": node_list, "buildings": building_list, "pawns": pawn_list, "piles": pile_list, "bodies": body_list, "next_body_id": world._next_body_id, "fires": world.fires.to_array(), "wildlife": world.wildlife.to_array(),
         "camera": world.camera_rig.save_state() if world.camera_rig != null else {},
         "summary": {"date": "%s, %s" % [GameClock.date_string(), GameClock.time_string()], "pop": world.pawns.size()},
     };
@@ -55,6 +55,7 @@ static func _restore_entities(world:World, save:Dictionary) -> void:
         if bd["id"] == &"town_hall" and b.is_complete():
             world.town_hall = b;
     world.fires.restore(save.get("fires", []));
+    world.wildlife.restore(save.get("wildlife", []));
     for i in world.buildings.size():
         var bd2:Dictionary = save["buildings"][i];
         if bd2.get("reloc_from", -1) >= 0:

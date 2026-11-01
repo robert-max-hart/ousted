@@ -23,6 +23,7 @@ const DEFS:Dictionary = {
         "temps": [11.0, 21.0, 9.0, -5.0], "swing": 4.0, "rain": [0.06, 0.03, 0.06, 0.05], "rain_stop": 0.12,
         "drought": [0.02, 0.05, 0.02, 0.0], "trees": 1.0, "winter": true, "storm": 1.0, "heat": 1.0, "cold": 1.0,
         "wild": {&"bush": 1.0, &"mushroom": 1.0, &"hazel": 1.0, &"herb": 1.0},
+        "game": 1.0,
         "species": [[&"tree", 0.45], [&"birch", 0.17], [&"oak", 0.38]], "dead": 0.015,
     },
     Id.ARCTIC: {
@@ -30,6 +31,7 @@ const DEFS:Dictionary = {
         "temps": [2.0, 12.0, 1.0, -17.0], "swing": 3.0, "rain": [0.04, 0.04, 0.05, 0.06], "rain_stop": 0.12,
         "drought": [0.0, 0.01, 0.0, 0.0], "trees": 0.6, "winter": true, "storm": 0.3, "heat": 0.5, "cold": 1.0,
         "wild": {&"bush": 0.35, &"mushroom": 1.4, &"herb": 0.5, &"lingon": 1.0},
+        "game": 0.6,
         "species": [[&"tree", 0.72], [&"birch", 0.28]], "dead": 0.07,
         "warning": "Not yet tuned: this climate may be too difficult. In tests the first winter often starves the colony.",
     },
@@ -38,6 +40,7 @@ const DEFS:Dictionary = {
         "temps": [22.0, 34.0, 23.0, 14.0], "swing": 6.0, "rain": [0.012, 0.005, 0.012, 0.015], "rain_stop": 0.2,
         "drought": [0.05, 0.1, 0.05, 0.02], "trees": 0.04, "winter": false, "storm": 0.4, "heat": 1.5, "cold": 0.3,
         "wild": {&"mushroom": 0.1, &"herb": 0.6, &"cactus": 1.0, &"date": 1.0},
+        "game": 0.25,
         "species": [[&"palm", 1.0]], "dead": 0.5,
         "ground": [Color(0.66, 0.57, 0.4), Color(0.7, 0.6, 0.41), Color(0.67, 0.57, 0.4), Color(0.64, 0.56, 0.41)],
         "rock": Color(0.6, 0.48, 0.38), "sand": Color(0.76, 0.67, 0.48),
@@ -49,6 +52,7 @@ const DEFS:Dictionary = {
         "temps": [26.0, 29.0, 27.0, 24.0], "swing": 3.0, "rain": [0.08, 0.1, 0.08, 0.05], "rain_stop": 0.13,
         "drought": [0.01, 0.01, 0.01, 0.01], "trees": 1.4, "winter": false, "storm": 2.0, "heat": 0.8, "cold": 0.0,
         "wild": {&"bush": 0.5, &"mushroom": 3.0, &"herb": 2.5, &"banana": 1.0, &"coconut": 1.0},
+        "game": 0.8,
         "species": [[&"palm", 0.5], [&"oak", 0.5]], "dead": 0.0,
     },
 };
@@ -61,6 +65,10 @@ static var current:int = Id.TEMPERATE;
 # How much of a wild food grows on this map, against the temperate amount (0: none).
 static func wild_share(kind:StringName) -> float:
     return float(data().get("wild", {}).get(kind, 0.0));
+
+# How much big game the woods hold on this map, against the temperate amount (see Wildlife).
+static func game_share() -> float:
+    return float(data().get("game", 1.0));
 
 static func has_wild(kind:StringName) -> bool:
     return wild_share(kind) > 0.0;
