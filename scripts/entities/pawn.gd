@@ -781,7 +781,7 @@ func _animate(delta:float) -> void:
         _rig.pose(PawnRig.Mode.SLEEP, _anim_t, 0.2, &"", false);
     elif work:
         _still_t = 0.0;
-        var phase:float = fposmod(_anim_t * PawnRig.WORK_RATE, TAU);
+        var phase:float = fposmod(_anim_t * PawnRig.rate_of(_work_sound()), TAU);
         if _last_phase < 1.5 * PI and phase >= 1.5 * PI:          # the tool comes down
             _strike();
         _last_phase = phase;
@@ -833,13 +833,20 @@ func _meal_sounds(kind:StringName) -> void:
 # The sound of one swing of the tool at what this citizen is working on (see Sfx).
 func _strike() -> void:
     var id:StringName = _work_sound();
-    if id != &"":
+    if id == &"cast" or id == &"throw":
+        id = &"splash";                      # the line and the bucket hit the water
+    if id != &"" and id != &"gesture" and id != &"tend":
         Sfx.at(id, global_position);
 
 func _work_sound() -> StringName:
     if task == null:
         return &"";
+    if task.kind == &"fire":
+        return &"throw";
     match task.job:
+        JobManager.Profession.FISHERMAN: return &"cast";
+        JobManager.Profession.TEACHER: return &"gesture";
+        JobManager.Profession.HEALER: return &"tend";
         JobManager.Profession.BUILDER: return &"hammer";
         JobManager.Profession.FARMER: return &"dig";
         JobManager.Profession.MINER: return &"pick";

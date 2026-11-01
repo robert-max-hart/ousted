@@ -69,6 +69,14 @@ func _poses2() -> Array:
         [PawnRig.Mode.IDLE, &"", false, 28.0, 0.2],
     ];
 
+# The actions with their own poses: casting a line, throwing a bucket on a fire, a lecture and tending the sick (three of each, at different ages).
+func _poses3() -> Array:
+    var out:Array = [];
+    for work in [&"cast", &"throw", &"gesture", &"tend"]:
+        for age in [28.0, 40.0, 14.0]:
+            out.append([PawnRig.Mode.WORK, work, false, age, 0.55]);
+    return out;
+
 func _process(_delta:float) -> void:
     _frame += 1;
     if _frame == 5:
@@ -106,6 +114,20 @@ func _process(_delta:float) -> void:
             world.camera_rig._pitch = deg_to_rad(-10.0);
         160:
             _shot("citizens_faces");
+            _poses_now = _poses3();
+            world.camera_rig._distance = 9.0;
+            world.camera_rig._target_distance = 9.0;
+            world.camera_rig._pitch = deg_to_rad(-24.0);
+            world.camera_rig.focus_on(Vector3(_o.x + 6.0, 0, _o.y + 2.0));
+            _arrange(0.1);
+        175:
+            _shot("citizens_actions_a");
+            _arrange(1.5);
+        190:
+            _shot("citizens_actions_b");
+            _arrange(3.0);
+        205:
+            _shot("citizens_actions_c");
             get_tree().quit();
 
 # Puts a citizen in each pose, in two rows, at animation time t (the work swing is at a different point of its cycle for each t).

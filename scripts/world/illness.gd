@@ -17,6 +17,7 @@ class_name Illness extends RefCounted;
 const ONSET_PER_DAY     :float = 0.003;    # chance a citizen falls ill on a day by themselves (x the Illness rule)
 const COLD_ONSET_MULT   :float = 2.0;      # ...when it is freezing
 const HUNGRY_ONSET_MULT :float = 2.0;      # ...when they are going hungry
+const HEAT_ONSET_MULT  :float = 1.5;       # a citizen worn down by heat falls ill more often
 const HOMELESS_ONSET_MULT:float = 1.5;
 const MERCHANT_CARRIES  :float = 0.15;     # chance a merchant who arrives brings a case in (x the rule)
 const HOME_PER_HOUR     :float = 0.012;    # hourly chance per ill housemate (x severity x rule)
@@ -151,17 +152,24 @@ func on_day() -> void:
     for p in world.pawns:
         if not can_catch(p):
             continue;
-        var chance:float = ONSET_PER_DAY * share;
-        if Weather.temperature < 2.0:
-            chance *= COLD_ONSET_MULT;
-        if p.hunger < 0.3:
-            chance *= HUNGRY_ONSET_MULT;
-        if p.home == null:
-            chance *= HOMELESS_ONSET_MULT;
+        var chance:float = onset_chance(p);
         if world.rng.randf() < chance and infect(p):
             world.notify("%s has fallen ill." % p.first_name);
     if before == 0 and ill_count() > 0:
         world.notify("Sickness has started in the colony. Rest, food, warmth and a healer help; the Policies panel has a quarantine rule.");
+
+# The chance that this citizen falls ill on a day, by itself: more in the cold, when hungry, worn down by heat, or with no home.
+func onset_chance(p:Pawn) -> float:
+    var chance:float = ONSET_PER_DAY * GameRules.illness_share();
+    if Weather.temperature < 2.0:
+        chance *= COLD_ONSET_MULT;
+    if p.hunger < 0.3:
+        chance *= HUNGRY_ONSET_MULT;
+    if p.overheat >= 0.5:
+        chance *= HEAT_ONSET_MULT;
+    if p.home == null:
+        chance *= HOMELESS_ONSET_MULT;
+    return chance;
 
 # A merchant reaches the Trading Post: they may carry a sickness in.
 func on_merchant_arrival() -> void:

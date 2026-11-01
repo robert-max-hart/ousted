@@ -39,7 +39,16 @@ const SWINGS:Dictionary = {
     &"anvil":  {"down": -0.5, "up": -1.7, "e_down": -0.2, "e_up": -1.25, "lean": 0.1, "bend": 0.08, "both": false, "prop": &"hammer", "style": &"quick"},
     &"dig":    {"down": -0.45, "up": -1.35, "e_down": -0.1, "e_up": -0.55, "lean": 0.5, "bend": 0.12, "both": true, "prop": &"hoe", "style": &"push"},
     &"rustle": {"down": -1.35, "up": -1.0, "e_down": -0.7, "e_up": -0.35, "lean": 0.4, "bend": 0.05, "both": false, "prop": &"basket", "style": &"gentle"},
+    # actions with no sound of their own: the rod (a slow back-cast and a fast cast), the bucket thrown on a fire, a teacher explaining and a healer tending
+    &"cast":    {"down": -1.4, "up": -2.3, "e_down": -0.2, "e_up": -1.1, "lean": -0.04, "bend": 0.08, "both": true, "prop": &"rod", "style": &"heavy", "rate": 0.4},
+    &"throw":   {"down": -1.5, "up": 0.3, "e_down": -0.3, "e_up": -0.2, "lean": 0.1, "bend": 0.16, "both": true, "prop": &"bucket", "style": &"quick", "rate": 0.8},
+    &"gesture": {"down": -1.0, "up": -1.65, "e_down": -0.9, "e_up": -1.4, "lean": 0.0, "bend": 0.0, "both": false, "prop": &"", "style": &"gentle", "rate": 0.45},
+    &"tend":    {"down": -1.0, "up": -0.85, "e_down": -0.7, "e_up": -0.9, "lean": 0.45, "bend": 0.1, "both": true, "prop": &"", "style": &"gentle", "rate": 0.4},
 };
+
+# How fast a swing's cycle runs (radians a second): most go at WORK_RATE, the slow ones (a cast, a lecture) at a fraction of it.
+static func rate_of(id:StringName) -> float:
+    return WORK_RATE * float((SWINGS.get(id, {}) as Dictionary).get("rate", 1.0));
 
 const SHIRTS_M:Array[Color] = [Color(0.25, 0.35, 0.6), Color(0.3, 0.5, 0.3), Color(0.55, 0.3, 0.25), Color(0.5, 0.45, 0.3)];
 const SHIRTS_F:Array[Color] = [Color(0.6, 0.3, 0.4), Color(0.55, 0.45, 0.6), Color(0.65, 0.5, 0.3), Color(0.35, 0.5, 0.55)];
@@ -283,7 +292,7 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:fl
         Mode.WORK:
             var sw:Dictionary = SWINGS.get(work, SWINGS[&"dig"]);
             prop = sw["prop"];
-            var u:float = RigMotion.work_u(fposmod(t * WORK_RATE, TAU) / TAU, sw["style"]);       # 0 at the strike, 1 at the top of the swing
+            var u:float = RigMotion.work_u(fposmod(t * rate_of(work), TAU) / TAU, sw["style"]);       # 0 at the strike, 1 at the top of the swing
             var low:float = clampf(1.0 - u, 0.0, 1.0);
             var a:float = lerpf(sw["down"], sw["up"], u);
             var e:float = lerpf(sw["e_down"], sw["e_up"], u);
@@ -301,6 +310,26 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:fl
             ang["roll"] = 0.03 * low;
             ang["head"] = -0.15 * low + droop * 0.3;
             ang["head_y"] = -0.5 * ang["twist"];
+            if work == &"gesture":                                # one hand on the hip, the other making the point, a nod with each
+                ang["al"] = -0.3;
+                ang["el"] = -1.35;
+                ang["azl"] = -0.55;
+                ang["lean"] = 0.02 + stoop;
+                ang["head"] = 0.04 * sin(t * rate_of(work) * 2.0);
+                ang["twist"] = 0.08 * sin(t * rate_of(work));
+                ang["kl"] = 0.08;
+                ang["kr"] = 0.08;
+                ang["y"] = 0.0;
+                ang["ll"] = 0.05;
+                ang["lr"] = -0.05;
+            elif work == &"tend":                                 # bent over the patient, both hands busy and a nod
+                ang["ar"] = a + 0.1 * sin(t * 3.1);
+                ang["al"] = a * 0.92 + 0.1 * sin(t * 3.1 + 1.3);
+                ang["head"] = 0.18 + 0.05 * sin(t * 1.1);
+                ang["kl"] = 0.25;
+                ang["kr"] = 0.3;
+                ang["twist"] = 0.0;
+                ang["y"] = -0.05;
             if work == &"rustle":
                 ang["al"] = lerpf(-1.3, -1.0, u);
                 ang["ar"] = lerpf(-1.1, -1.5, u);

@@ -40,12 +40,14 @@ func _ready() -> void:
     _expect("carrying holds the arms out front", rig._arm_l.rotation.x < -1.0 and rig._arm_r.rotation.x < -1.0);
     for id in PawnRig.SWINGS:
         var sw:Dictionary = PawnRig.SWINGS[id];
-        rig.pose(PawnRig.Mode.WORK, PI / 2.0 / PawnRig.WORK_RATE * 3.0, 1.0, id, false);            # sin = -1: the strike
+        var rate:float = PawnRig.rate_of(id);
+        rig.pose(PawnRig.Mode.WORK, 1.5 * PI / rate, 1.0, id, false);            # the strike
         var down:float = rig._arm_r.rotation.x;
-        rig.pose(PawnRig.Mode.WORK, PI / 2.0 / PawnRig.WORK_RATE, 1.0, id, false);                  # sin = +1: the top
+        rig.pose(PawnRig.Mode.WORK, 0.5 * PI / rate, 1.0, id, false);            # most of the way up the swing
         var up:float = rig._arm_r.rotation.x;
-        _expect("%s: the arm comes down at the strike (%.2f) and rises (%.2f)" % [id, down, up], up < down - 0.2 or id == &"rustle");
-        _expect("%s: the tool is shown" % id, rig._prop.visible and rig._prop.mesh != null);
+        var gentle:bool = sw["style"] == &"gentle";
+        _expect("%s: the arm moves between the strike (%.2f) and the lift (%.2f)" % [id, down, up], gentle or absf(up - down) > 0.5);
+        _expect("%s: the tool shown is the one it should be" % id, (rig._prop.visible and rig._prop.mesh != null) == (sw["prop"] != &""));
     rig.pose(PawnRig.Mode.IDLE, 0.0, 1.0, &"", false);
     _expect("no tool when not working", not rig._prop.visible);
     rig.pose(PawnRig.Mode.SLEEP, 0.0, 1.0, &"", false);

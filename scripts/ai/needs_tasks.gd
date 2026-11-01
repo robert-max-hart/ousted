@@ -342,12 +342,18 @@ func cool_task(p:Pawn) -> Task:
     var home:Building = world.shelter_for(p);
     var well:Building = world.nearest_building(p.position, func(x:Building) -> bool:
         return x.is_complete() and x.def.get("water", false));
+    var shade:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_complete() and x.def.get("shade", false));
+    var shade_d:float = INF if shade == null else Vector2(shade.center_cell()).distance_to(here_c);
     var tree:Vector2i = _nearest_tree(p.cell());
     var home_d:float = INF if home == null else Vector2(home.center_cell()).distance_to(here_c);
     var well_d:float = INF if well == null else Vector2(well.center_cell()).distance_to(here_c);
     var tree_d:float = INF if tree == Fires.NO_CELL else Vector2(tree).distance_to(here_c);
     var t:Task = Task.new(&"cool", "Going to cool off", false);
-    if home_d <= well_d and home_d <= tree_d and home != null:
+    if shade != null and shade_d <= home_d and shade_d <= well_d and shade_d <= tree_d:
+        t.target = shade;
+        t.move_rect(shade.rect(), true);
+    elif home_d <= well_d and home_d <= tree_d and home != null:
         t.target = home;
         t.move_rect(home.rect());
         t.act(func(pw:Pawn) -> bool:

@@ -68,7 +68,11 @@ static func cooling_spot(p:Pawn) -> bool:
             if w.terrain.in_bounds(n) and w.terrain.is_water(n):
                 return true;
     for b in w.buildings:
-        if b.def.get("water", false) and b.is_complete() and b.rect().grow(WELL_COOL).has_point(c):
+        if not b.is_complete():
+            continue;
+        if b.def.get("water", false) and b.rect().grow(WELL_COOL).has_point(c):
+            return true;
+        if b.def.get("shade", false) and b.rect().grow(1).has_point(c):
             return true;
     return false;
 

@@ -115,8 +115,8 @@ const SOW_PER_KIND:int = 18;       # a hut sows no more of a kind than this with
 # Sows a new patch of one of the wild foods switched on, on free ground in the hut's radius.
 func _sow_task(b:Building) -> Task:
     var kinds:Array[StringName] = [];
-    for kind in [&"bush", &"mushroom", &"hazel"]:
-        if b.settings.get("sow_%s" % kind, false):
+    for kind in FORAGE_KINDS:
+        if Climate.has_wild(kind) and b.settings.get("sow_%s" % kind, false):
             kinds.append(kind);
     kinds.shuffle();
     var center:Vector2i = Vector2i(b.center_cell());

@@ -41,7 +41,9 @@ func _ready() -> void:
     world.town_hall.take(&"honey", 2);
     # recipes: three ways to one product
     var r:Dictionary = _still.def["recipes"];
-    _expect("six recipes make spirits (barley and five fruits)", r.size() == 6 and r[&"spirits_barley"]["output"] == &"spirits" and r[&"spirits_apples"]["output"] == &"spirits");
+    _expect("eleven recipes make spirits (barley, five orchard fruits and five wild ones)", r.size() == 11 and r[&"spirits_barley"]["output"] == &"spirits" and r[&"spirits_apples"]["output"] == &"spirits");
+    for wild in [&"dates", &"cactus_fruit", &"lingonberries", &"bananas", &"coconuts"]:
+        _expect("%s can be distilled, and the still keeps some in store" % wild, r.has(StringName("spirits_%s" % wild)) and _still.def["inputs"].has(wild) and Defs.is_food(wild));
     _expect("the recipes are switched on", _still.recipe_enabled(&"spirits_barley") and _still.recipe_enabled(&"spirits_apples"));
     # water
     _expect("the Distillery needs water in reach", _still.needs_water() and _still.def["needs_water"] == 12.0);

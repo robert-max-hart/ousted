@@ -803,6 +803,17 @@ func shelter_for(p:Pawn) -> Building:
 # --------------------------------
 # Navigation
 
+const NAV_SNOW_STEPS:int = 8;           # snow cover is turned into walking costs in this many steps (each change redoes the whole grid)
+var _nav_snow_level:int = 0;
+
+# Citizens plan their walks to match the snow (Pawn.ground_speed): called hourly, it redoes the grid's costs when the cover has moved a step.
+func _update_nav_snow() -> void:
+    var level:int = roundi(Weather.snow_depth * NAV_SNOW_STEPS);
+    if level == _nav_snow_level:
+        return;
+    _nav_snow_level = level;
+    _refresh_nav_rect(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
+
 func _refresh_nav_rect(r:Rect2i) -> void:
     r = r.intersection(Rect2i(0, 0, Terrain.SIZE, Terrain.SIZE));
     for z in range(r.position.y, r.end.y):
@@ -827,6 +838,10 @@ func _refresh_nav(c:Vector2i) -> void:
             weight = 1.6;
     if terrain.overlay[i] == Terrain.Overlay.ROAD:
         weight = 0.6;
+    if _nav_snow_level > 0 and not solid and not (terrain.is_water(c) and not (b != null and is_bridge(c))):
+        var snow:float = _nav_snow_level / float(NAV_SNOW_STEPS);          # snow slows open ground a lot and roads and bridges a little, so roads win more
+        var roadlike:bool = terrain.overlay[i] == Terrain.Overlay.ROAD or (b != null and is_bridge(c));
+        weight /= lerpf(1.0, Pawn.SNOW_ROAD_MULT if roadlike else Pawn.SNOW_SPEED_MULT, snow);
     if fires != null and fires.is_wild_cell(c):
         weight += Fires.NAV_WEIGHT;       # citizens go round flames
     nav.set_cell(c, solid, weight);
@@ -876,6 +891,7 @@ func _on_hour(h:int) -> void:
             if b.is_complete() and b.def.has("school_capacity"):
                 Sfx.at(&"bell", b.global_position + Vector3(0, 2.0, 0), 0.0, -4.0, 55.0);      # the school bell, at the start and the end of lessons
     jobs.reconcile();
+    _update_nav_snow();
     families.on_hour();
     illness.on_hour();
     fires.on_hour();

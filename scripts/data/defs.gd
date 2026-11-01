@@ -89,6 +89,7 @@ const ITEMS:Dictionary = {
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
 # fuel_capacity: housing that burns firewood to stay warm; this is how much it can hold
+# shade:    citizens cool off beside it in hot weather (Heat.cooling_spot)
 # fuel_use: multiplies how much fuel a house burns (default 1.0; a stone house keeps its heat and burns half)
 # counts_as: another building this one counts as for goals and the tutorial (a stone house is a house)
 # becomes:  (in an upgrade) the building turns into this one when the upgrade is finished
@@ -233,6 +234,12 @@ const BUILDINGS:Dictionary = {
             {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation", "wild": &"bush"},
             {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation", "wild": &"mushroom"},
             {"id": "sow_hazel", "type": "toggle", "label": "Sow hazel", "default": false, "requires_upgrade": &"cultivation", "wild": &"hazel"},
+            {"id": "sow_herb", "type": "toggle", "label": "Sow healing herbs", "default": false, "requires_upgrade": &"cultivation", "wild": &"herb"},
+            {"id": "sow_lingon", "type": "toggle", "label": "Sow lingonberries", "default": false, "requires_upgrade": &"cultivation", "wild": &"lingon"},
+            {"id": "sow_cactus", "type": "toggle", "label": "Sow prickly pears", "default": false, "requires_upgrade": &"cultivation", "wild": &"cactus"},
+            {"id": "sow_date", "type": "toggle", "label": "Plant date palms (near water)", "default": false, "requires_upgrade": &"cultivation", "wild": &"date"},
+            {"id": "sow_banana", "type": "toggle", "label": "Sow bananas", "default": false, "requires_upgrade": &"cultivation", "wild": &"banana"},
+            {"id": "sow_coconut", "type": "toggle", "label": "Plant coconut palms", "default": false, "requires_upgrade": &"cultivation", "wild": &"coconut"},
         ],
         "upgrades": {
             &"cultivation": {
@@ -346,6 +353,12 @@ const BUILDINGS:Dictionary = {
         "inputs": {&"herbs": 8}, "keep_inputs": true,
         "desc": "The healer visits sick citizens at home and tends them for an hour and a half. A tended citizen recovers faster and loses less health for a day. With healing herbs from the hut's store the care is much better (herbs are picked by foragers and brought here); with none the healer can still sit with the sick, but it helps little. The hut keeps up to 8 herbs. Resting at home helps too.",
     },
+    &"arbor": {
+        "name": "Shady Arbor", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 6.0, "wall": &"planks",
+        "shape": "house", "height": 1.75, "color": Color(0.5, 0.4, 0.28), "roof": Color(0.45, 0.62, 0.3), "roof_texture": &"turf",
+        "shade": true, "walkable": true,
+        "desc": "A leafy shelter with a bench. Citizens who are too hot come to cool off in its shade, and it keeps the heat off anyone resting beside it. Cheap and open: build one where people work, or in a hot climate beside the fields and the well.",
+    },
     &"tavern": {
         "wall": &"planks", "name": "Tavern", "size": Vector2i(4, 3), "cost": {&"wood": 40, &"stone": 20, &"iron": 4}, "work": 36.0,
         "shape": "house", "height": 2.0, "color": Color(0.62, 0.44, 0.3), "roof": Color(0.42, 0.26, 0.2),
@@ -380,7 +393,7 @@ const BUILDINGS:Dictionary = {
         "storage": true, "capacity": 40, "accepts_items": [&"spirits"],
         "worker_slots": 1, "profession": "ARTISAN", "needs_water": 12.0,
         "produces": [&"spirits"],
-        "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"cherries": 8, &"peaches": 8, &"plums": 8, &"firewood": 4},
+        "inputs": {&"barley": 8, &"apples": 8, &"pears": 8, &"cherries": 8, &"peaches": 8, &"plums": 8, &"dates": 8, &"cactus_fruit": 8, &"lingonberries": 8, &"bananas": 8, &"coconuts": 8, &"firewood": 4},
         "recipes": {
             &"spirits_barley": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"barley": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
             &"spirits_apples": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"apples": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
@@ -388,6 +401,11 @@ const BUILDINGS:Dictionary = {
             &"spirits_cherries": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"cherries": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
             &"spirits_peaches":  {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"peaches": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
             &"spirits_plums":    {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"plums": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_dates":    {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"dates": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_cactus_fruit": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"cactus_fruit": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_lingonberries": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"lingonberries": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_bananas":  {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"bananas": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
+            &"spirits_coconuts": {"output": &"spirits", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"coconuts": 4, &"firewood": 1}, "hours": 3.0, "yield": 2},
         },
         "controls": [
             {"id": "cap_spirits", "type": "cap", "label": "Spirits cap", "item": &"spirits", "default": 20, "step": 5, "zero_label": "Off"},
@@ -398,8 +416,13 @@ const BUILDINGS:Dictionary = {
             {"id": "make_spirits_cherries", "type": "toggle", "label": "Distil cherries", "default": true},
             {"id": "make_spirits_peaches", "type": "toggle", "label": "Distil peaches", "default": true},
             {"id": "make_spirits_plums", "type": "toggle", "label": "Distil plums", "default": true},
+            {"id": "make_spirits_dates", "type": "toggle", "label": "Distil dates", "default": true},
+            {"id": "make_spirits_cactus_fruit", "type": "toggle", "label": "Distil prickly pears", "default": true},
+            {"id": "make_spirits_lingonberries", "type": "toggle", "label": "Distil lingonberries", "default": true},
+            {"id": "make_spirits_bananas", "type": "toggle", "label": "Distil bananas", "default": true},
+            {"id": "make_spirits_coconuts", "type": "toggle", "label": "Distil coconuts", "default": true},
         ],
-        "desc": "Artisans distil barley, apples or pears (4 with a little firewood make 2 spirits) and store the spirits. It needs water: a well, the Town Hall or open water within 12 cells. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
+        "desc": "Artisans distil barley, apples, pears or whatever fruit the land gives (dates, prickly pears, lingonberries, bananas, coconuts: 4 with a little firewood make 2 spirits) and store the spirits. It needs water: a well, the Town Hall or open water within 12 cells. Citizens drink spirits now and then for a bigger happiness boost than honey, and merchants pay well for them. The grain and fruit are food, so it only distils while the colony's food stock is above the level you set.",
     },
     &"pottery": {
         "indoor_work": true, "wall": &"stone", "name": "Potter's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 12, &"stone": 8}, "work": 14.0,
@@ -460,10 +483,10 @@ const BUILD_CATEGORIES:Array = [
     ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
-    ["Civic", [&"town_hall", &"well", &"school", &"herbalist", &"tavern", &"trading_post", &"graveyard", &"bridge"]],
+    ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"trading_post", &"graveyard", &"bridge"]],
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"graveyard", &"bridge", &"fishing_hut"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"graveyard", &"bridge", &"fishing_hut"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold

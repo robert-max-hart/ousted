@@ -15,6 +15,8 @@ const ACTION_PRIORITY   :Dictionary = {&"harvest": 0, &"clear": 1, &"treat": 2, 
 const MANURE_BELOW      :float = 0.7;      # a fallow plot poorer than this gets manure before it is sown, when there is any
 const MANURE_BOOST      :float = 0.3;      # what one load adds to the plot and the eight around it     # ripe crops are gathered before anything is watered or sown
 const IRRIGATED_MOISTURE:float = 0.65;  # a plot beside a flowing channel never dries below this
+const HEAT_STRESS_FROM:float = 35.0;     # C: above this crops grow more slowly...
+const HEAT_STRESS     :float = 0.4;      # ...by up to this share at 10 degrees more
 const PEST_MIN_TEMP     :float = 6.0;      # pests are about only above this (a hard frost clears them)
 const PEST_OUTBREAK     :float = 0.05;     # chance a day for a field with something growing, in the warm months
 const PEST_SAME_CROP    :float = 0.5;      # outbreak chance grows this much for each other field growing the same crop nearby
@@ -536,7 +538,8 @@ func _growth_rate(c:Dictionary, temp:float, m:float) -> float:
         return 0.0;
     var temp_f:float = clampf((temp - c["min_temp"]) / 8.0, 0.3, 1.0);
     var water_f:float = clampf(0.3 + m * 1.2, 0.3, 1.0);
-    return temp_f * water_f / (c["grow_days"] * GameClock.HOURS_PER_DAY);
+    var heat_f:float = 1.0 - HEAT_STRESS * clampf((temp - HEAT_STRESS_FROM) / 10.0, 0.0, 1.0);       # scorching days slow the crop
+    return temp_f * water_f * heat_f / (c["grow_days"] * GameClock.HOURS_PER_DAY);
 
 # Plots within CHANNEL_RANGE of a channel with water in it.
 func _update_irrigated() -> void:

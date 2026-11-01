@@ -205,10 +205,29 @@ def basket():
     return m
 
 
+def rod():
+    """A fishing rod: the grip is the origin; it runs down the arm and bends forward at the tip, with a thin line to a float."""
+    m = Mesh()
+    m.limb((0, 0.08, 0), (0, -0.55, 0.12), 0.022, 0.014, WOOD, segs=6)
+    m.limb((0, -0.55, 0.12), (0, -1.0, 0.42), 0.014, 0.006, WOOD, segs=5)
+    m.limb((0, -1.0, 0.42), (0, -1.45, 0.42), 0.004, 0.004, (0.9, 0.9, 0.85), segs=3)
+    m.ball(0, -1.5, 0.42, 0.03, 0.03, 0.03, (0.85, 0.2, 0.2), segs=5, rings=3)
+    return m
+
+def bucket():
+    """A wooden bucket with water in it, hanging from the grip."""
+    m = Mesh()
+    m.limb((0, 0.02, 0), (0, -0.12, 0.0), 0.012, 0.012, DARK_STEEL, segs=4)
+    m.tcyl(0, -0.34, 0.0, 0.1, 0.13, -0.1, WOOD, segs=9)
+    m.tcyl(0, -0.105, 0.0, 0.125, 0.125, -0.095, (0.25, 0.42, 0.7), segs=9)                 # the water in it
+    m.tcyl(0, -0.26, 0.0, 0.118, 0.118, -0.245, DARK_STEEL, segs=9, top=False, bottom=False)   # a hoop
+    return m
+
+
 for name, mesh in (("torso_m", torso(False)), ("torso_f", torso(True)),
                    ("head_0", head(0)), ("head_1", head(1)), ("head_2", head(2)), ("head_3", head(3)), ("head_4", head(4)),
                    ("arm_l", arm(-1)), ("arm_r", arm(1)), ("forearm", forearm()), ("leg_l", leg(-1)), ("leg_r", leg(1)), ("shin", shin()),
                    ("mouth_happy", mouth("happy")), ("mouth_neutral", mouth("neutral")), ("mouth_sad", mouth("sad")),
-                   ("axe", axe()), ("hammer", hammer()), ("pick", pick()), ("hoe", hoe()), ("basket", basket())):
+                   ("axe", axe()), ("hammer", hammer()), ("pick", pick()), ("hoe", hoe()), ("basket", basket()), ("rod", rod()), ("bucket", bucket())):
     mesh.write(name, OUT)
 print("wrote", len([f for f in os.listdir(OUT) if f.endswith(".obj")]), "parts")

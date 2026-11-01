@@ -41,6 +41,8 @@ const RAIN_MIN       :float = 0.25;      # rain lighter than this does nothing t
 const SOAK_HOURS     :float = 5.0;       # ground a bucket of water has been thrown on cannot catch for this long
 const SOAK_RADIUS    :int = 1;
 const DOUSE_RADIUS   :int = 0;           # a bucket puts out the fire in the cell aimed at (and soaks the ground round it)
+const STRIKE_DAMAGE  :Dictionary = {&"planks": 0.22, &"plaster": 0.14, &"stone": 0.05};   # health a lightning bolt takes off a building by its wall
+const STRIKE_TREE    :float = 0.5;       # chance a bolt that hits a tree blasts it into a dead one, fire or no fire
 const STRIKE_CATCH   :float = 0.5;       # a lightning strike on a tree or shrub in dry weather
 const STRIKE_GRASS   :float = 0.12;
 const SPONTANEOUS_PER_DAY:float = 0.05;  # a drought or heat wave day starts a fire on its own this often
@@ -285,8 +287,11 @@ func _put_out(c:Vector2i) -> void:
 
 # Lightning strikes the cell: a tree, shrub or building may catch, more readily when everything is dry.
 func strike(c:Vector2i) -> void:
+    if not world.terrain.in_bounds(c):
+        return;
+    _strike_damage(c);
     var share:float = GameRules.fire_share();
-    if share <= 0.0 or not world.terrain.in_bounds(c):
+    if share <= 0.0:
         return;
     var fl:Dictionary = flammability(c);
     if fl.is_empty():
@@ -294,6 +299,22 @@ func strike(c:Vector2i) -> void:
     var base:float = STRIKE_GRASS if fl["catch"] <= GRASS_CATCH else (STRIKE_CATCH if fl["catch"] >= SHRUB_CATCH else fl["catch"] * 1.5);
     if world.rng.randf() < minf(1.0, base * dryness() * share * 1.6):
         ignite(c);
+
+# A bolt hurts what it hits whether or not it starts a fire: a building loses health (and burns down if that is the end of it), a tree
+# may be blasted into a dead one.
+func _strike_damage(c:Vector2i) -> void:
+    var i:int = world.idx(c);
+    var b:Building = world.occupant[i];
+    if b != null and not b is Field and not b is Pasture and b.is_complete() and not b.def.get("bridge", false) and not b is Graveyard:
+        b.fire_hit(STRIKE_DAMAGE[wall_of(b)]);
+        world.notify("Lightning struck the %s." % b.display_name().to_lower());
+        if b.health <= 0.0:
+            _destroy_building(b);
+        return;
+    var rn:ResourceNode = world.node_at[i];
+    if rn != null and rn.is_tree() and not rn.def.get("dead", false) and rn.is_mature() and world.rng.randf() < STRIKE_TREE:
+        world.remove_node(rn);
+        world.add_node(&"dead", c);
 
 # --------------------------------
 # Time

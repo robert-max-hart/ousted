@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.9 | 2 Nov 2026 | Loose ends
+- Wild foods: the Cultivation upgrade can now sow healing herbs and every climate's wild foods (lingonberries, prickly pears, date palms by the water, bananas, coconut palms), not just berries, mushrooms and hazel. Merchants now bring and ask for dates, coconuts, lingonberries and more, and the Distillery makes spirits from dates, prickly pears, lingonberries, bananas and coconuts.
+- Lightning now hurts what it hits even when it starts no fire: a building loses some health (a wooden one most, a stone one least) and a tree may be blasted into a dead one.
+- A new Shady Arbor (Civic, 6 wood): citizens who are too hot go and cool off in its shade. Heat now also makes citizens likelier to fall ill, and scorching days (above 35 C) slow crops.
+- Snow now counts in the paths citizens plan: open ground costs more to walk across in deep snow and a road less, so they keep to the roads in winter.
+- New poses: fishermen cast a rod (a slow back-cast, then a fast throw), firefighters swing a bucket, teachers explain with a hand on the hip and healers bend over their patients. Each has its own pace.
+
 # 0.7.8 | 2 Nov 2026 | Livelier citizens
 - Citizens move less like machines. They now have elbows and knees (new models), so a walk has bending knees, swinging forearms, a bobbing step with the shoulders turning against the hips, and a lean over the leg that carries them. Work swings have a wind-up, a pause at the top, a fast strike and a rebound, with the knees giving and the body turning into the blow (a heavy axe or pick is slower to lift than a hammer).
 - Everyone has their own pace, spring and starting moment, so a crowd no longer moves in step. Joints settle with a little overshoot and the hands and head trail the body. A tired citizen slumps, an unhappy one hangs their head, a happy one walks with more spring, children bounce, and they turn to face where they are going instead of snapping round. Standing about, they shift their weight and now and then glance round, stretch, scratch their head or put their hands on their hips. Eating pauses at the mouth.

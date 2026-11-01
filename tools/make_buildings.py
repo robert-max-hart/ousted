@@ -256,6 +256,31 @@ def root_cellar(name, sx, sz, h):
     door.write("building_%s_door" % name, OUT)
 
 root_cellar("root_cellar", 3, 3, 1.3)
+# arbor: four posts, cross beams, and a roof of slats under a leafy canopy: shade, open on every side
+def arbor(name, sx, sz, h):
+    bx, bz = sx - 0.5, sz - 0.5
+    hx, hz = bx / 2, bz / 2
+    shift = -h / 2
+    body = Mesh()
+    for sx_ in (-1, 1):
+        for sz_ in (-1, 1):
+            body.box(sx_ * (hx - 0.08), shift + h / 2, sz_ * (hz - 0.08), 0.14, h, 0.14, TIMBER)
+    for sz_ in (-1, 1):
+        body.box(0, shift + h - 0.07, sz_ * (hz - 0.08), bx, 0.12, 0.12, DARK_TIMBER)
+    for sx_ in (-1, 1):
+        body.box(sx_ * (hx - 0.08), shift + h - 0.07, 0, 0.12, 0.12, bz, DARK_TIMBER)
+    body.box(0, shift + 0.22, hz - 0.1, bx * 0.8, 0.07, 0.3, TIMBER)                      # a bench along the back
+    body.write("building_%s_body" % name, OUT)
+    roof = Mesh()
+    slats = 7 if not LOW else 4
+    for k in range(slats):
+        z = -hz + (k + 0.5) * bz / slats
+        roof.box(0, h + 0.03, z, bx + 0.2, 0.05, 0.07, DARK_TIMBER)
+    for k, (x, z, r) in enumerate([(-0.45, -0.3, 0.42), (0.4, -0.35, 0.4), (-0.2, 0.3, 0.45), (0.45, 0.3, 0.38), (0.0, 0.0, 0.5)]):
+        roof.ball(x * bx / 1.5, h + 0.2 + 0.05 * (k % 2), z * bz / 1.5, r, r * 0.55, r, shade(0.95 - 0.06 * (k % 3)), segs=7, rings=4, wobble=0.07)
+    roof.write("building_%s_roof" % name, OUT)
+
+arbor("arbor", 2, 2, 1.75)
 # shack: bare planks, a shallow roof, no frills
 cottage("shack", 2, 2, 1.3, 0.3, "planks", windows=0, footing=0.0, step=False, overhang=0.12, thickness=0.05, home=False)
 # forager's hut: a steep thatched roof coming down low, a round-ended look

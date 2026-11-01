@@ -55,6 +55,11 @@ func _compare(a:Dictionary, b:Dictionary) -> void:
         if not same:
             bad += 1;
             print("SAVE_LOAD MISMATCH in '", key, "'");
+            if key == "buildings":
+                for i in mini(a[key].size(), b[key].size()):
+                    for field in a[key][i]:
+                        if hash(a[key][i][field]) != hash(b[key][i].get(field)):
+                            print("  building ", i, " ", a[key][i]["id"], ": '", field, "' differs: ", a[key][i][field], " against ", b[key][i].get(field));
     print("SAVE_LOAD: round trip ", "identical" if bad == 0 else "DIFFERS in %d sections" % bad);
 
 func _pawns_equal(a:Array, b:Array) -> bool:
