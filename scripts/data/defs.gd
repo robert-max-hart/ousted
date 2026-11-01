@@ -24,6 +24,11 @@ const ITEMS:Dictionary = {
     &"herbs":   {"name": "Healing herbs", "color": Color(0.5, 0.68, 0.44), "spoil_days": 40.0},
     &"mushrooms": {"name": "Mushrooms", "color": Color(0.7, 0.55, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 4.0},
     &"hazelnuts": {"name": "Hazelnuts", "color": Color(0.65, 0.5, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 150.0},
+    &"lingonberries": {"name": "Lingonberries", "color": Color(0.62, 0.1, 0.16), "food": true, "nutrition": 0.3, "spoil_days": 40.0},
+    &"cactus_fruit": {"name": "Prickly pears", "color": Color(0.85, 0.25, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 9.0},
+    &"dates":    {"name": "Dates", "color": Color(0.45, 0.28, 0.12), "food": true, "nutrition": 0.45, "spoil_days": 160.0},
+    &"bananas":  {"name": "Bananas", "color": Color(0.95, 0.85, 0.25), "food": true, "nutrition": 0.3, "spoil_days": 5.0},
+    &"coconuts": {"name": "Coconuts", "color": Color(0.5, 0.38, 0.25), "food": true, "nutrition": 0.35, "spoil_days": 50.0},
     &"radish":  {"name": "Radishes", "color": Color(0.85, 0.25, 0.3),  "food": true, "nutrition": 0.18, "spoil_days": 20.0},
     &"lettuce": {"name": "Lettuce", "color": Color(0.5, 0.8, 0.35),   "food": true, "nutrition": 0.12, "spoil_days": 6.0},
     &"barley":  {"name": "Barley",  "color": Color(0.8, 0.7, 0.4),    "food": true, "nutrition": 0.4,  "spoil_days": 120.0},
@@ -80,6 +85,7 @@ const ITEMS:Dictionary = {
 # decor:    extras added to a house-shaped body (BuildingShapes.decorate: forge, school, hut, wood, shack); roof_pitch: roof height over wall height (default 0.55)
 # roof_texture: texture of the roof model (shingle by default; turf for a cellar's mound)
 # wall:     texture of the body in SurfaceTextures (planks by default; stone, plaster)
+# (a control with "wild": a wild food is shown only on maps whose climate has that food, Climate.has_wild)
 # controls: player settings shown in the inspector (type: choice, toggle or cap), stored in Building.settings
 #           A "cap" control is a production cap on an output item: 0 means no cap (or "zero_label", e.g. "Off")
 # fuel_capacity: housing that burns firewood to stay warm; this is how much it can hold
@@ -210,16 +216,23 @@ const BUILDINGS:Dictionary = {
         "shape": "house", "decor": "hut", "roof_pitch": 0.95, "height": 1.5, "color": Color(0.42, 0.45, 0.28), "roof": Color(0.66, 0.58, 0.3),
         "radius": 16.0, "worker_slots": 2, "profession": "FORAGER",
         "controls": [
-            {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true},
-            {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true},
-            {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true},
-            {"id": "forage_herb", "type": "toggle", "label": "Gather healing herbs", "default": true},
-            {"id": "forage_pref", "type": "choice", "label": "Pick first", "options": ["Nearest", "What we have least of", "Berries", "Mushrooms", "Hazelnuts", "Herbs"], "default": 0},
+            {"id": "forage_bush", "type": "toggle", "label": "Pick berries", "default": true, "wild": &"bush"},
+            {"id": "forage_mushroom", "type": "toggle", "label": "Pick mushrooms", "default": true, "wild": &"mushroom"},
+            {"id": "forage_hazel", "type": "toggle", "label": "Gather hazelnuts", "default": true, "wild": &"hazel"},
+            {"id": "forage_herb", "type": "toggle", "label": "Gather healing herbs", "default": true, "wild": &"herb"},
+            {"id": "forage_lingon", "type": "toggle", "label": "Pick lingonberries", "default": true, "wild": &"lingon"},
+            {"id": "forage_cactus", "type": "toggle", "label": "Pick prickly pears", "default": true, "wild": &"cactus"},
+            {"id": "forage_date", "type": "toggle", "label": "Gather dates", "default": true, "wild": &"date"},
+            {"id": "forage_banana", "type": "toggle", "label": "Pick bananas", "default": true, "wild": &"banana"},
+            {"id": "forage_coconut", "type": "toggle", "label": "Gather coconuts", "default": true, "wild": &"coconut"},
+            {"id": "forage_pref", "type": "choice", "label": "Pick first", "default": 0,
+             "options": ["Nearest", "What we have least of", "Berries", "Mushrooms", "Hazelnuts", "Herbs", "Lingonberries", "Prickly pears", "Dates", "Bananas", "Coconuts"],
+             "option_wild": [&"", &"", &"bush", &"mushroom", &"hazel", &"herb", &"lingon", &"cactus", &"date", &"banana", &"coconut"]},
             {"id": "cap_herbs", "type": "cap", "label": "Stop at herb stock", "item": &"herbs", "default": 24, "step": 4},
             {"id": "cap_food", "type": "cap", "label": "Stop at food stock", "item": &"food", "default": 120, "step": 20},
-            {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation"},
-            {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation"},
-            {"id": "sow_hazel", "type": "toggle", "label": "Sow hazel", "default": false, "requires_upgrade": &"cultivation"},
+            {"id": "sow_bush", "type": "toggle", "label": "Sow berry bushes", "default": false, "requires_upgrade": &"cultivation", "wild": &"bush"},
+            {"id": "sow_mushroom", "type": "toggle", "label": "Sow mushrooms (among trees)", "default": false, "requires_upgrade": &"cultivation", "wild": &"mushroom"},
+            {"id": "sow_hazel", "type": "toggle", "label": "Sow hazel", "default": false, "requires_upgrade": &"cultivation", "wild": &"hazel"},
         ],
         "upgrades": {
             &"cultivation": {
@@ -227,7 +240,7 @@ const BUILDINGS:Dictionary = {
                 "desc": "Foragers with nothing to pick sow new patches of the wild foods you switch on, near the hut. Wild patches also spread by themselves, only slowly.",
             },
         },
-        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, hazelnuts and healing herbs, as switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
+        "desc": "Foragers from here pick wild food in a radius (berries, mushrooms, nuts, fruit and healing herbs, whichever grow in this climate and are switched on) and carry it to storage. They can pick the nearest first, favour one food, or favour whichever the colony has least of, which keeps the diet varied. They stop once the colony's food stock reaches the cap. Wild food only comes back in its season, so the first pickers do best.",
     },
     &"fishing_hut": {
         "name": "Fishing Hut", "size": Vector2i(3, 4), "cost": {&"wood": 14}, "work": 10.0,
@@ -547,6 +560,7 @@ const CROPS:Dictionary = {
 const TRADE_VALUE:Dictionary = {
     &"wood": 2, &"stone": 3, &"iron": 6, &"coal": 5, &"firewood": 2, &"manure": 1,
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3, &"herbs": 4,
+    &"lingonberries": 2, &"cactus_fruit": 2, &"dates": 4, &"bananas": 2, &"coconuts": 4,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3, &"cherries": 3, &"peaches": 3, &"plums": 3, &"walnuts": 4, &"pecans": 5,
     &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
@@ -629,6 +643,16 @@ const RESOURCE_NODES:Dictionary = {
               "forage": true, "fruit_seasons": [0, 2], "regrow_days": 2, "spread_chance": 0.008, "max_total": 170},
     &"herb": {"name": "Healing Herbs", "item": &"herbs", "amount": 3, "work": 0.4, "solid": false, "verb": "Picking herbs", "regrows": true,
               "forage": true, "fruit_seasons": [0, 1, 2], "regrow_days": 3, "spread_chance": 0.004, "max_total": 90},
+    &"lingon": {"name": "Lingonberry Patch", "item": &"lingonberries", "amount": 5, "work": 0.3, "solid": false, "verb": "Foraging", "auto": true, "regrows": true,
+              "forage": true, "fruit_seasons": [1, 2], "regrow_days": 1, "spread_chance": 0.006, "max_total": 200},
+    &"cactus": {"name": "Prickly Pear", "item": &"cactus_fruit", "amount": 4, "work": 0.45, "solid": false, "verb": "Picking", "auto": true, "regrows": true,
+              "forage": true, "fruit_seasons": [0, 1, 2], "regrow_days": 2, "spread_chance": 0.004, "max_total": 150},
+    &"date": {"name": "Date Palm", "item": &"dates", "amount": 8, "work": 0.7, "solid": false, "verb": "Gathering dates", "regrows": true,
+              "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.003, "max_total": 80},
+    &"banana": {"name": "Banana Plants", "item": &"bananas", "amount": 6, "work": 0.4, "solid": false, "verb": "Picking", "auto": true, "regrows": true,
+              "forage": true, "fruit_seasons": [0, 1, 2, 3], "regrow_days": 3, "spread_chance": 0.006, "max_total": 200},
+    &"coconut": {"name": "Coconut Palm", "item": &"coconuts", "amount": 5, "work": 0.8, "solid": false, "verb": "Gathering coconuts", "regrows": true,
+              "forage": true, "fruit_seasons": [0, 1, 2, 3], "regrow_days": 4, "spread_chance": 0.003, "max_total": 110},
     &"hazel": {"name": "Hazel Grove", "item": &"hazelnuts", "amount": 6, "work": 0.5, "solid": false, "verb": "Gathering nuts", "regrows": true,
               "forage": true, "fruit_seasons": [2], "regrow_days": 1, "spread_chance": 0.004, "max_total": 125},
 };

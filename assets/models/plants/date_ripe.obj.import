@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://ds8lrmmentxhe"
+path="res://.godot/imported/date_ripe.obj-a400f9135b69de2282ff9b3c040975cd.mesh"
+
+[deps]
+
+files=["res://.godot/imported/date_ripe.obj-a400f9135b69de2282ff9b3c040975cd.mesh"]
+
+source_file="res://assets/models/plants/date_ripe.obj"
+dest_files=["res://.godot/imported/date_ripe.obj-a400f9135b69de2282ff9b3c040975cd.mesh", "res://.godot/imported/date_ripe.obj-a400f9135b69de2282ff9b3c040975cd.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

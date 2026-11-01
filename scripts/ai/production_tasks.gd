@@ -88,7 +88,7 @@ func fisherman_task(p:Pawn) -> Task:
         return t;
     return null;
 
-const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel", &"herb"];
+const FORAGE_KINDS:Array[StringName] = [&"bush", &"mushroom", &"hazel", &"herb", &"lingon", &"cactus", &"date", &"banana", &"coconut"];       # (the order of the hut's "Pick first" options)
 
 # The wild foods a hut's foragers try in turn: each is "pick only this kind", and &"" at the end means anything
 # switched on (the nearest). The hut's "Pick first" choice is Nearest, What we have least of, or one food.
@@ -96,7 +96,7 @@ func _forage_order(b:Building) -> Array[StringName]:
     var order:Array[StringName] = [];
     var pref:int = b.settings.get("forage_pref", 0);
     if pref == 1:
-        var kinds:Array[StringName] = FORAGE_KINDS.filter(func(k:StringName) -> bool: return k != &"herb" and b.settings.get("forage_%s" % k, true));
+        var kinds:Array[StringName] = FORAGE_KINDS.filter(func(k:StringName) -> bool: return k != &"herb" and Climate.has_wild(k) and b.settings.get("forage_%s" % k, true));
         kinds.sort_custom(func(a:StringName, c:StringName) -> bool:
             return Stock.amount(Defs.RESOURCE_NODES[a]["item"]) < Stock.amount(Defs.RESOURCE_NODES[c]["item"]));
         order.append_array(kinds);

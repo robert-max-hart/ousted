@@ -417,6 +417,8 @@ func _refresh_controls(obj:Variant) -> void:
     for c in b.def["controls"]:
         if c.has("requires_upgrade") and not b.has_upgrade(c["requires_upgrade"]):
             continue;
+        if c.has("wild") and not Climate.has_wild(c["wild"]):
+            continue;                  # a wild food this map does not have
         _controls_box.add_child(_make_control(b, c));
 
 # Upgrade buttons for a finished building: one per upgrade in its def. Blocked ones are disabled and say why;
@@ -478,7 +480,11 @@ func _make_control(b:Building, c:Dictionary) -> Control:
                 return "%s: %s" % [c["label"], opts[b.settings[id]]];
             btn.text = label_for.call();
             btn.pressed.connect(func() -> void:
-                b.settings[id] = (b.settings[id] + 1) % opts.size();
+                var next:int = (b.settings[id] + 1) % opts.size();
+                var kinds:Array = c.get("option_wild", []);
+                while kinds.size() == opts.size() and kinds[next] != &"" and not Climate.has_wild(kinds[next]):
+                    next = (next + 1) % opts.size();          # (skip a food this map does not have)
+                b.settings[id] = next;
                 btn.text = label_for.call());
             return btn;
         "cap":

@@ -307,6 +307,8 @@ func _spawn_nature() -> void:
     species.seed = world_seed + 11;
     species.frequency = 0.045;
     var trees:float = float(Climate.data()["trees"]);       # a dry climate has thin woods, a wet one thick
+    var wild_rng:RandomNumberGenerator = RandomNumberGenerator.new();         # (its own, so the map of a seed does not change: it only thins out the wild foods)
+    wild_rng.seed = world_seed + 23;
     for z in Terrain.SIZE:
         for x in Terrain.SIZE:
             var c:Vector2i = Vector2i(x, z);
@@ -321,19 +323,26 @@ func _spawn_nature() -> void:
                 var patch:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);       # patches of one kind among the others
                 add_node(Climate.pick_tree(patch, c), c);
             elif slope < 1.0 and f > -0.1 and f < 0.15 and r < 0.025:
-                add_node(&"bush", c);
+                _add_wild(&"bush", c, wild_rng);
             elif slope < 1.4 and f > -0.35 and f <= 0.15 and r > SPARSE_FROM and r < SPARSE_FROM + (SPARSE_TREES if f > -0.1 else SPARSE_TREES * 0.55) * trees:
                 var kind:float = species.get_noise_2d(x, z) + rng.randf_range(-0.25, 0.25);        # a lone tree here and there, thicker towards the groves
                 add_node(Climate.pick_tree(kind, c), c);
             elif slope < 1.0 and r < 0.008:
                 add_node(&"rock", c);             # loose surface stone on open ground (twice what it was originally)
             elif slope < 1.0 and f > 0.1 and f < 0.4 and r > 0.45 and r < 0.485:
-                add_node(&"mushroom", c);         # damp patches among the trees
+                _add_wild(&"mushroom", c, wild_rng);         # damp patches among the trees
             elif slope < 1.0 and f > -0.1 and f < 0.3 and r > 0.486 and r < 0.514:
-                add_node(&"herb", c);             # healing herbs in the meadows at the forest edge
+                _add_wild(&"herb", c, wild_rng);             # healing herbs in the meadows at the forest edge
             elif slope < 1.0 and f > -0.3 and f <= -0.1 and r > 0.6 and r < 0.64:
-                add_node(&"hazel", c);            # groves on the open ground beside the woods
+                _add_wild(&"hazel", c, wild_rng);            # groves on the open ground beside the woods
+    WildGrowth.spawn_extra(self, forest, wild_rng);       # more of the foods a climate has plenty of, and the ones only it has
     renderer.mark_dirty();
+
+# Adds a wild food unless this climate thins it out (a share under 1 keeps that share of them; none, none).
+func _add_wild(kind:StringName, c:Vector2i, wild_rng:RandomNumberGenerator) -> void:
+    var share:float = Climate.wild_share(kind);
+    if share >= 1.0 or (share > 0.0 and wild_rng.randf() < share):
+        add_node(kind, c);
 
 # Picks the flattest dry spot nearest the map center.
 

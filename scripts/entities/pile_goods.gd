@@ -22,7 +22,7 @@ const FORMS:Dictionary = {
     &"wood": &"log", &"firewood": &"split", &"stone": &"block", &"coal": &"lump", &"manure": &"lump",
     &"iron": &"ingot", &"silver": &"ingot", &"gold": &"ingot",
     &"wheat": &"sack", &"barley": &"sack", &"beans": &"sack", &"hazelnuts": &"sack", &"walnuts": &"sack",
-    &"pecans": &"sack", &"potato": &"sack",
+    &"pecans": &"sack", &"potato": &"sack", &"dates": &"sack",
     &"milk": &"barrel", &"honey": &"barrel", &"spirits": &"barrel",
     &"wool": &"bale", &"leather": &"bale", &"clothes_wool": &"bale", &"clothes_leather": &"bale", &"clothes_fine": &"bale",
     &"pottery": &"pot",

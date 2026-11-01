@@ -11,6 +11,7 @@
 #       bush_0..1 _leaves/_twigs/_berries     a berry bush
 #       hazel_0..1 _leaves/_stems  a hazel stool
 #       mushroom_ripe, mushroom_picked
+#       herb_ripe, lingon_ripe, cactus_ripe, date_ripe, banana_ripe, coconut_ripe   one coloured mesh each (wild foods of other climates)
 #       orchard_<crop> _trunk/_crown/_fruit   apple pear cherry peach plum walnut pecan
 #     Origin at the middle of the foot, up is +y; a rock fills about 1.4 m
 #     of ground, a bush 0.8, an orchard tree one cell (about 1 m wide).
@@ -183,11 +184,77 @@ def make_orchard():
         fruit.write("orchard_%s_fruit" % name, OUT)
 
 
+def make_wild_foods():
+    # lingonberry: a low cushion of dark leaves studded with red berries
+    m = Mesh()
+    for k, (x, z, r) in enumerate([(0, 0, 0.3), (0.28, 0.12, 0.22), (-0.26, 0.16, 0.22), (0.05, -0.28, 0.22), (-0.1, 0.3, 0.2)]):
+        m.ball(x, 0.12, z, r, r * 0.5, r, (0.2, 0.36, 0.2), segs=6, rings=3, wobble=0.06)
+    for k in range(11):
+        a = k * 2.4
+        d = 0.08 + 0.22 * ((k * 5) % 7) / 7.0
+        m.ball(math.cos(a) * d, 0.2 + 0.03 * (k % 3), math.sin(a) * d, 0.045, 0.045, 0.045, (0.78, 0.1, 0.16), segs=4, rings=3)
+    m.write("lingon_ripe", OUT)
+    # prickly pear: flat green pads stacked at angles, with pink fruit along the rims
+    m = Mesh()
+    pads = [(0, 0.28, 0, 0.26, 0.34, 0.07, 0.0), (0.16, 0.62, 0.02, 0.2, 0.26, 0.06, 0.5), (-0.17, 0.55, -0.02, 0.2, 0.25, 0.06, -0.6), (0.02, 0.88, 0.0, 0.17, 0.21, 0.055, 0.2)]
+    for (x, y, z, rx, ry, rz, yaw) in pads:
+        m.ball(x, y, z, rx, ry, rz, (0.36, 0.55, 0.28), segs=7, rings=4, yaw=yaw)
+    for (x, y, z) in [(0.2, 1.0, 0.0), (-0.1, 1.05, 0.04), (0.3, 0.76, 0.03), (-0.3, 0.7, 0.0), (0.1, 0.5, 0.08)]:
+        m.ball(x, y, z, 0.06, 0.08, 0.06, (0.8, 0.22, 0.42), segs=5, rings=3)
+    for k in range(10):
+        a = k * 1.1
+        m.box(math.cos(a) * 0.14, 0.2 + 0.07 * k, math.sin(a) * 0.12, 0.012, 0.03, 0.012, (0.9, 0.88, 0.7))
+    m.write("cactus_ripe", OUT)
+    # date palm, small: a slim bending trunk, a crown of drooping fronds and heavy orange-brown bunches
+    m = palm_shape((0.5, 0.4, 0.28), (0.3, 0.5, 0.2), 1.9, (0.85, 0.45, 0.12))
+    m.write("date_ripe", OUT)
+    # coconut palm: taller and leaning, with a cluster of brown nuts under the crown
+    m = palm_shape((0.58, 0.5, 0.36), (0.28, 0.52, 0.24), 2.2, (0.45, 0.32, 0.2), lean=0.25, nuts=True)
+    m.write("coconut_ripe", OUT)
+    # banana: three stems of broad long leaves around a green bunch of fingers
+    m = Mesh()
+    for k in range(3):
+        a = k * 2.1 + 0.4
+        base = v(math.cos(a) * 0.12, 0, math.sin(a) * 0.12)
+        top = v(math.cos(a) * 0.2, 1.0 + 0.15 * k, math.sin(a) * 0.2)
+        m.limb(base, top, 0.06, 0.04, (0.5, 0.68, 0.3), segs=5)
+        for j in range(4):
+            la = a + j * 1.57 + 0.3
+            m.limb(top, v(top[0] + math.cos(la) * 0.55, top[1] - 0.1, top[2] + math.sin(la) * 0.55), 0.07, 0.01, (0.32, 0.58, 0.22), segs=4)
+            m.ball(top[0] + math.cos(la) * 0.3, top[1] - 0.04, top[2] + math.sin(la) * 0.3, 0.3, 0.025, 0.12, (0.36, 0.62, 0.24), segs=6, rings=3, yaw=-la)
+    for k in range(5):
+        m.limb(v(0.1 + 0.04 * k, 0.8, 0.0), v(0.14 + 0.04 * k, 0.58, 0.04 * k), 0.035, 0.03, (0.95, 0.85, 0.25), segs=4)
+    m.write("banana_ripe", OUT)
+
+
+def palm_shape(trunk_col, leaf_col, height, fruit_col, lean=0.12, nuts=False):
+    m = Mesh()
+    top = v(lean, height, 0.0)
+    m.limb(v(0, 0, 0), v(lean * 0.4, height * 0.55, 0.02), 0.11, 0.08, trunk_col, segs=6)
+    m.limb(v(lean * 0.4, height * 0.55, 0.02), top, 0.08, 0.06, trunk_col, segs=6)
+    for k in range(8):
+        a = k * 0.785 + 0.2
+        tip = v(top[0] + math.cos(a) * 0.9, top[1] - 0.45, top[2] + math.sin(a) * 0.9)
+        m.limb(top, tip, 0.05, 0.012, leaf_col, segs=4)
+        m.ball((top[0] + tip[0]) / 2, (top[1] + tip[1]) / 2 + 0.02, (top[2] + tip[2]) / 2, 0.5, 0.03, 0.14, leaf_col, segs=6, rings=3, yaw=-a)
+    if nuts:
+        for k in range(5):
+            a = k * 1.3
+            m.ball(top[0] + math.cos(a) * 0.14, top[1] - 0.2, top[2] + math.sin(a) * 0.14, 0.11, 0.11, 0.11, fruit_col, segs=5, rings=3)
+    else:
+        for k in range(3):
+            a = k * 2.1
+            m.limb(v(top[0], top[1] - 0.05, top[2]), v(top[0] + math.cos(a) * 0.3, top[1] - 0.45, top[2] + math.sin(a) * 0.3), 0.02, 0.02, trunk_col, segs=3)
+            m.ball(top[0] + math.cos(a) * 0.3, top[1] - 0.52, top[2] + math.sin(a) * 0.3, 0.1, 0.16, 0.1, fruit_col, segs=5, rings=3)
+    return m
+
+
 make_rocks()
 make_ore()
 make_shrubs()
 make_hazel()
 make_mushrooms()
 make_herbs()
+make_wild_foods()
 make_orchard()
 print("wrote", len([f for f in os.listdir(OUT) if f.endswith(".obj")]), "plant parts")
