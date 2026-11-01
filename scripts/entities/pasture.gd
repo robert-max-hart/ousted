@@ -14,6 +14,11 @@ const COLLECT_AT      :int = 4;        # units ready before a farmer is sent
 const READY_CAP       :int = 60;       # what piles up uncollected (the rest is lost)
 const SLAUGHTER_PER_DAY:int = 2;       # most animals slaughtered a day when over the "keep at most" level
 const EXTRA_COLLECT_AT:int = 2;        # meat or leather ready before a farmer is sent
+const SPEED           :Dictionary = {&"chicken": 0.55, &"sheep": 0.38, &"cow": 0.3};      # metres a second at 1x
+const GRAZE_FOR       :Vector2 = Vector2(3.0, 9.0);       # seconds an animal stands with its head down before wandering on
+const YOUNG_OFFSET    :Dictionary = {&"chicken": 0.45, &"sheep": 0.8, &"cow": 1.15};       # how far from its mother a young one stands
+const YOUNG_SIZE      :float = 0.45;                      # a newborn's size against a grown one
+const CHICK_COLOUR    :Color = Color(1.0, 0.88, 0.4);
 const STARVE_CHANCE   :float = 0.35;   # chance a day that each unfed animal dies
 const FEED_DAYS       :float = 12.0;   # the grain buffer a herd is topped up to, in days of feed
 const STOCK_UP_BELOW  :float = 12.0;   # C, daily mean: below this the buffer is kept stocked (autumn, winter, early spring)
@@ -30,7 +35,15 @@ var ready_extra :Dictionary = {};      # item -> units from slaughtered animals 
 var claimed     :bool = false;         # a citizen is on the way to collect (not saved)
 var _herd       :Node3D;                        # holds the herd's layers: body, head and legs (see Animals)
 var _layers     :Dictionary = {};               # part -> MultiMeshInstance3D
+var young_ages  :Array[float] = [];     # days old, oldest first, of the young in the herd (the last of its animals): drawn small until grown. Looks only; saved
 var _t          :float = 0.0;
+var _pos        :PackedVector2Array = PackedVector2Array();       # where each animal is, where it is heading, how long it waits there, and how it is moving
+var _goal       :PackedVector2Array = PackedVector2Array();
+var _wait       :PackedFloat32Array = PackedFloat32Array();
+var _yaw        :PackedFloat32Array = PackedFloat32Array();
+var _walk       :PackedFloat32Array = PackedFloat32Array();
+var _graze      :PackedFloat32Array = PackedFloat32Array();
+var _vis_rng    :RandomNumberGenerator = RandomNumberGenerator.new();      # (not the world's: the herd's looks must not change a game's random numbers)
 var _drawn      :int = -1;
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:
@@ -74,6 +87,7 @@ func set_kind(k:StringName) -> bool:
     ready_product = 0;
     ready_manure = 0;
     ready_extra.clear();
+    young_ages.clear();
     _make_layers();
     return true;
 
@@ -123,8 +137,13 @@ func on_day() -> void:
     manure_acc -= m;
     ready_product = mini(READY_CAP, ready_product + p);
     ready_manure = mini(READY_CAP, ready_manure + m);
+    for i in young_ages.size():
+        young_ages[i] += 1.0;
+    while not young_ages.is_empty() and young_ages[0] >= a["mature"]:
+        young_ages.pop_front();
     if animals >= 2 and animals < capacity_animals() and world.rng.randf() < a["breed"]:
         animals += 1;
+        young_ages.append(0.0);
     _cull();
 
 # A herd over its "keep at most" level has a few animals slaughtered a day for their meat and leather.
@@ -232,6 +251,7 @@ func to_dict() -> Dictionary:
     d["ready_product"] = ready_product;
     d["ready_manure"] = ready_manure;
     d["ready_extra"] = ready_extra.duplicate();
+    d["young"] = young_ages.duplicate();
     return d;
 
 func restore_dict(d:Dictionary) -> void:
@@ -245,6 +265,9 @@ func restore_dict(d:Dictionary) -> void:
     ready_product = d.get("ready_product", 0);
     ready_manure = d.get("ready_manure", 0);
     ready_extra = d.get("ready_extra", {});
+    young_ages.clear();
+    for a in d.get("young", []):
+        young_ages.append(float(a));
 
 func info_text() -> String:
     if state != State.COMPLETE:
@@ -272,6 +295,9 @@ func help_text() -> String:
 # --------------------------------
 # The herd, wandering inside the fence
 
+func young_count() -> int:
+    return mini(young_ages.size(), animals);
+
 func _process(delta:float) -> void:
     if animals != _drawn:
         _drawn = animals;
@@ -279,22 +305,85 @@ func _process(delta:float) -> void:
             (_layers[part] as MultiMeshInstance3D).multimesh.instance_count = animals if is_complete() else 0;
     if animals <= 0 or not is_complete() or not _herd.visible:
         return;
-    _t += delta * 0.6 * World.fx_speed();
+    while young_ages.size() > animals:
+        young_ages.pop_back();
+    var dt:float = delta * minf(World.fx_speed(), 3.0);
+    _t += dt;
     var r:Rect2 = Rect2(rect()).grow(-0.9);
+    _sync_herd(r);
+    var adults:int = animals - young_count();
+    var warm:bool = grazing();
+    var speed:float = SPEED[kind];
+    var mature:float = animal()["mature"];
     for i in animals:
-        var h:int = (i * 73856093) ^ (origin.x * 19349663) ^ (origin.y * 83492791);
-        var fx:float = float(h & 1023) / 1023.0;
-        var fz:float = float((h >> 10) & 1023) / 1023.0;
-        var ph:float = float((h >> 20) & 255) / 255.0 * TAU;
-        var x:float = r.position.x + fx * maxf(r.size.x, 0.1) + sin(_t * 0.7 + ph) * 0.5;
-        var z:float = r.position.y + fz * maxf(r.size.y, 0.1) + cos(_t * 0.55 + ph * 1.3) * 0.5;
-        var yaw:float = atan2(sin(_t * 0.55 + ph * 1.3) * 0.28, cos(_t * 0.7 + ph) * 0.35);       # the way it is heading (the models face +x)
-        var walk:float = clampf(0.5 + 0.9 * sin(_t * 0.4 + ph * 2.0), 0.0, 1.0);                 # walking, or standing with its head down
-        var bob:float = absf(sin(_t * 6.0 + ph)) * 0.012 * walk;
-        var xf:Transform3D = Transform3D(Basis(Vector3.UP, yaw), Vector3(x, world.terrain.height_at(x, z) + bob, z));
-        var timing:Color = Color(ph, walk, 1.0 - walk, 0.0);
+        var young:bool = i >= adults;
+        var mother:int = (i - adults) % adults if young and adults > 0 else -1;
+        var moving:bool = false;
+        if mother >= 0:
+            # a young one keeps close to its mother, running to catch up
+            var near:Vector2 = _pos[mother] + Vector2(cos(i * 2.3), sin(i * 2.3)) * YOUNG_OFFSET[kind];
+            _goal[i] = near;
+            moving = _pos[i].distance_to(near) > 0.3;
+            if moving:
+                _step(i, speed * 1.5 * dt);
+        elif _wait[i] > 0.0:
+            _wait[i] -= dt;
+        else:
+            moving = _pos[i].distance_to(_goal[i]) > 0.08;
+            if moving:
+                _step(i, speed * dt);
+            else:
+                _wait[i] = _vis_rng.randf_range(GRAZE_FOR.x, GRAZE_FOR.y) * (1.0 if warm else 1.6);
+                _goal[i] = _random_spot(r);
+        _walk[i] = move_toward(_walk[i], 1.0 if moving else 0.0, dt * 2.5);
+        _graze[i] = move_toward(_graze[i], 1.0 if (not moving and (warm or kind == &"chicken")) else 0.0, dt * 1.5);
+        var ph:float = float(((i * 73856093) ^ (origin.x * 19349663)) & 255) / 255.0 * TAU;
+        var bob:float = absf(sin(_t * 6.0 + ph)) * 0.012 * _walk[i];
+        var size:float = 1.0;
+        var coat:Color = Animals.coat(kind, i if mother < 0 else mother);
+        if young:
+            var grown:float = clampf(young_ages[i - adults] / mature, 0.0, 1.0);
+            size = lerpf(YOUNG_SIZE, 1.0, grown);
+            if kind == &"chicken":
+                coat = CHICK_COLOUR.lerp(coat, grown);
+        var xf:Transform3D = Transform3D(Basis(Vector3.UP, _yaw[i]).scaled(Vector3.ONE * size), Vector3(_pos[i].x, world.terrain.height_at(_pos[i].x, _pos[i].y) + bob * size, _pos[i].y));
+        var timing:Color = Color(ph, _walk[i], _graze[i], 0.0);
         for part in _layers:
             var mm:MultiMesh = (_layers[part] as MultiMeshInstance3D).multimesh;
             mm.set_instance_transform(i, xf);
-            mm.set_instance_color(i, Color.WHITE if (part == &"legs" and kind != &"cow") else Animals.coat(kind, i));       # (a cow has legs of her own colour)
+            mm.set_instance_color(i, Color.WHITE if (part == &"legs" and kind != &"cow") else coat);       # (a cow has legs of her own colour)
             mm.set_instance_custom_data(i, timing);
+
+func _random_spot(r:Rect2) -> Vector2:
+    return Vector2(r.position.x + _vis_rng.randf() * maxf(r.size.x, 0.1), r.position.y + _vis_rng.randf() * maxf(r.size.y, 0.1));
+
+# Moves animal i up to `dist` metres toward its goal, turning to face the way it goes.
+func _step(i:int, dist:float) -> void:
+    var to:Vector2 = _goal[i] - _pos[i];
+    var d:float = to.length();
+    if d < 0.001:
+        return;
+    _pos[i] += to / d * minf(d, dist);
+    _yaw[i] = lerp_angle(_yaw[i], atan2(-to.y, to.x), 0.12);          # (the models face +x)
+
+# Keeps the per-animal state the size of the herd: a new one appears at a random spot (a newborn beside its mother).
+func _sync_herd(r:Rect2) -> void:
+    var adults:int = animals - young_count();
+    while _pos.size() < animals:
+        var i:int = _pos.size();
+        var at:Vector2 = _random_spot(r);
+        if i >= adults and adults > 0:
+            at = _pos[(i - adults) % adults] + Vector2(0.3, 0.2) * YOUNG_OFFSET[kind] / 0.45;
+        _pos.append(at);
+        _goal.append(_random_spot(r));
+        _wait.append(_vis_rng.randf_range(0.0, GRAZE_FOR.y));
+        _yaw.append(_vis_rng.randf() * TAU);
+        _walk.append(0.0);
+        _graze.append(0.0);
+    if _pos.size() > animals:
+        _pos.resize(animals);
+        _goal.resize(animals);
+        _wait.resize(animals);
+        _yaw.resize(animals);
+        _walk.resize(animals);
+        _graze.resize(animals);

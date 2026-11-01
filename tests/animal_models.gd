@@ -47,6 +47,50 @@ func _ready() -> void:
     GameClock.set_speed(0);
     world.visuals._update_water(0.5);
     _expect("the animal clock runs with the game and holds when it is paused", running > 0.0 and is_equal_approx(float(legs.get_shader_parameter("clock")), running));
+    # young animals and wandering
+    p.set_kind(&"sheep");
+    p.animals = 6;
+    p.young_ages.assign([1.0, 3.0]);
+    GameClock.set_speed(1);
+    var before:PackedVector2Array = PackedVector2Array();
+    for i in 40:
+        p._process(0.25);
+        if i == 0:
+            before = p._pos.duplicate();
+    _expect("per-animal state matches the herd", p._pos.size() == 6 and p._wait.size() == 6 and p._yaw.size() == 6);
+    var moved:int = 0;
+    for i in 6:
+        if p._pos[i].distance_to(before[i]) > 0.3:
+            moved += 1;
+    _expect("the animals wander about (%d of 6 moved)" % moved, moved >= 3);
+    var r:Rect2 = Rect2(p.rect()).grow(-0.8);
+    var inside:bool = true;
+    for i in 6:
+        inside = inside and r.grow(0.6).has_point(p._pos[i]);
+    _expect("and stay inside the fence", inside);
+    for i in 200:
+        p._process(0.25);
+    var close:bool = true;
+    for j in 2:
+        close = close and p._pos[4 + j].distance_to(p._pos[(j) % 4]) < 2.5;
+    _expect("the young keep near their mothers", close);
+    # the young grow up
+    p.young_ages.assign([1.0, 3.0]);
+    p.on_day();
+    _expect("a day ages the young", is_equal_approx(p.young_ages[0], 2.0));
+    p.young_ages.assign([11.5]);
+    p.on_day();
+    _expect("a lamb that reaches twelve days is grown (the list holds no one over it)", not p.young_ages.any(func(a:float) -> bool: return a >= 12.0) and not p.young_ages.has(12.5));
+    p.young_ages.assign([11.5]);
+    p.animals = 3;
+    var d:Dictionary = p.to_dict();
+    var q:Pasture = world.place_building(&"pasture", TestSite.spot(world, Vector2i(6, 6), Vector2i(14, -14)), Vector2i(6, 6), true) as Pasture;
+    q.restore_dict(d);
+    _expect("the young are saved", q.young_ages.size() == 1 and is_equal_approx(q.young_ages[0], 11.5));
+    p.animals = 1;
+    p._process(0.1);
+    _expect("fewer animals than young trims the list", p.young_ages.size() <= 1);
+    GameClock.set_speed(0);
     var herd:GuidedHerd = GuidedHerd.lead(world, &"chicken", 3, world.pawns[0]);
     _expect("a led herd is three whole animals", herd._animals.size() == 3 and (herd._animals[0] as MeshInstance3D).mesh == Animals.whole(&"chicken"));
     herd.queue_free();

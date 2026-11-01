@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.6.15 | 31 Oct 2026 | Chicks, lambs and calves, and herds that wander
+- Newborn animals now appear small: chicks (yellow), lambs and calves stay close to their mothers and grow up over a few days (6 for chicks, 12 for lambs, 16 for calves). They are only a matter of looks: breeding and what the animals give are as before.
+- Herds wander around inside their pasture instead of standing near one spot. Each animal walks across the grass, stops with its head down to graze (in the cold months, when they eat grain, they keep their heads up), and turns to face the way it is going. Chickens peck all year.
+
 # 0.6.14 | 31 Oct 2026 | Citizens sit, eat and smile
 - Citizens now sit down on the ground to eat, bending a hand to their mouth, and bend over to scoop water when they drink. Anyone with nothing to do for a few seconds sits down to rest.
 - Walking is in step with the ground: the legs move with the distance covered, so citizens no longer seem to skate when wading or hurrying, and children take shorter steps.

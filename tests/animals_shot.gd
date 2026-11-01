@@ -36,6 +36,7 @@ func _ready() -> void:
         var p:Pasture = world.place_building(&"pasture", _o + Vector2i(i * 7, 0), Vector2i(6, 6), true) as Pasture;
         p.set_kind(kinds[i]);
         p.animals = counts[i];
+        p.young_ages.assign([[0.5, 2.0, 4.0], [1.0, 6.0], [2.0]][i]);       # the last of the herd are young: drawn small
     world.camera_rig.focus_on(Vector3(_o.x + 10.0, 0, _o.y + 3.0));
     world.camera_rig._distance = 15.0;
     world.camera_rig._target_distance = 15.0;

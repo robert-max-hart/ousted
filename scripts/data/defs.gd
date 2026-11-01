@@ -547,13 +547,14 @@ static func offer_name(key:StringName) -> String:
 # Farm animals kept in a Pasture (its chosen kind, `Pasture.kind`). cells: ground per animal; start: how many a
 # merchant brings at most (a pasture starts empty: animals are bought); value: trade value of one; guide: how many a
 # citizen can lead to a pasture at once; breed: chance a day of one more while there is room (two or more are needed);
+# mature: days a newborn is drawn small (a chick, lamb or calf) before it looks grown (looks only);
 # meat, leather: what one slaughtered animal gives (a pasture's "keep at most" setting culls the surplus);
 # product/rate: item and units per animal per day; manure: units per animal per day; feed: grain per animal per day
 # when nothing grows to graze (the cold months).
 const ANIMALS:Dictionary = {
-    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "meat": 1, "leather": 0, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
-    &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "meat": 3, "leather": 1, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
-    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "meat": 8, "leather": 3, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
+    &"chicken": {"name": "Chickens", "one": "chicken", "cells": 1.5, "start": 4, "value": 12, "guide": 4, "breed": 0.10, "mature": 6.0, "meat": 1, "leather": 0, "product": &"eggs", "rate": 0.6, "manure": 0.15, "feed": 0.06},
+    &"sheep":   {"name": "Sheep", "one": "sheep", "cells": 3.0, "start": 3, "value": 30, "guide": 2, "breed": 0.06, "mature": 12.0, "meat": 3, "leather": 1, "product": &"wool", "rate": 0.14, "manure": 0.25, "feed": 0.12},
+    &"cow":     {"name": "Cows", "one": "cow", "cells": 6.0, "start": 2, "value": 70, "guide": 1, "breed": 0.04, "mature": 16.0, "meat": 8, "leather": 3, "product": &"milk", "rate": 1.6, "manure": 0.6, "feed": 0.35},
 };
 # Old building ids that were one animal each (before the single selectable Pasture): save loading turns them into a pasture of that animal.
 const LEGACY_PASTURES:Dictionary = {&"coop": &"chicken", &"pasture": &"cow", &"sheepfold": &"sheep"};
