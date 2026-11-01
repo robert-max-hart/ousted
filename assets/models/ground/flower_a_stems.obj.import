@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://f2d4r0v8gpld"
+path="res://.godot/imported/flower_a_stems.obj-9ae94d45d774050a11619a29b49fc1cf.mesh"
+
+[deps]
+
+files=["res://.godot/imported/flower_a_stems.obj-9ae94d45d774050a11619a29b49fc1cf.mesh"]
+
+source_file="res://assets/models/ground/flower_a_stems.obj"
+dest_files=["res://.godot/imported/flower_a_stems.obj-9ae94d45d774050a11619a29b49fc1cf.mesh", "res://.godot/imported/flower_a_stems.obj-9ae94d45d774050a11619a29b49fc1cf.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

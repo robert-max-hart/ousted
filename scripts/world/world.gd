@@ -156,6 +156,7 @@ func _ready() -> void:
     add_child(renderer);
     add_child(RoadDetail.new(self));
     add_child(GrassDetail.new(self));
+    add_child(GroundPlants.new(self));
     jobs = JobManager.new(self);
     families = Families.new(self);
     policies.changed.connect(jobs.on_policy_changed);

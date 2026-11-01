@@ -35,6 +35,8 @@ func apply_settings() -> void:
     WindSway.grass_enabled = Settings.grass_sway_on();
     if _water_mat != null:
         _water_mat.set_shader_parameter("detail", float(Settings.water));
+    if edge_clouds != null:
+        edge_clouds.apply_settings();
     if world.terrain != null:
         world.terrain.apply_settings();
 

@@ -29,6 +29,7 @@ static var sway       :bool = true;       # trees, bushes and hazel
 static var grass_sway :bool = true;
 static var ground     :bool = true;       # ground grain and rock strata
 static var snow_edge  :bool = true;       # ragged, patchy snow edges
+static var wispy_clouds:bool = true;     # dithered, broken-up edges on the cloud bank round the map
 static var shadows    :bool = true;
 static var volume_master :int = 80;      # 0 to 100
 static var volume_sfx    :int = 80;
@@ -59,6 +60,7 @@ static func ensure_loaded() -> void:
     grass_sway = bool(cfg.get_value("graphics", "grass_sway", grass_sway));
     ground = bool(cfg.get_value("graphics", "ground", ground));
     snow_edge = bool(cfg.get_value("graphics", "snow_edge", snow_edge));
+    wispy_clouds = bool(cfg.get_value("graphics", "wispy_clouds", wispy_clouds));
     fullscreen = bool(cfg.get_value("window", "fullscreen", fullscreen));
     vsync = bool(cfg.get_value("window", "vsync", vsync));
 
@@ -77,6 +79,7 @@ static func save() -> void:
     cfg.set_value("graphics", "grass_sway", grass_sway);
     cfg.set_value("graphics", "ground", ground);
     cfg.set_value("graphics", "snow_edge", snow_edge);
+    cfg.set_value("graphics", "wispy_clouds", wispy_clouds);
     cfg.set_value("window", "fullscreen", fullscreen);
     cfg.set_value("window", "vsync", vsync);
     cfg.save(PATH);
@@ -114,11 +117,15 @@ static func ground_on() -> bool:
     ensure_loaded();
     return ground;
 
+static func wispy_clouds_on() -> bool:
+    ensure_loaded();
+    return wispy_clouds;
+
 static func snow_shading_on() -> bool:
     ensure_loaded();
     return snow_edge;
 
-# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "fullscreen" or "vsync"), saves and applies it.
+# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "wispy_clouds", "fullscreen" or "vsync"), saves and applies it.
 static func set_value(key:String, value:Variant) -> void:
     ensure_loaded();
     match key:
@@ -135,6 +142,7 @@ static func set_value(key:String, value:Variant) -> void:
         "grass_sway": grass_sway = bool(value);
         "ground": ground = bool(value);
         "snow_edge": snow_edge = bool(value);
+        "wispy_clouds": wispy_clouds = bool(value);
         "fullscreen": fullscreen = bool(value);
         "vsync": vsync = bool(value);
         _: return;
@@ -159,6 +167,8 @@ static func apply() -> void:
         for c in w.get_children():
             if c is GrassDetail:
                 (c as GrassDetail).reload();
+            elif c is GroundPlants:
+                (c as GroundPlants).reload();
 
 static func apply_window() -> void:
     ensure_loaded();

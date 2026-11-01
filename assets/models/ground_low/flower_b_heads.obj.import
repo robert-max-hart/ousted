@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cyi4s20857we2"
+path="res://.godot/imported/flower_b_heads.obj-d1d159a52d4c3865b6aac01a60be7493.mesh"
+
+[deps]
+
+files=["res://.godot/imported/flower_b_heads.obj-d1d159a52d4c3865b6aac01a60be7493.mesh"]
+
+source_file="res://assets/models/ground_low/flower_b_heads.obj"
+dest_files=["res://.godot/imported/flower_b_heads.obj-d1d159a52d4c3865b6aac01a60be7493.mesh", "res://.godot/imported/flower_b_heads.obj-d1d159a52d4c3865b6aac01a60be7493.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

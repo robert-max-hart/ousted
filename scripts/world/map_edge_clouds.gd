@@ -37,11 +37,13 @@ func build(terrain:Terrain, world_seed:int) -> void:
     var size:float = Terrain.SIZE;
     _bank_mat = ShaderMaterial.new();
     _bank_mat.shader = load("res://shaders/cloud_bank.gdshader") as Shader;
+    var lumps:Texture2D = _lump_texture(world_seed);
+    _bank_mat.set_shader_parameter("lumps", lumps);
     WindSway.track(_bank_mat);
     _floor_mat = ShaderMaterial.new();
     _floor_mat.shader = load("res://shaders/cloud_floor.gdshader") as Shader;
     _floor_mat.set_shader_parameter("centre", Vector2(size * 0.5, size * 0.5));
-    _floor_mat.set_shader_parameter("lumps", _lump_texture(world_seed));
+    _floor_mat.set_shader_parameter("lumps", lumps);
     WindSway.track(_floor_mat);
 
     var plane:PlaneMesh = PlaneMesh.new();
@@ -56,8 +58,8 @@ func build(terrain:Terrain, world_seed:int) -> void:
     var sphere:SphereMesh = SphereMesh.new();
     sphere.radius = 1.0;
     sphere.height = 2.0;
-    sphere.radial_segments = 9;
-    sphere.rings = 5;
+    sphere.radial_segments = 20;
+    sphere.rings = 10;
     var mm:MultiMesh = MultiMesh.new();
     mm.transform_format = MultiMesh.TRANSFORM_3D;
     mm.use_colors = true;                 # kept for the shade (and the Compatibility renderer needs it on)
@@ -84,6 +86,7 @@ func build(terrain:Terrain, world_seed:int) -> void:
     _puffs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;
     _puffs.extra_cull_margin = 60.0;      # the bank is one object round the whole map: do not cull it when only part is in view
     add_child(_puffs);
+    apply_settings();
 
 # One billow: its transform, shade and phase. `side` 0 to 3 is north, east, south, west; `t` is where along the edge.
 func _puff(terrain:Terrain, rng:RandomNumberGenerator, side:int, t:float, row:Dictionary, k:int) -> Array:
@@ -127,6 +130,11 @@ func set_tint(horizon:Color) -> void:
     var day:float = clampf(horizon.get_luminance() * 2.4, 0.0, 1.0);
     _bank_mat.set_shader_parameter("tint", horizon.lerp(Color(1, 1, 1), 0.38 * day));
     _floor_mat.set_shader_parameter("tint", horizon.lerp(Color(1, 1, 1), 0.2 * day));
+
+# The wispy edges follow the player's setting.
+func apply_settings() -> void:
+    if _bank_mat != null:
+        _bank_mat.set_shader_parameter("wispy", 1.0 if Settings.wispy_clouds_on() else 0.0);
 
 func puff_count() -> int:
     return _puffs.multimesh.instance_count;

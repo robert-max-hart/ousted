@@ -37,6 +37,10 @@ func _ready() -> void:
         _pile.stored[each[i]] = _pile.capacity() / each.size();
     for item in [&"wood", &"stone", &"wheat", &"firewood"]:
         _full.stored[item] = _full.capacity() / 4;
+    # loose piles in a row below the stockpiles: different goods and sizes
+    var loose:Array = [[&"wood", 1], [&"wood", 6], [&"stone", 12], [&"firewood", 30], [&"wheat", 5], [&"wheat", 24], [&"iron", 9], [&"apples", 14], [&"pottery", 7], [&"tool_iron", 4]];
+    for i in loose.size():
+        GroundPiles.drop_pile(world, loose[i][0], loose[i][1], _o + Vector2i(1 + i * 2, 7));
     world.camera_rig.focus_on(Vector3(_o.x + 2.5, 0, _o.y + 1.5));
     world.camera_rig._distance = 11.0;
     world.camera_rig._target_distance = 11.0;
@@ -57,6 +61,11 @@ func _process(_delta:float) -> void:
             world.camera_rig._target_distance = 9.0;
         130:
             _shot("goods_c");
+            world.camera_rig.focus_on(Vector3(_o.x + 10.0, 0, _o.y + 7.5));
+            world.camera_rig._distance = 9.0;
+            world.camera_rig._target_distance = 9.0;
+        170:
+            _shot("goods_ground");
             get_tree().quit();
 
 func _shot(n:String) -> void:

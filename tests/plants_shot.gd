@@ -93,6 +93,9 @@ func _process(_delta:float) -> void:
             world.visuals.snow_cover = 0.8;
         130:
             _shot("plants_winter");
+            world.visuals.snow_cover = 0.3;
+        155:
+            _shot("plants_light_snow");
             get_tree().quit();
 
 func _shot(n:String) -> void:

@@ -70,6 +70,13 @@ func _ready() -> void:
     Climate.current = Climate.Id.TROPICAL;
     _expect("without a winter the crowns stay", CropMeshes.leaf_colour(&"apple").a > 0.0);
     Climate.current = Climate.Id.TEMPERATE;
+    # rocks and ore take snow: their material is the rock shader, and WindSway.update gives it the cover
+    var rock_layer:ChunkedLayer = world.renderer._layers[&"rock:0"];
+    var rock_mat:ShaderMaterial = (rock_layer.mesh as ArrayMesh).surface_get_material(0) as ShaderMaterial;
+    _expect("a rock uses the snow shader", rock_mat != null and rock_mat.shader.resource_path.ends_with("rock.gdshader"));
+    WindSway.update(1.0, 1.0, 0.7);
+    _expect("and gets the snow cover", rock_mat != null and is_equal_approx(float(rock_mat.get_shader_parameter("snow")), 0.7));
+    WindSway.update(1.0, 1.0, 0.0);
     print("PLANT MODELS %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
 

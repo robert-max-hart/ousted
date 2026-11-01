@@ -69,6 +69,7 @@ func _init() -> void:
     _check(col, "Grass sway", Settings.grass_sway, "grass_sway", "The grass tufts bend in the wind. Off helps weak graphics cards.");
     _check(col, "Ground detail", Settings.ground, "ground", "Grain on the ground and bands on steep slopes. Off shows the plain ground colour.");
     _check(col, "Snow edge detail", Settings.snow_edge, "snow_edge", "Ragged, patchy snow edges. Off makes snow an even cover.");
+    _check(col, "Wispy cloud edges", Settings.wispy_clouds, "wispy_clouds", "The clouds round the map break up into dithered wisps at their edges. Off makes them solid, which is a little lighter on weak graphics cards.");
     _check(col, "Shadows", Settings.shadows, "shadows", "Sun and moon shadows. Off helps weak graphics cards.");
     _check(col, "Fullscreen", Settings.fullscreen, "fullscreen", "");
     _check(col, "Vertical sync", Settings.vsync, "vsync", "Stops tearing; turn off if the game feels laggy.");

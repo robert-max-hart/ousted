@@ -3,9 +3,12 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
-# 0.6.12-dev | 31 Oct 2026 | Clouds round the edge of the map
+# 0.6.12 | 31 Oct 2026 | Clouds round the map, flowers, ferns and reeds, snowy rocks
 - The map no longer ends in a hard cut with empty sky beyond it. A bank of cloud billows stands along all four edges, rising a little above the ground there, and a sea of cloud stretches out under and around the map to the horizon. From the edge, from above and from outside, the land now looks like an island in the clouds.
-- The clouds follow the sky: white by day, gold at dusk and bluish at night, and they swell and drift slowly with the game clock (and stop when it is paused).
+- The clouds follow the sky: white by day, gold at dusk and bluish at night, and they swell and drift slowly with the game clock (and stop when it is paused). Their edges are wispy and break up into fine wisps, and they fade out softly where they meet the ground instead of ending in a hard line. Settings has a Wispy clouds switch for the broken-up edges.
+- Small plants now grow on the ground. Meadow flowers bloom in patches of one colour in spring and summer (a few asters linger in autumn, none in winter), ferns grow under and beside trees, and reeds with cattails line the shores and shallows. They sway in the wind and follow the Grass setting (Off removes them), the grass sway setting and Model detail.
+- Rocks and ore outcrops now take snow: it settles on their tops and climbs the sides as it gets deeper, in a patchy edge.
+- Goods lying on the ground outside storage are now drawn as little heaps of the same logs, blocks, sacks and barrels as in a stockpile, one for every three units, instead of a grey box.
 
 # 0.6.11 | 31 Oct 2026 | Graphics settings for trees and crops, and a fairer mix of trees
 - Settings has two new options for weaker graphics cards. **Tree and crop distance** (Near, Normal, Far) stops drawing trees, bushes, rocks and crops past a set distance from the camera; Far, the default, draws everything as before. **Model detail** (Full, Reduced) swaps trees, bushes, rocks, orchard trees and crops for simpler models with fewer sides, leaves and stalks, about 40% fewer triangles for trees, bushes and rocks.

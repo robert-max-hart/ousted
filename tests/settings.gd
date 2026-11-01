@@ -66,6 +66,11 @@ func _ready() -> void:
     Settings.set_value("snow_edge", false);
     var tm:ShaderMaterial = world.terrain._material;
     _expect("ground and snow switches reach the terrain", float(tm.get_shader_parameter("ground_detail")) == 0.0 and float(tm.get_shader_parameter("snow_detail")) == 0.0);
+    var bank:ShaderMaterial = world.visuals.edge_clouds._bank_mat;
+    _expect("wispy cloud edges are on by default", float(bank.get_shader_parameter("wispy")) == 1.0);
+    Settings.set_value("wispy_clouds", false);
+    _expect("the wispy cloud switch reaches the cloud bank", float(bank.get_shader_parameter("wispy")) == 0.0);
+    Settings.set_value("wispy_clouds", true);
     Settings.set_value("grass", 1);
     Settings.set_value("vsync", false);
     Settings._loaded = false;

@@ -10,7 +10,7 @@
 import os, subprocess, sys
 
 here = os.path.dirname(os.path.abspath(__file__))
-for gen in ("make_trees.py", "make_plants.py", "make_crops.py"):
+for gen in ("make_trees.py", "make_plants.py", "make_crops.py", "make_ground.py"):
     for extra in ([], ["--low"]):
         out = subprocess.run([sys.executable, os.path.join(here, gen)] + extra, capture_output=True, text=True)
         print(gen, " ".join(extra), "->", out.stdout.strip().splitlines()[-1] if out.stdout.strip() else out.stderr.strip())

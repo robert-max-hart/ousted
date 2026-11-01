@@ -226,8 +226,8 @@ func _make_tree_layers(trunk_color:Color) -> void:
 
 # The layers for rocks, ore, shrubs and mushrooms, from the plant models.
 func _make_plant_layers(trunk_color:Color) -> void:
-    var rock_mat:StandardMaterial3D = _make_material(Color(0.55, 0.54, 0.52));
-    var dark_mat:StandardMaterial3D = _make_material(Color(0.36, 0.35, 0.36));
+    var rock_mat:ShaderMaterial = _make_rock_material(Color(0.55, 0.54, 0.52));       # snow lies on these (shaders/rock.gdshader)
+    var dark_mat:ShaderMaterial = _make_rock_material(Color(0.36, 0.35, 0.36));
     var rust_mat:StandardMaterial3D = _make_material(Color(0.66, 0.31, 0.16));
     var glint_mat:StandardMaterial3D = _make_material(Color(0.72, 0.74, 0.78));
     glint_mat.metallic = 0.7;
@@ -384,6 +384,14 @@ func _node_position(world:World, rn:ResourceNode) -> Vector3:
     var x:float = rn.cell.x + 0.5 + rn.offset.x;
     var z:float = rn.cell.y + 0.5 + rn.offset.y;
     return Vector3(x, world.terrain.height_at(x, z), z);
+
+# Rock and ore bodies: lit like the plain material, with snow on top (WindSway.update gives it the snow cover).
+func _make_rock_material(c:Color) -> ShaderMaterial:
+    var m:ShaderMaterial = ShaderMaterial.new();
+    m.shader = load("res://shaders/rock.gdshader") as Shader;
+    m.set_shader_parameter("albedo", c);
+    WindSway.track(m);
+    return m;
 
 func _make_material(c:Color) -> StandardMaterial3D:
     var m:StandardMaterial3D = StandardMaterial3D.new();
