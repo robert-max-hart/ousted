@@ -271,9 +271,11 @@ Decisions and why:
 | M5 | Trade *(done, closed 2026-10-30 as 0.5.0; was M6 before the renumbering)* | Trading post, merchants and merchant types, barter UI, trade history, luxury goods (honey, wool and clothing, pottery, spirits, gold and silver), rivers, bridges and fishing came along with it |
 | M6 | Meta *(done, closed 2026-10-30 as 0.6.0; was M8 before the renumbering)* | See "M6 scope" below: save slots and a load menu, a settings screen, map and game setup (seed, size, river style, climate, difficulty, realism mode, choosing the start), scenarios, a tutorial, and the help overlays |
 | **M7** | **Content & art pass** *(done, closed as 0.7.0 on 2026-10-31)* | Real models and animation, audio, UI theme, textures, nicer water, icons, wind sway (see "M7 scope") |
-| M8 | Additional features | Everything wanted that has no home in the milestones above (see "M8 scope"): a tavern and other happiness buildings, decorative items, fires, a map editor with terrain modification, more of the economy |
+| M8 | Additional features | Everything wanted that has no home in the milestones above (see "M8 scope"): a tavern and other happiness buildings, decorative items, fires, more of the economy |
+| M9 | Balance, scenarios and release | Tune the difficulty and the early game, finish and check the scenarios, polish the tutorial and settings, replace placeholder assets, prepare an export (see "M9 scope") |
+| M10 | Map editor | A map editor, the only home for terrain modification (see "M10 scope") |
 
-**Removed (2026-10-30):** the old **M5, "Terrain as labor"** (terraforming as worker jobs, dirt and stone moved). Player terrain modification is no longer part of the design; if it ever returns it belongs to a map editor (M8), not to the colony game. (The terrain brush code still exists but is not on the toolbar.) The texture-splat and snow terrain shader that M5 carried moved to M7.
+**Removed (2026-10-30):** the old **M5, "Terrain as labor"** (terraforming as worker jobs, dirt and stone moved). Player terrain modification is no longer part of the design; if it ever returns it belongs to a map editor (M10), not to the colony game. (The terrain brush code still exists but is not on the toolbar.) The texture-splat and snow terrain shader that M5 carried moved to M7.
 
 **Renumbering of 2026-10-30** (older notes, decisions and the history in CLAUDE.md use the old numbers): old M6 (trade) is now **M5**; old M8 (meta) is now **M6**; M7 is unchanged; the new **M8** is "Additional features". Old M5 (terrain as labor) is gone.
 
@@ -282,10 +284,20 @@ Decisions and why:
 **M7 scope (Content and art), closed 2026-10-31 as 0.7.0: everything below was built (details in CLAUDE.md); background music went to M8.** **Pinned (2026-10-30):** each shader effect (water, wind sway, ground detail and snow) gets its own graphics setting for weaker machines. Step 1, the shader pass (water, wind sway, terrain textures and snow, palette), is built; next are the UI theme and icons, stockpile goods, audio and models. Real models and animation, audio, the UI theme and art pass (the generated top-bar icons and the idle bubble are placeholders), **textures** (roads, ground, terrain texture splat and snow), a second look at the **palette** (it still reads a little washed out), **nicer water**, wind sway for grass and trees, real goods in stockpiles (logs, sacks) and the plain panels (Esc menu, Citizens).
 
 **M8 scope (Additional features).** Collected from the playtest notes, nothing here is scheduled:
+- **Health and disease (pinned 2026-10-31, look into the scope first):** ill citizens that spread illness between a house, a workplace or a school, slower work and deaths, a place to treat them (an Herbalist's Hut), and a quarantine policy. See `docs/scenario_ideas.md`, "The Plague Year".
 - **Happiness and daily life:** a tavern (and other happiness buildings, tied to honey and spirits), a **downside to drinking** spirits, **decorative items** (which, whether they affect happiness), **fires** (cold homeless citizens build little fires, maybe real ones that spread).
 - **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, other catches and boats for fishing and smoking or salting fish, a tannery step for leather, jewelry or coins from gold and silver, finite ore veins, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
-- **World and weather:** overheating as well as cold, more weather (thunderstorms), a **map editor** (the only home for terrain modification), shrinking buildings and growing others in place, expansion while a building is paused.
+- **World and weather:** overheating as well as cold, more weather (thunderstorms), shrinking buildings and growing others in place, expansion while a building is paused.
 - **Known issue to chase, not a feature:** laborers sometimes get stuck hauling in a loop (needs a repro or a save).
+
+**M9 scope (Balance, scenarios and release).** Added 2026-10-31 as the home for the work that comes after the features:
+- **Balance:** tune the difficulty with `arctic_probe` and `run_probe.sh` (the first winter, the early food and wood supply, a normal start in any climate) and then drop the Arctic "not yet tuned" warning; a playtest pass on whether selling spare goods to merchants is too easy.
+- **Scenarios:** check that each existing scenario is winnable and adjust the goal numbers; build out some of `docs/scenario_ideas.md`.
+- **Polish:** more tutorial steps (foraging, fishing, school, trade), the settings that were left out on purpose (key rebinding), the generated sound levels checked by ear.
+- **Assets:** replace placeholder assets (generated sounds, icons, models) with supplied or recorded ones where the user wants, keeping the file names and ids.
+- **Release:** a game export (it must include `data/*.txt`), the icon and version, a final full-suite run and a long soak.
+
+**M10 scope (Map editor).** The one objective: a map editor, so a map can be shaped by hand and used for a game or a scenario. It is the only place player terrain modification belongs (`Terrain.apply_brush` is kept for it; the toolbar has no brushes). Scope to settle when it starts: the tools (raise, lower, flatten, water, paint, place trees, rocks and ore), saving and loading maps, using one as a scenario's map.
 
 Save and load was moved earlier and built at the end of M2 (quicksave, autosave and a round-trip test; see CLAUDE.md). M6 (Meta, was M8) keeps the load menu, named slots, map seeds and settings.
 
@@ -333,7 +345,7 @@ Save and load was moved earlier and built at the end of M2 (quicksave, autosave 
    dropped on the ground as a loose pile that can be hauled later. A storage building can't be
    demolished until it is empty.
 4. ~~**Terraforming cost**~~ **Superseded (2026-10-30):** player terrain modification is no longer part of the design
-   (the old M5 was removed); it would belong to a map editor (M8). The older call, kept for reference: terraforming
+   (the old M5 was removed); it would belong to a map editor (M10). The older call, kept for reference: terraforming
    requires citizen labor and dirt is not a resource.
 5. **Art direction:** low-poly stylised (it fits the procedural approach) or something more realistic?
 6. **Failure state:** does the game end when everyone dies, or are there "settler wave" recovery options?
