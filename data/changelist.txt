@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.5 | 2 Nov 2026 | Settings window fixes
+- The settings window now scrolls when the screen is short, so the Back button can always be clicked (it used to run off the bottom of the title screen).
+- New Window size setting: pick a window size that fits your screen (it is greyed out in fullscreen).
+
 # 0.8.4 | 2 Nov 2026 | Longer music, sleeping and a stuck-hauler fix
 - Fixed a loop where an exhausted citizen carrying goods walked back and forth, never stored them and never went to bed. They now drop the load off and sleep.
 - Five pieces of music per season, each about two minutes long, with new tunes in every round.

@@ -8,6 +8,11 @@ class_name SettingsPanel extends Control;
 
 signal closed;
 
+const MARGIN_Y:float = 150.0;           # room kept for the title, the Back button and the panel's frame and a gap to the screen edge
+
+var _scroll:ScrollContainer;
+var _col:VBoxContainer;
+
 # --------------------------------
 func _init() -> void:
     Settings.ensure_loaded();
@@ -25,14 +30,23 @@ func _init() -> void:
     var panel:PanelContainer = PanelContainer.new();
     panel.add_theme_stylebox_override("panel", UITheme.panel_box(1.0, 6, 12));
     center.add_child(panel);
-    var col:VBoxContainer = VBoxContainer.new();
-    col.custom_minimum_size = Vector2(380, 0);
-    col.add_theme_constant_override("separation", 8);
-    panel.add_child(col);
+    # the title and the Back button stay put; the options between them scroll when the window is not tall enough for all of them
+    var outer:VBoxContainer = VBoxContainer.new();
+    outer.add_theme_constant_override("separation", 8);
+    panel.add_child(outer);
     var title:Label = Label.new();
     title.text = "Settings";
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER;
-    col.add_child(title);
+    outer.add_child(title);
+    _scroll = ScrollContainer.new();
+    _scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED;
+    outer.add_child(_scroll);
+    var col:VBoxContainer = VBoxContainer.new();
+    col.custom_minimum_size = Vector2(380, 0);
+    col.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    col.add_theme_constant_override("separation", 8);
+    _scroll.add_child(col);
+    _col = col;
 
     _volume(col, "Master volume", Settings.volume_master, "volume_master", "");
     _volume(col, "Effects volume", Settings.volume_sfx, "volume_sfx", "Work sounds, clicks and the chimes for events.");
@@ -73,13 +87,43 @@ func _init() -> void:
     _check(col, "Snow edge detail", Settings.snow_edge, "snow_edge", "Ragged, patchy snow edges. Off makes snow an even cover.");
     _check(col, "Wispy cloud edges", Settings.wispy_clouds, "wispy_clouds", "The clouds round the map break up into dithered wisps at their edges. Off makes them solid, which is a little lighter on weak graphics cards.");
     _check(col, "Shadows", Settings.shadows, "shadows", "Sun and moon shadows. Off helps weak graphics cards.");
-    _check(col, "Fullscreen", Settings.fullscreen, "fullscreen", "");
+    var size_pick:OptionButton = OptionButton.new();
+    size_pick.focus_mode = Control.FOCUS_NONE;
+    var choices:Array[Vector2i] = Settings.window_size_choices();
+    var current:Vector2i = DisplayServer.window_get_size() if Settings.window_w <= 0 else Vector2i(Settings.window_w, Settings.window_h);
+    var chosen:int = -1;
+    for i in choices.size():
+        size_pick.add_item("%d x %d" % [choices[i].x, choices[i].y]);
+        if choices[i] == current:
+            chosen = i;
+    if chosen < 0:          # the window is some other size (dragged to it, or opened that way): show it, as the starting entry
+        size_pick.add_item("%d x %d (current)" % [current.x, current.y]);
+        chosen = choices.size();
+    size_pick.select(chosen);
+    size_pick.disabled = Settings.fullscreen;
+    size_pick.item_selected.connect(func(i:int) -> void:
+        if i < choices.size():
+            Settings.set_value("window_size", choices[i]));
+    _row(col, "Window size", size_pick, "The size of the window when the game is not fullscreen (the sizes that fit this screen). You can also drag the window's edge.");
+    var full:CheckBox = _check(col, "Fullscreen", Settings.fullscreen, "fullscreen", "");
+    full.toggled.connect(func(v:bool) -> void: size_pick.disabled = v);
     _check(col, "Vertical sync", Settings.vsync, "vsync", "Stops tearing; turn off if the game feels laggy.");
     var back:Button = Button.new();
     back.text = "Back";
     back.focus_mode = Control.FOCUS_NONE;
     back.pressed.connect(close);
-    col.add_child(back);
+    outer.add_child(back);
+
+func _ready() -> void:
+    get_viewport().size_changed.connect(_fit);
+    _fit();
+
+# The options take the height they need, but never more than the window leaves.
+func _fit() -> void:
+    if _scroll == null or not is_inside_tree():
+        return;
+    var room:float = get_viewport_rect().size.y - MARGIN_Y;
+    _scroll.custom_minimum_size.y = clampf(_col.get_combined_minimum_size().y + 4.0, 80.0, maxf(80.0, room));
 
 func _row(col:Container, text:String, control:Control, tip:String) -> void:
     var row:HBoxContainer = HBoxContainer.new();
@@ -104,7 +148,7 @@ func _volume(col:Container, text:String, value:int, key:String, tip:String) -> v
     slider.value_changed.connect(func(v:float) -> void: Settings.set_value(key, int(v)));
     _row(col, text, slider, tip);
 
-func _check(col:Container, text:String, on:bool, key:String, tip:String) -> void:
+func _check(col:Container, text:String, on:bool, key:String, tip:String) -> CheckBox:
     var c:CheckBox = CheckBox.new();
     c.text = text;
     c.button_pressed = on;
@@ -112,6 +156,7 @@ func _check(col:Container, text:String, on:bool, key:String, tip:String) -> void
     c.tooltip_text = tip;
     c.toggled.connect(func(v:bool) -> void: Settings.set_value(key, v));
     col.add_child(c);
+    return c;
 
 func close() -> void:
     closed.emit();

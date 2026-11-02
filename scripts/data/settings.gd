@@ -38,6 +38,10 @@ static var volume_ambient:int = 60;
 static var volume_music  :int = 60;       # the background music (MusicPlayer)
 static var fullscreen :bool = false;
 static var vsync      :bool = true;
+# The window's size when it is not fullscreen: one of WINDOW_SIZES; (0, 0) leaves the window as the engine opens it.
+static var window_w   :int = 0;
+static var window_h   :int = 0;
+const WINDOW_SIZES:Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1366, 768), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)];
 static var _loaded    :bool = false;
 
 # --------------------------------
@@ -65,6 +69,8 @@ static func ensure_loaded() -> void:
     mute_unfocused = bool(cfg.get_value("audio", "mute_unfocused", mute_unfocused));
     fullscreen = bool(cfg.get_value("window", "fullscreen", fullscreen));
     vsync = bool(cfg.get_value("window", "vsync", vsync));
+    window_w = clampi(int(cfg.get_value("window", "width", window_w)), 0, 16384);
+    window_h = clampi(int(cfg.get_value("window", "height", window_h)), 0, 16384);
 
 static func save() -> void:
     var cfg:ConfigFile = ConfigFile.new();
@@ -85,6 +91,8 @@ static func save() -> void:
     cfg.set_value("audio", "mute_unfocused", mute_unfocused);
     cfg.set_value("window", "fullscreen", fullscreen);
     cfg.set_value("window", "vsync", vsync);
+    cfg.set_value("window", "width", window_w);
+    cfg.set_value("window", "height", window_h);
     cfg.save(PATH);
 
 static func grass_share() -> float:
@@ -128,7 +136,7 @@ static func snow_shading_on() -> bool:
     ensure_loaded();
     return snow_edge;
 
-# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "wispy_clouds", "mute_unfocused", "fullscreen" or "vsync"), saves and applies it.
+# Changes one setting ("tree_distance", "model_detail", "volume_master", "volume_sfx", "volume_ambient", "volume_music", "grass", "shadows", "water", "sway", "grass_sway", "ground", "snow_edge", "wispy_clouds", "mute_unfocused", "fullscreen", "vsync" or "window_size" (a Vector2i)), saves and applies it.
 static func set_value(key:String, value:Variant) -> void:
     ensure_loaded();
     match key:
@@ -149,14 +157,20 @@ static func set_value(key:String, value:Variant) -> void:
         "mute_unfocused": mute_unfocused = bool(value);
         "fullscreen": fullscreen = bool(value);
         "vsync": vsync = bool(value);
+        "window_size":
+            var v:Vector2i = value;
+            window_w = clampi(v.x, 0, 16384);
+            window_h = clampi(v.y, 0, 16384);
         _: return;
     save();
     apply();
+    if key == "window_size" or key == "fullscreen":
+        apply_window(true);          # (only these resize the window: any other change leaves a hand-dragged window as it is)
 
 # Pushes the settings to the window and, if a world is running, to its grass, lights and shaders.
 static func apply() -> void:
     ensure_loaded();
-    apply_window();
+    apply_window(false);
     Sfx.apply_volumes();
     var w:World = World.instance;
     CropMeshes.reload_if_needed();
@@ -175,7 +189,29 @@ static func apply() -> void:
             elif c is GroundPlants:
                 (c as GroundPlants).reload();
 
-static func apply_window() -> void:
+# Fullscreen, vsync and, with `resize` (at start-up and when the size or fullscreen is changed), the window's size.
+static func apply_window(resize:bool = true) -> void:
     ensure_loaded();
     DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED);
     DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED);
+    if resize and not fullscreen and window_w > 0 and window_h > 0:
+        var screen:Vector2i = DisplayServer.screen_get_size();
+        if screen.x <= 0 or screen.y <= 0:
+            return;          # (no screen to measure against: a headless run)
+        var size:Vector2i = Vector2i(mini(window_w, screen.x), mini(window_h, screen.y));
+        DisplayServer.window_set_size(size);
+        var at:Vector2i = DisplayServer.screen_get_position() + (screen - size) / 2;
+        DisplayServer.window_set_position(Vector2i(at.x, maxi(at.y, DisplayServer.screen_get_position().y)));
+
+# The sizes the window can be set to: the presets that fit this screen, and the saved one if it is not a preset.
+static func window_size_choices() -> Array[Vector2i]:
+    ensure_loaded();
+    var screen:Vector2i = DisplayServer.screen_get_size();
+    var out:Array[Vector2i] = [];
+    for v in WINDOW_SIZES:
+        if screen.x <= 0 or (v.x <= screen.x and v.y <= screen.y):          # (a headless run has no screen to measure: offer them all)
+            out.append(v);
+    if window_w > 0 and not out.has(Vector2i(window_w, window_h)):
+        out.append(Vector2i(window_w, window_h));
+        out.sort_custom(func(a:Vector2i, b:Vector2i) -> bool: return a.x < b.x);
+    return out;
