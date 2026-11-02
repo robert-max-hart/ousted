@@ -10,6 +10,10 @@
 //       - snow cover (`snow`, 0 to 1, set by the script from the weather):
 //         it settles on up-facing ground first and on the heights first,
 //         in patches at low cover and over everything at full cover.
+//       - a dithered path edge: natural ground beside a dirt road carries
+//         a weight in UV.x (how much road is next to that corner); the
+//         shader turns it into a ragged, noise-thresholded fringe of road
+//         colour, so the road does not end on a hard cell edge.
 //     With an overlay on (`overlay_view`) the colour is shown plain.
 // ----------------------------------------------------------------
 shader_type spatial;
@@ -21,20 +25,33 @@ uniform float overlay_view = 0.0;
 uniform float ground_detail = 1.0;    // from Settings: 0 skips the grain and rock strata
 uniform float snow_detail = 1.0;      // from Settings: 0 makes snow a plain even cover (no ragged edge texture)
 uniform float grain = 0.35;           // how strongly the ground grain shows
+uniform vec3 road_color : source_color = vec3(0.56, 0.46, 0.33);   // the dirt road's colour, mixed into the fringe
+uniform float road_snow_hold = 0.25;
 uniform vec3 snow_color : source_color = vec3(0.9, 0.93, 0.97);
 
 varying vec3 world_pos;
 varying vec3 world_normal;
+varying float road_edge;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	road_edge = UV.x;
 }
 
 void fragment() {
 	vec3 base = COLOR.rgb;            // used as it is: the standard material this replaces did not convert it either (in the Compatibility renderer)
 	float roughness = 1.0;
+	float hold = COLOR.a;
 	if (overlay_view < 0.5) {
+		// dithered road fringe: a fine noise decides, pixel by pixel, whether this is road or ground
+		if (road_edge > 0.01 && ground_detail > 0.5) {
+			float dn = texture(noise_tex, world_pos.xz * 2.7).g * 0.6 + texture(noise_tex, world_pos.xz * 0.7).g * 0.4;
+			dn = clamp((dn - 0.5) * 2.4 + 0.5, 0.0, 1.0);          // spread the noise over 0..1 so the fringe fades across the whole cell
+			float fringe = smoothstep(dn - 0.08, dn + 0.08, road_edge * 1.1 - 0.04) * smoothstep(0.0, 0.1, road_edge);
+			base = mix(base, road_color, fringe);
+			hold = mix(hold, road_snow_hold, fringe);
+		}
 		float fine = 0.0;
 		if (ground_detail > 0.5) {
 			fine = texture(noise_tex, world_pos.xz * 0.9).g - 0.5;
@@ -54,7 +71,7 @@ void fragment() {
 		}
 		float up = smoothstep(0.4, 0.8, world_normal.y);
 		float cover = snow * (up + clamp((world_pos.y - 6.0) * 0.03, 0.0, 0.35));
-		float s = smoothstep(0.42, 0.6, cover * COLOR.a * 1.2 + edge * 0.75);
+		float s = smoothstep(0.42, 0.6, cover * hold * 1.2 + edge * 0.75);
 		base = mix(base, snow_color * (0.94 + fine * 0.1), s);
 		roughness = mix(1.0, 0.85, s);
 	}

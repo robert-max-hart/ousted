@@ -70,7 +70,7 @@ func choose_task(p:Pawn) -> Task:
     var night:bool = GameClock.is_night();
     if p.carry_amount > 0:
         # no topping up the load when school is waiting for a child or the teacher
-        if not night and p.carry_amount < Pawn.CARRY_CAP and not school.calls(p) and not _child_barred(p):
+        if not night and p.energy >= 0.15 and p.carry_amount < Pawn.CARRY_CAP and not school.calls(p) and not _child_barred(p):          # (a worn-out citizen drops the load and goes to bed)
             t = _gather_more_task(p, p.carry_item);
             if t != null:
                 return t;

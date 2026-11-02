@@ -42,6 +42,26 @@ func _disc() -> Array[Vector2i]:
                 out.append(cell);
     return out;
 
+# The pier cells fishermen have taken (pawn -> cell), so two fishermen never stand on the same planks.
+var _spot_claims:Dictionary = {};
+
+# The best free pier cell for `p` (the one it already holds, if any); the cell stays theirs until release_spot. (-1, -1) if there is no pier.
+func claim_spot(p:Pawn) -> Vector2i:
+    for k in _spot_claims.keys():
+        if not World.alive(k) or (k as Pawn).task == null or not is_same((k as Pawn).task.workplace, self):
+            _spot_claims.erase(k);          # a claim whose fisherman has moved on
+    if _spot_claims.has(p):
+        return _spot_claims[p];
+    var all:Array[Vector2i] = work_spots();
+    for c in all:
+        if not _spot_claims.values().has(c):
+            _spot_claims[p] = c;
+            return c;
+    return all[0] if not all.is_empty() else Vector2i(-1, -1);          # more fishermen than cells: share the best
+
+func release_spot(p:Pawn) -> void:
+    _spot_claims.erase(p);
+
 # Other finished (or building) fishing huts whose circles reach this one.
 func _neighbours() -> Array[FishingHut]:
     var out:Array[FishingHut] = [];

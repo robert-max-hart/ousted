@@ -2,7 +2,7 @@
 # ----------------------------------------------------------------
 # make_music.py
 #     Synthesises the game's background music into assets/audio/music/ as
-#     <season>_<n>.ogg (spring, summer, autumn, winter; two pieces each,
+#     <season>_<n>.ogg (spring, summer, autumn, winter; five pieces each of about two minutes,
 #     22.05 kHz mono Vorbis; WAV if ffmpeg is missing). Folk and medieval
 #     in feel, but mellow: a soft piano tune in a church mode over a
 #     piano arpeggio and a soft drone, no drum (the first version, with
@@ -29,15 +29,15 @@ MODES = {
     "aeolian":    [0, 2, 3, 5, 7, 8, 10],
 }
 
-# season: reps (how many times the four phrases go round), tonic (MIDI note of the tune's lowest tonic), mode, tempo (beats a minute), steps in a bar (eighth notes), the lead voice,
+# season: target (a season piece runs about this many seconds: the A A B A form goes round with fresh phrases each round, ending on an A; the title has none and plays its tune `reps` times), reps (how many times the four phrases go round), tonic (MIDI note of the tune's lowest tonic), mode, tempo (beats a minute), steps in a bar (eighth notes), the lead voice,
 # drum, how often the tune rests, and the four-bar chord loops for the A and B phrases (scale degrees, 0 is the tonic chord)
 SEASONS = {
-    "spring": {"tonic": 62, "mode": "mixolydian", "bpm": 104, "steps": 8, "reps": 1, "lead": "piano", "drum": False, "rest": 0.10, "A": [0, 3, 0, 4], "B": [3, 0, 4, 0]},
-    "summer": {"tonic": 67, "mode": "ionian",     "bpm": 84, "steps": 6, "reps": 2, "lead": "piano", "drum": False, "rest": 0.06, "A": [0, 4, 0, 3], "B": [3, 4, 0, 4]},
-    "autumn": {"tonic": 57, "mode": "dorian",     "bpm": 84,  "steps": 8, "reps": 1, "lead": "piano", "drum": False, "rest": 0.16, "A": [0, 6, 0, 4], "B": [3, 0, 6, 0]},
+    "spring": {"tonic": 62, "mode": "mixolydian", "bpm": 104, "steps": 8, "reps": 1, "target": 117, "lead": "piano", "drum": False, "rest": 0.10, "A": [0, 3, 0, 4], "B": [3, 0, 4, 0]},
+    "summer": {"tonic": 67, "mode": "ionian",     "bpm": 84, "steps": 6, "reps": 2, "target": 120, "lead": "piano", "drum": False, "rest": 0.06, "A": [0, 4, 0, 3], "B": [3, 4, 0, 4]},
+    "autumn": {"tonic": 57, "mode": "dorian",     "bpm": 84,  "steps": 8, "reps": 1, "target": 114, "lead": "piano", "drum": False, "rest": 0.16, "A": [0, 6, 0, 4], "B": [3, 0, 6, 0]},
     # the title screen's piece: piano alone (no drone), slow and warm, twice round so it runs a little over a minute; written as title.ogg
     "title":  {"tonic": 60, "mode": "ionian",     "bpm": 72,  "steps": 8, "reps": 2, "lead": "piano", "drum": False, "rest": 0.12, "drone": False, "A": [0, 5, 3, 4], "B": [3, 4, 0, 4]},
-    "winter": {"tonic": 64, "mode": "aeolian",    "bpm": 64,  "steps": 8, "reps": 1, "lead": "piano", "drum": False, "rest": 0.28, "A": [0, 5, 0, 4], "B": [5, 4, 0, 3]},
+    "winter": {"tonic": 64, "mode": "aeolian",    "bpm": 64,  "steps": 8, "reps": 1, "target": 120, "lead": "piano", "drum": False, "rest": 0.28, "A": [0, 5, 0, 4], "B": [5, 4, 0, 3]},
 }
 # rhythm cells (in eighth notes) that add up to a bar
 CELLS = {
@@ -351,10 +351,24 @@ def compose(season_name, seed, bass_shift=12):          # the arpeggio sits an o
     step_sec = 60.0 / season["bpm"] / 2.0
     if steps == 6:
         step_sec = 60.0 / season["bpm"] / 3.0
-    a = compose_phrase(season, season["A"], rng, rng.choice([2, 3, 4]), True)
-    b = compose_phrase(season, season["B"], rng, rng.choice([5, 6]), False)
-    b[-1] = (b[-1][0], b[-1][1], 4)
-    form = [("A", a), ("A", a), ("B", b), ("A", a)] * season["reps"]
+    if "target" in season:
+        # a long piece: as many phrases as fit the target, each round of A A B A with new tunes, stopping on an A (never after 3 of the 4)
+        phrase_sec = 4 * steps * step_sec
+        count = max(2, round((season["target"] - 3.0) / phrase_sec))
+        if count % 4 == 3:
+            count += 1
+        form = []
+        while len(form) < count:
+            a = compose_phrase(season, season["A"], rng, rng.choice([2, 3, 4]), True)
+            b = compose_phrase(season, season["B"], rng, rng.choice([5, 6]), False)
+            b[-1] = (b[-1][0], b[-1][1], 4)
+            form += [("A", a), ("A", a), ("B", b), ("A", a)]
+        form = form[:count]
+    else:
+        a = compose_phrase(season, season["A"], rng, rng.choice([2, 3, 4]), True)
+        b = compose_phrase(season, season["B"], rng, rng.choice([5, 6]), False)
+        b[-1] = (b[-1][0], b[-1][1], 4)
+        form = [("A", a), ("A", a), ("B", b), ("A", a)] * season["reps"]
     bars = 4 * len(form)
     tail = 3.0
     total_sec = bars * steps * step_sec + tail
@@ -440,7 +454,7 @@ if __name__ == "__main__":
     for season_name in SEASONS:
         if only and season_name not in only:
             continue
-        for n in ((0,) if season_name == "title" else (1, 2, 3)):
+        for n in ((0,) if season_name == "title" else (1, 2, 3, 4, 5)):
             piece = compose(season_name, sum(map(ord, season_name)) * 100 + n)
             name = season_name if n == 0 else "%s_%d" % (season_name, n)
             write(name, piece)

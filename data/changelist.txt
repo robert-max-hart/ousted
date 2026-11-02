@@ -3,6 +3,13 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.4 | 2 Nov 2026 | Longer music, sleeping and a stuck-hauler fix
+- Fixed a loop where an exhausted citizen carrying goods walked back and forth, never stored them and never went to bed. They now drop the load off and sleep.
+- Five pieces of music per season, each about two minutes long, with new tunes in every round.
+- Citizens sleeping in the open now have their eyes shut, breathe more visibly, shift in their sleep and have Zs floating above them.
+- Fishermen on the same hut now stand on different pier planks instead of on top of each other.
+- Dirt roads now have a dithered, worn edge instead of a hard line.
+
 # 0.8.3 | 2 Nov 2026 | Game icon
 - The game has its own icon (a cottage above wheat fields) instead of the Godot default.
 

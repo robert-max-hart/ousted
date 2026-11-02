@@ -127,6 +127,15 @@ def mouth(kind):
         m.box(0, cy - 0.082, 0.1405, 0.04, 0.006, 0.008, (0.95, 0.93, 0.9))              # a hint of teeth
     return m
 
+def lids():
+    """Closed eyes: a skin-coloured lid over each eye and a dark lash line along it. The rig shows this part only while a citizen sleeps."""
+    m = Mesh()
+    cy = 0.18
+    for sx in (-1, 1):
+        m.ball(sx * 0.055, cy + 0.02, 0.138, 0.031, 0.033, 0.017, skin(1.0), segs=7, rings=4)
+        m.box(sx * 0.055, cy + 0.012, 0.1535, 0.046, 0.006, 0.006, EYE)
+    return m
+
 ELBOW = -0.26          # how far below the shoulder the elbow is
 KNEE = -0.2            # ... and the knee below the hip
 
@@ -227,7 +236,7 @@ def bucket():
 for name, mesh in (("torso_m", torso(False)), ("torso_f", torso(True)),
                    ("head_0", head(0)), ("head_1", head(1)), ("head_2", head(2)), ("head_3", head(3)), ("head_4", head(4)),
                    ("arm_l", arm(-1)), ("arm_r", arm(1)), ("forearm", forearm()), ("leg_l", leg(-1)), ("leg_r", leg(1)), ("shin", shin()),
-                   ("mouth_happy", mouth("happy")), ("mouth_neutral", mouth("neutral")), ("mouth_sad", mouth("sad")),
+                   ("mouth_happy", mouth("happy")), ("mouth_neutral", mouth("neutral")), ("mouth_sad", mouth("sad")), ("lids", lids()),
                    ("axe", axe()), ("hammer", hammer()), ("pick", pick()), ("hoe", hoe()), ("basket", basket()), ("rod", rod()), ("bucket", bucket())):
     mesh.write(name, OUT)
 print("wrote", len([f for f in os.listdir(OUT) if f.endswith(".obj")]), "parts")

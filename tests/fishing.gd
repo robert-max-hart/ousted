@@ -58,6 +58,9 @@ func _ready() -> void:
     _phase = 1;
 
 func _process(_delta:float) -> void:
+    if _phase == 2:
+        _two_fishers();
+        return;
     if _phase != 1:
         return;
     for p in world.pawns:
@@ -65,9 +68,47 @@ func _process(_delta:float) -> void:
     var hours:float = GameClock.total_hours - _start;
     if Stock.amount(&"fish") >= 3:
         _expect("a fisherman brought fish to storage (%d in %.0f hours)" % [Stock.amount(&"fish"), hours], true);
-        _finish();
+        world.pawns[1].profession = JobManager.Profession.FISHERMAN;          # a second fisherman: they must not share a plank
+        world.jobs.sync_targets();
+        _phase = 2;
+        _start = GameClock.total_hours;
     elif hours > 40.0:
         _expect("a fisherman brought fish within 40 hours (%d)" % Stock.amount(&"fish"), false);
+        _finish();
+
+var _both:int = 0;              # frames with both fishermen fishing
+var _stood:int = 0;             # frames with both standing still at work
+var _last_a:Vector3 = Vector3.ZERO;
+var _last_b:Vector3 = Vector3.ZERO;
+
+# Two fishermen on one hut: while both are fishing they hold two different pier cells, and when both stand still at work they are not on top of each other.
+func _two_fishers() -> void:
+    for q in world.pawns:
+        q.hunger = 1.0; q.thirst = 1.0; q.energy = 1.0; q.warmth = 1.0;
+    var a:Pawn = world.pawns[0];
+    var b:Pawn = world.pawns[1];
+    var fishing:bool = a.task != null and b.task != null and a.task.kind == &"fish" and b.task.kind == &"fish";
+    var standing:bool = a.position.distance_to(_last_a) < 0.001 and b.position.distance_to(_last_b) < 0.001;
+    _last_a = a.position;
+    _last_b = b.position;
+    if fishing:
+        _both += 1;
+        var claims:Array = _hut._spot_claims.values();
+        if claims.size() < 2 or claims[0] == claims[1]:
+            _expect("two fishermen hold different pier cells (%s)" % [claims], false);
+            _finish();
+            return;
+        if standing:
+            _stood += 1;
+            var gap:float = Vector2(a.position.x - b.position.x, a.position.z - b.position.z).length();
+            if gap < 0.8:
+                _expect("two fishermen stand on different planks (%.2f m apart)" % gap, false);
+                _finish();
+                return;
+    if _stood >= 10 or (_both >= 30 and GameClock.total_hours - _start > 40.0):
+        _finish();
+    elif GameClock.total_hours - _start > 100.0:
+        _expect("two fishermen were both fishing within 100 hours (%d frames)" % _both, false);
         _finish();
 
 # A spot for a fishing hut (a facing, so its pier is over the water) with a second one 5 cells along: [origin, origin2, size, facing].

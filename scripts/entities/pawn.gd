@@ -74,6 +74,7 @@ var health      :float = 1.0;
 var indoors     :bool = false;
 var shelter     :Building = null;   # the building we are inside
 var sleeping    :bool = false;
+var _zs         :SleepZs = null;      # the Zs over a citizen asleep in the open (made when first needed)
 
 var carry_item  :StringName = &"";
 var carry_amount:int = 0;
@@ -444,8 +445,11 @@ func _should_interrupt() -> bool:
     if Heat.siesta_due(self) and carry_amount == 0 and not indoors and not NON_LABOR_KINDS.has(task.kind):
         return true;          # the worst of the midday heat: whoever is out at their work goes home (see JobManager.choose_task)
     if GameClock.total_hours >= _need_block_until:
-        if thirst < 0.2 or warmth < 0.2 or energy < 0.08 or overheat > Heat.CRITICAL:
+        if thirst < 0.2 or warmth < 0.2 or overheat > Heat.CRITICAL:
             return true;
+        if energy < 0.08 and carry_amount == 0:
+            return true;          # (not while carrying: choose_task drops the load off before sleep, so cutting that walk short
+                                  # every frame would only start it over and the citizen would never reach their bed)
         if hunger < 0.15 and Stock.best_food() != &"":
             return true;
     return GameClock.is_night() and not NIGHT_EXEMPT.has(task.kind);
@@ -854,8 +858,16 @@ func _animate(delta:float) -> void:
             _steps = step_now;
             _footstep();
     var carrying:bool = carry_amount > 0;
-    if sleeping and not indoors:         # out in the open (homeless): lie down, with a slow breath
+    if _zs != null and not (sleeping and not indoors):
+        _zs.visible = false;
+    if sleeping and not indoors:         # out in the open (homeless): lie down, eyes shut, with a slow breath and some Zs
         _rig.pose(PawnRig.Mode.SLEEP, _anim_t, 0.2, &"", false);
+        if _zs == null:
+            _zs = SleepZs.new();
+            _zs.position = Vector3(0.0, 0.75, -0.85);          # above the head of a body lying along the ground
+            add_child(_zs);
+        _zs.visible = true;
+        _zs.update(_anim_t);
     elif work:
         _still_t = 0.0;
         var phase:float = fposmod(_anim_t * PawnRig.rate_of(_work_sound()), TAU);

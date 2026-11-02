@@ -176,21 +176,26 @@ func deck_has(c:Vector2i) -> bool:
 
 # Where a worker stands to work here, or (-1, -1) for the building's ordinary access cells. A fishing hut: the far end of its pier.
 func work_spot() -> Vector2i:
+    var all:Array[Vector2i] = work_spots();
+    return all[0] if not all.is_empty() else Vector2i(-1, -1);
+
+# Every cell a worker could stand on to work here, best first (the pier's far end first, then back towards the shore).
+func work_spots() -> Array[Vector2i]:
+    var out:Array[Vector2i] = [];
     var pier:Rect2i = pier_rect();
     if not pier.has_area():
-        return Vector2i(-1, -1);
+        return out;
     var back:Vector3 = Vector3(0, 0, -1).rotated(Vector3.UP, -facing * PI * 0.5);
-    var best:Vector2i = pier.position;
-    var best_score:float = -INF;
     var mid:Vector2 = Vector2(pier.position) + Vector2(pier.size) * 0.5;
+    var scored:Array = [];
     for z in range(pier.position.y, pier.end.y):
         for x in range(pier.position.x, pier.end.x):
             var c:Vector2 = Vector2(x + 0.5, z + 0.5);
-            var score:float = Vector2(back.x, back.z).dot(c - mid) * 4.0 - (c - mid).length_squared() * 0.01;
-            if score > best_score:
-                best_score = score;
-                best = Vector2i(x, z);
-    return best;
+            scored.append([Vector2(back.x, back.z).dot(c - mid) * 4.0 - (c - mid).length_squared() * 0.01, Vector2i(x, z)]);
+    scored.sort_custom(func(a:Array, b:Array) -> bool: return a[0] > b[0]);
+    for e in scored:
+        out.append(e[1]);
+    return out;
 
 func display_name() -> String:
     return def["name"];

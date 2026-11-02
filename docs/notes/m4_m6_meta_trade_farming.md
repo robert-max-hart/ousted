@@ -108,3 +108,5 @@ From `playtests/playtest_2.txt` (git-ignored). Built: **rotation** (`R` turns th
 
 **Still open from that list:** 16 (berries and the starting wheat spoil: needs a test pass, then maybe a root cellar or smokehouse), 23 (laborers stuck hauling: needs a repro or a save). **None of this round's visuals were seen windowed** (no display): rotation, staked roads, one-tile placement, the filter, the "?" button, hazel, blacksmith glow. `ui_flow_shot` has two relocation fails that predate this work (headless).
 
+
+**Fishing huts, a plank each (2026-11-02).** `Building.work_spots()` lists every pier cell, best (far end) first; `FishingHut.claim_spot(pawn)` gives each fisherman a free one (held until `release_spot`, called from the task's `on_end`; stale claims are dropped on the next claim) so two fishermen no longer stand on the same cell. Test `fishing` checks distinct cells and distance.

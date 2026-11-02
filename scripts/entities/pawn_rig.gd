@@ -63,6 +63,7 @@ var _upper    :Node3D;            # everything above the hips: leans to work
 var _head     :Node3D;
 var _mouth    :MeshInstance3D;
 var _mouth_kind:StringName = &"";
+var _lids     :MeshInstance3D;          # closed eyes, shown while asleep
 var _arm_l    :Node3D;
 var _arm_r    :Node3D;
 var _fore_l   :Node3D;            # the forearms hang from the elbows
@@ -146,6 +147,8 @@ func build(is_male:bool, rng:RandomNumberGenerator) -> void:
     _head = _joint(_upper, "head_%d" % style, Vector3(0, NECK, 0.0));
     _mouth = _mesh_on(_head, "mouth_neutral");
     _mouth_kind = &"neutral";
+    _lids = _mesh_on(_head, "lids");
+    _lids.visible = false;
     _prop = MeshInstance3D.new();
     _prop.material_override = _mat;
     _prop.position = Vector3(0, -0.24, 0.0);          # in the right hand
@@ -338,9 +341,12 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:fl
                 ang["twist"] = 0.1 * sin(t * WORK_RATE * 0.5);
         Mode.SLEEP:
             lie = 1.0;
-            ang["al"] = -0.15;
-            ang["ar"] = 0.1;
-            ang["lean"] = 0.012 * sin(t * 1.3);
+            ang["al"] = -0.15 + 0.03 * sin(t * 0.9);
+            ang["ar"] = 0.1 - 0.03 * sin(t * 0.7);
+            ang["lean"] = 0.035 * sin(t * 1.5);          # a slow, visible breath
+            ang["head_y"] = 0.3 * sin(t * 0.21);         # the head lolls from side to side
+            ang["head_z"] = 0.08 * sin(t * 0.17 + 1.0);
+            ang["roll"] = 0.05 * sin(t * 0.29);          # now and then a shift of the shoulders
         Mode.SIT, Mode.EAT:
             # sitting on the ground, legs out in front, hands on the knees; eating brings a hand to the mouth now and then
             sit = 1.0;
@@ -403,6 +409,7 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:fl
                 ang["azr"] = -0.12;
             else:
                 _fidget(t, ang);
+    _lids.visible = mode == Mode.SLEEP;
     if mode != Mode.IDLE:
         _fid_kind = &"";
     _set_prop(prop);
@@ -426,7 +433,7 @@ func pose(mode:Mode, t:float, k:float, work:StringName, carrying:bool, stride:fl
     _head.rotation.y = _drive("head_y", ang["head_y"], dt, snap);
     _head.rotation.z = _drive("head_z", ang["head_z"], dt, snap);
     rotation.x = lerpf(rotation.x, -PI * 0.5 * lie, f if snap else 1.0 - exp(-dt * 10.0));
-    var floor_y:float = 0.22 + 0.01 * sin(t * 2.0) if lie > 0.0 else (-(HIP - 0.07) if sit > 0.0 else 0.0);       # (sitting: the hips come down to the ground)
+    var floor_y:float = 0.22 + 0.012 * sin(t * 1.5) if lie > 0.0 else (-(HIP - 0.07) if sit > 0.0 else 0.0);       # (sitting: the hips come down to the ground)
     position.y = lerpf(position.y, floor_y, f if snap else 1.0 - exp(-dt * 10.0));
 
 # Moves a joint towards its target on a spring (a slight overshoot, and the further joints trail the nearer ones).

@@ -69,9 +69,9 @@ func fisherman_task(p:Pawn) -> Task:
         t.job = JobManager.Profession.FISHERMAN;
         t.target = hut;
         t.workplace = hut;
-        var spot:Vector2i = hut.work_spot();
+        var spot:Vector2i = hut.claim_spot(p);          # each fisherman gets a plank of their own, the far end first
         if spot.x >= 0:
-            t.move_cell(spot, "Walking out on the pier");       # the end of the pier is where the fishing is done
+            t.move_cell(spot, "Walking out on the pier");
         else:
             t.move_rect(hut.rect(), false, "Walking to %s" % hut.display_name().to_lower());
         var cast:Callable = func(pw:Pawn, dh:float) -> bool:
@@ -85,6 +85,9 @@ func fisherman_task(p:Pawn) -> Task:
             hut.dig_progress[&"fish"] = progress;
             return pw.carry_amount >= Pawn.CARRY_CAP;
         t.work(cast, "Fishing");
+        t.on_end = func(pw:Pawn) -> void:
+            if World.alive(hut):
+                hut.release_spot(pw);
         return t;
     return null;
 

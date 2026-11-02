@@ -66,6 +66,7 @@ func _ready() -> void:
     _material.set_shader_parameter("noise_tex", TerrainTexture.make(world_seed_for_textures));
     _material.set_shader_parameter("snow", 0.0);
     _material.set_shader_parameter("overlay_view", 0.0);
+    _material.set_shader_parameter("road_color", COLOR_ROAD);
     apply_settings();
     for i in CHUNKS * CHUNKS:
         var mi:MeshInstance3D = MeshInstance3D.new();
@@ -688,6 +689,8 @@ func _build_chunk(ci:int) -> void:
     verts.resize(cells * 4);
     normals.resize(cells * 4);
     colors.resize(cells * 4);
+    var edges:PackedVector2Array = PackedVector2Array();       # UV.x: how much dirt road touches the corner (shaders/terrain.gdshader dithers it)
+    edges.resize(cells * 4);
     indices.resize(cells * 6);
     # cell colors for this chunk plus a one-cell border, so natural surfaces can blend across cells
     var span:int = CHUNK + 2;
@@ -744,6 +747,15 @@ func _build_chunk(ci:int) -> void:
                             sum += cell_cols[li + o.y * span + o.x];
                             n += 1;
                     colors[v + j] = _detail(sum / float(n), x + (1 if (j == 1 or j == 2) else 0), z + (1 if (j == 2 or j == 3) else 0));
+                    if not (slope_view or water_view or soil_view):
+                        var reach:float = 0.0;
+                        if in_bounds(cell + Vector2i(dx, 0)) and overlay[index(cell + Vector2i(dx, 0))] == Overlay.ROAD:
+                            reach += 1.0;
+                        if in_bounds(cell + Vector2i(0, dz)) and overlay[index(cell + Vector2i(0, dz))] == Overlay.ROAD:
+                            reach += 1.0;
+                        if in_bounds(cell + Vector2i(dx, dz)) and overlay[index(cell + Vector2i(dx, dz))] == Overlay.ROAD:
+                            reach += 0.5;
+                        edges[v + j] = Vector2(minf(reach, 1.0), 0.0);
             for j in 4:       # no snow under or at the water: it fades out over the shore
                 var wet:float = smoothstep(WATER_LEVEL, WATER_LEVEL + SNOW_SHORE, verts[v + j].y);
                 if wet < 1.0:
@@ -764,6 +776,7 @@ func _build_chunk(ci:int) -> void:
     arrays[Mesh.ARRAY_VERTEX] = verts;
     arrays[Mesh.ARRAY_NORMAL] = normals;
     arrays[Mesh.ARRAY_COLOR] = colors;
+    arrays[Mesh.ARRAY_TEX_UV] = edges;
     arrays[Mesh.ARRAY_INDEX] = indices;
     var mesh:ArrayMesh = ArrayMesh.new();
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays);
