@@ -78,6 +78,7 @@ var _windows    :Array[MeshInstance3D] = [];
 var windows_lit_always:bool = false;      # the title screen's mock town: lit without residents
 var smoke_always:bool = false;            # ... and smoking without a fire to feed
 var _window_mat :StandardMaterial3D;
+var fill_bar    :FillBar;        # floats over a store while it is hovered, selected or the Stores toggle is on (FillBars)
 var _site_label :Label3D;        # floats over a site that is paused or short of materials
 
 func setup(w:World, id:StringName, o:Vector2i, s:Vector2i) -> void:

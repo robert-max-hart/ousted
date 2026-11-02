@@ -60,6 +60,7 @@ var child_labor_share:float = 0.0;   # share of the children working right now (
 var _next_body_id:int = 1;
 var visuals     :WorldVisuals;
 var tools       :PlayerTools;
+var fill_bars   :FillBars;
 var hud         :HUD;
 var camera_rig  :RTSCamera;
 var renderer    :ResourceRenderer;
@@ -273,6 +274,9 @@ func _ready() -> void:
     hud = HUD.new();
     hud.name = "HUD";
     add_child(hud);
+    fill_bars = FillBars.new();
+    fill_bars.name = "FillBars";
+    add_child(fill_bars);
 
     GameClock.hour_changed.connect(_on_hour);
     GameClock.day_changed.connect(_on_day);

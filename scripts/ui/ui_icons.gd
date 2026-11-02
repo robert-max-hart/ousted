@@ -47,7 +47,7 @@ const BY_LABEL:Dictionary = {
     "Demolish": &"hammer", "Cancel": &"cross",
     "Housing": &"house", "Storage": &"crate", "Food": &"wheat", "Industry": &"anvil", "Civic": &"flag", "Paths": &"path",
     "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet",
-    "Soil": &"soil", "Water": &"drop", "Slope": &"slope",
+    "Soil": &"soil", "Water": &"drop", "Slope": &"slope", "Stores": &"crate",
     "Laborer": &"person", "Builder": &"hammer", "Farmer": &"wheat", "Woodcutter": &"axe", "Miner": &"pick",
     "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"cross", "Hunter": &"bow",
 };

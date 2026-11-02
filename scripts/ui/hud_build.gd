@@ -65,6 +65,11 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
             hud._soil_toggle.button_pressed = false;
             hud._water_toggle.button_pressed = false;
         World.instance.terrain.set_slope_view(on));
+    hud._stores_toggle = hud._panel_toggle(row, "Stores");
+    hud._stores_toggle.text = "";
+    hud._stores_toggle.tooltip_text = "Stores: show how full every store is. A bar floats over each Town Hall, stockpile, granary and cellar: green, yellow from 70% and red from 90%. (The store under the cursor and the selected one always show theirs.)";
+    hud._stores_toggle.toggled.connect(func(on:bool) -> void:
+        World.instance.fill_bars.show_all = on);
     var labels:Array[String] = ["||", "1x", "2x", "5x", "10x"];
     for i in labels.size():
         var b:Button = Button.new();

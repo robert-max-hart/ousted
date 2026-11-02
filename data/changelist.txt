@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.0 | 2 Nov 2026 | Milestone 8 done: fill bars
+- New fill bars: a small bar floats over a store showing how full it is (green, yellow from 70% full, red from 90%). It shows over the store you point at or select. A new Stores button in the top bar shows them over every store at once.
+- This closes milestone 8, Additional features: health and disease, the tavern, chapel and bathhouse, fires and heat, thunderstorms, spoilage, the hunting lodge and smokehouse, a herb greenhouse, better clothes and more.
+
 # 0.7.18 | 2 Nov 2026 | Spoilage tuning
 - A root cellar is never warmer than the air outside, so it is never worse than leaving food out (before, a cellar spoiled food faster than a frozen open store in winter). It is still far better in summer.
 - Stores have their own strengths. A Granary keeps grain, beans, nuts, dates and smoked food more than three times as long as the open; a Root Cellar keeps roots, vegetables and fruit best, but grain and nuts are damp in it and keep worse.

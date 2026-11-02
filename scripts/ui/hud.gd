@@ -48,6 +48,7 @@ var _dismiss_btn:Button;               # send the merchant on their way early
 var _jobs_panel :PanelContainer;
 var _jobs_toggle:Button;
 var _water_toggle:Button;               # colours the ground by reach of water (where a Distillery or Potter's Workshop may go)
+var _stores_toggle:Button;             # shows every store's fill bar (the hovered and selected one always show theirs)
 var _slope_toggle:Button;              # colours the ground by how steep it is for building
 var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
 var _citizens_toggle:Button;
