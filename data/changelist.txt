@@ -6,6 +6,7 @@
 # 0.7.16 | 2 Nov 2026 | Herb greenhouse
 - The herbalist now gathers herbs too: between visits to the sick they pick wild herbs near their hut (switch it off in the inspector) and keep them in its store. A sick citizen always comes first, even in the middle of a pick. Foragers can still pick herbs as before.
 - New Herb Greenhouse upgrade for the Herbalist's Hut (wood 30, stone 36, iron 14): a glasshouse appears on the back of the hut and grows about a herb a day in any weather, up to 10 waiting. The herbalist picks them before wild herbs. The hut then keeps 16 herbs instead of 8, and herbs that do not fit go to storage, where they can be traded.
+- On the title screen the Changelist button is now a small button above the build number, not in the main menu.
 
 # 0.7.15 | 2 Nov 2026 | Bathhouse and the Open switch
 - New Bathhouse (Civic, wood 30 and stone 24, needs water within 12 cells): about every 4th day each citizen from the age of 5 may come for a bath in the late afternoon. They are in a better mood for 2 days, less likely to catch or spread a sickness for 3, and in the cold the hot water warms them through. Laborers keep it stocked with firewood: one firewood heats the water for six bathers, three in the cold. With no firewood it is a cold bath, worth less.

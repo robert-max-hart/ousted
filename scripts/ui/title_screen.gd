@@ -135,9 +135,6 @@ func _build_ui() -> void:
     var settings:Button = _menu_button("Settings");
     settings.tooltip_text = "Graphics and window options";
     settings.pressed.connect(func() -> void: _ui_root.add_child(SettingsPanel.new()));
-    var changes:Button = _menu_button("Changelist");
-    changes.tooltip_text = "What changed in each push to main";
-    changes.pressed.connect(func() -> void: _changes.visible = true);
     var quit:Button = _menu_button("Quit");
     quit.pressed.connect(get_tree().quit);
     _build_new_game_panel(stack);
@@ -166,6 +163,17 @@ func _build_ui() -> void:
     build.offset_bottom = -10.0;
     build.mouse_filter = Control.MOUSE_FILTER_IGNORE;
     root.add_child(build);
+    var changes:Button = Button.new();       # a small button just above the build id, not in the main list
+    changes.text = "Changelist";
+    changes.tooltip_text = "What changed in each push to main";
+    changes.focus_mode = Control.FOCUS_ALL;
+    changes.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT);
+    changes.grow_horizontal = Control.GROW_DIRECTION_BEGIN;
+    changes.grow_vertical = Control.GROW_DIRECTION_BEGIN;
+    changes.offset_right = -14.0;
+    changes.offset_bottom = -38.0;
+    changes.pressed.connect(func() -> void: _changes.visible = true);
+    root.add_child(changes);
 
 # The changelist overlay: one heading per push, newest first, read from data/changelist.txt.
 func _build_changelist(root:Control) -> void:

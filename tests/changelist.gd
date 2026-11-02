@@ -32,15 +32,26 @@ func _process(_delta:float) -> void:
     _expect("the title shows the build id", label_found);
     _expect("the panel starts hidden", not _title._changes.visible);
     var button:Button = null;
+    var in_menu:bool = false;
     for b in _title._menu.get_children():
-        if b is Button and (b as Button).text == "Changelist":
-            button = b;
-    _expect("the menu has a Changelist button", button != null);
+        in_menu = in_menu or (b is Button and (b as Button).text == "Changelist");
+    for b in _title.get_children():
+        button = button if button != null else _find_button(b, "Changelist");
+    _expect("there is a Changelist button, a small one outside the main menu", button != null and not in_menu and button.custom_minimum_size.y < 46.0);
     if button != null:
         button.pressed.emit();
         _expect("pressing it opens the panel", _title._changes.visible);
     print("CHANGELIST %s" % ("PASS" if _fails == 0 else "FAIL"));
     get_tree().quit(1 if _fails > 0 else 0);
+
+func _find_button(n:Node, text:String) -> Button:
+    if n is Button and (n as Button).text == text:
+        return n;
+    for c in n.get_children():
+        var found:Button = _find_button(c, text);
+        if found != null:
+            return found;
+    return null;
 
 func _find_labels(n:Node) -> Array[Label]:
     var out:Array[Label] = [];
