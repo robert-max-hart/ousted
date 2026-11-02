@@ -35,7 +35,7 @@ func _ready() -> void:
     Weather._day_offset = 0.0;
     Weather._update_temperature();
     world.wetness = 0.1;
-    var o:Vector2i = TestSite.near(world, Vector2i(10, -14), Vector2i(26, 20));
+    var o:Vector2i = TestSite.near(world, Vector2i(10, -14), Vector2i(30, 25));       # (the test uses cells up to x 24 and z 18 from the origin: all must be dry and clear)
     world.terrain.flatten_rect(Rect2i(o - Vector2i(1, 1), Vector2i(28, 22)));
     for rn in world.nodes.duplicate():
         if Rect2i(o - Vector2i(2, 2), Vector2i(30, 24)).has_point(rn.cell):
@@ -128,7 +128,14 @@ func _ready() -> void:
         fires.ignite(rt.cell);
     Weather.intensity = 0.15;
     fires._rain_on_fires();
-    _expect("a drizzle does not put a fire out (%d of 8 still burning)" % fires.wild_cell_count(), fires.wild_cell_count() == 8);
+    var lit:int = 0;
+    var why:String = "";
+    for rt in rainy:
+        if fires.is_burning(rt.cell):
+            lit += 1;
+        else:
+            why += " [%s soaked %s removed %s burning-flag %s]" % [rt.cell, fires.is_soaked(rt.cell), rt.removed, rt.burning];
+    _expect("a drizzle does not put a fire out (%d of 8 still burning, %d cells, rain %.2f%s)" % [lit, fires.wild_cell_count(), Weather.intensity, why], fires.wild_cell_count() == 8);
     Weather.intensity = 1.0;
     for h in 5:
         fires.on_hour();
@@ -271,8 +278,9 @@ func _ready() -> void:
         fires.cells.erase(e);
     # citizens go round flames: a burning cell costs a lot to walk through
     var cold_cell:Vector2i = o + Vector2i(2, 17);
-    var plain_w:float = world.nav.astar.get_point_weight_scale(cold_cell);
     var tree3:ResourceNode = world.add_node(&"tree", cold_cell);
+    world._refresh_nav(cold_cell);        # (fires erased from the table above left their weights behind)
+    var plain_w:float = world.nav.astar.get_point_weight_scale(cold_cell);
     fires.ignite(tree3.cell);
     _expect("a burning cell is weighted so walkers avoid it (%.1f against %.1f)" % [world.nav.astar.get_point_weight_scale(cold_cell), plain_w], world.nav.astar.get_point_weight_scale(cold_cell) >= plain_w + Fires.NAV_WEIGHT - 0.001);
     fires.douse(cold_cell);
