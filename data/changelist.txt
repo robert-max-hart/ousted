@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.3 | 2 Nov 2026 | Game icon
+- The game has its own icon (a cottage above wheat fields) instead of the Godot default.
+
 # 0.8.2 | 2 Nov 2026 | Piano music
 - The music is now played on a sampled upright piano, softer than before, with a third piece for every season.
 - The title screen has its own piano piece, and the land sounds behind it are much quieter.
