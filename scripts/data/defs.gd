@@ -52,7 +52,7 @@ const ITEMS:Dictionary = {
     &"meat":    {"name": "Meat", "color": Color(0.72, 0.28, 0.25), "food": true, "nutrition": 0.5, "spoil_days": 8.0},
     &"clothes_wool":    {"name": "Wool Clothes", "color": Color(0.82, 0.78, 0.66), "clothing": {"warm": 0.3, "days": 80.0}},
     &"clothes_leather": {"name": "Leather Clothes", "color": Color(0.5, 0.34, 0.2), "clothing": {"warm": 0.3, "days": 80.0}},
-    &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
+    &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0, "mood": 0.1}},
     &"spirits": {"name": "Spirits", "color": Color(0.85, 0.7, 0.35), "treat": {"nutrition": 0.02, "mood": 0.2, "days": 3.0}},
     &"pottery": {"name": "Pottery", "color": Color(0.74, 0.45, 0.3)},
     &"gilded_pottery": {"name": "Gilded pottery", "color": Color(0.82, 0.58, 0.24)},
@@ -444,7 +444,7 @@ const BUILDINGS:Dictionary = {
             {"id": "cap_clothes_wool", "type": "cap", "label": "Wool clothes cap", "item": &"clothes_wool", "default": 6, "step": 2, "zero_label": "Off"},
             {"id": "cap_clothes_leather", "type": "cap", "label": "Leather clothes cap", "item": &"clothes_leather", "default": 4, "step": 2, "zero_label": "Off"},
         ],
-        "desc": "Artisans make clothes that citizens wear against the cold: wool clothes from 3 wool, leather clothes from 2 leather, and fine clothes from both, which take twice as long but keep out twice as much cold and last nearly twice as long. Clothes wear out (2.5 years, 4.5 for fine) and are replaced from what is in storage. Wool comes from sheep, leather from slaughtered animals (set a pasture's keep-at-most level). Clothes also trade well.",
+        "desc": "Artisans make clothes that citizens wear against the cold: wool clothes from 3 wool, leather clothes from 2 leather, and fine clothes from both, which take twice as long but keep out twice as much cold and last nearly twice as long. Fine clothes also lift the mood of whoever wears them. Clothes wear out (2.5 years, 4.5 for fine) and are replaced from what is in storage; anyone in plainer clothes swaps up to fine ones when they are in storage and nobody is left without, and the old set goes back to storage if it is still good. Wool comes from sheep, leather from slaughtered animals (set a pasture's keep-at-most level). Clothes also trade well.",
     },
     &"smokehouse": {
         "indoor_work": true, "wall": &"planks", "name": "Smokehouse", "size": Vector2i(3, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,

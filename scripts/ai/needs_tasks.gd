@@ -167,11 +167,16 @@ func chapel_task(p:Pawn) -> Task:
             pw.go_outside();
     return t;
 
-# A citizen with no clothes on fetches a set from storage and puts it on (the best there is).
+# A citizen with no clothes on fetches a set from storage and puts it on (the best there is). Someone in plainer clothes
+# swaps up when better ones sit in storage and no one is left without clothes to need them more; the set they take off goes
+# back to storage if it has more than half its wear left (the stock does not track wear: it comes back as a whole set).
 func dress_task(p:Pawn) -> Task:
     var item:StringName = Stock.best_clothing();
     if item == &"":
         return null;
+    if p.clothing != &"":
+        if Defs.ITEMS[item]["clothing"]["warm"] <= p.cold_resist() + 0.001 or Stock.available(item) <= _unclothed():
+            return null;
     var s:Building = world.nearest_storage_with(item, p.position);
     if s == null or p.has_failed(s) or s.reserve_out(item, 1) == 0:
         return null;
@@ -183,12 +188,24 @@ func dress_task(p:Pawn) -> Task:
         st["taken"] = true;
         if s.take_reserved(item, 1) < 1:
             return false;
+        var old:StringName = pw.clothing;
+        var left:float = pw.clothing_hours;
         pw.dress(item);
+        if old != &"" and World.alive(s) and left > Defs.ITEMS[old]["clothing"]["days"] * GameClock.HOURS_PER_DAY * 0.5:
+            s.store(old, 1);
         return true);
     t.on_cancel = func(_pw:Pawn) -> void:
         if not st["taken"] and World.alive(s):
             s.release_out(item, 1);
     return t;
+
+# Citizens with no clothes on (babies wear none).
+func _unclothed() -> int:
+    var n:int = 0;
+    for q in world.pawns:
+        if not q.removed and not q.is_baby() and q.clothing == &"":
+            n += 1;
+    return n;
 
 func warm_task(p:Pawn) -> Task:
     var b:Building = world.warm_shelter_for(p);

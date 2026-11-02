@@ -253,6 +253,10 @@ func _wear_tool(dh:float) -> void:
 func cold_resist() -> float:
     return Defs.ITEMS[clothing]["clothing"]["warm"] if clothing != &"" else 0.0;
 
+# The mood the clothes give (fine clothes only).
+func clothes_mood() -> float:
+    return Defs.ITEMS[clothing]["clothing"].get("mood", 0.0) if clothing != &"" else 0.0;
+
 func dress(item:StringName) -> void:
     clothing = item;
     clothing_hours = Defs.ITEMS[item]["clothing"]["days"] * GameClock.HOURS_PER_DAY;
@@ -501,6 +505,8 @@ func happiness_factors() -> Array:
         f.append(["Ill", -0.2 * illness]);
     if Heat.mood_loss(self) > 0.0:
         f.append(["Too hot", -Heat.mood_loss(self)]);
+    if clothes_mood() > 0.0:
+        f.append(["Fine clothes", clothes_mood()]);
     if GameClock.total_hours < tavern_until:
         f.append(["Evening at the tavern", Defs.TAVERN_MOOD]);
     if GameClock.total_hours < bath_until:

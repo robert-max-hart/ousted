@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.17 | 2 Nov 2026 | Better clothes
+- Fine clothes now lift the mood of whoever wears them ("Fine clothes", +10%).
+- Citizens in wool or leather swap up to fine clothes when some are in storage, though never ahead of someone with no clothes at all. The set they take off goes back to storage if it is still good (more than half its wear left) and is thrown away if not.
+
 # 0.7.16 | 2 Nov 2026 | Herb greenhouse
 - The herbalist now gathers herbs too: between visits to the sick they pick wild herbs near their hut (switch it off in the inspector) and keep them in its store. A sick citizen always comes first, even in the middle of a pick. Foragers can still pick herbs as before.
 - New Herb Greenhouse upgrade for the Herbalist's Hut (wood 30, stone 36, iron 14): a glasshouse appears on the back of the hut and grows about a herb a day in any weather, up to 10 waiting. The herbalist picks them before wild herbs. The hut then keeps 16 herbs instead of 8, and herbs that do not fit go to storage, where they can be traded.

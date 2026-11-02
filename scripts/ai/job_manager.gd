@@ -123,8 +123,8 @@ func choose_task(p:Pawn) -> Task:
         if t != null:
             return t;
 
-    if p.clothing == &"" and not p.is_baby():
-        t = needs.dress_task(p);
+    if not p.is_baby():
+        t = needs.dress_task(p);       # (no clothes, or better ones in storage than those worn)
         if t != null:
             return t;
 

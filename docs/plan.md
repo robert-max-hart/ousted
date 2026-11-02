@@ -271,7 +271,7 @@ Decisions and why:
 | M5 | Trade *(done, closed 2026-10-30 as 0.5.0; was M6 before the renumbering)* | Trading post, merchants and merchant types, barter UI, trade history, luxury goods (honey, wool and clothing, pottery, spirits, gold and silver), rivers, bridges and fishing came along with it |
 | M6 | Meta *(done, closed 2026-10-30 as 0.6.0; was M8 before the renumbering)* | See "M6 scope" below: save slots and a load menu, a settings screen, map and game setup (seed, size, river style, climate, difficulty, realism mode, choosing the start), scenarios, a tutorial, and the help overlays |
 | **M7** | **Content & art pass** *(done, closed as 0.7.0 on 2026-10-31)* | Real models and animation, audio, UI theme, textures, nicer water, icons, wind sway (see "M7 scope") |
-| M8 | Additional features | Everything wanted that has no home in the milestones above (see "M8 scope"): a tavern, chapel and bathhouse (happiness buildings, closed 2026-11-02), decorative items, fires, more of the economy |
+| M8 | Additional features | Everything wanted that has no home in the milestones above (see "M8 scope"): a tavern, chapel and bathhouse (happiness buildings, closed 2026-11-02), fires, more of the economy |
 | M9 | Balance, scenarios and release | Tune the difficulty and the early game, finish and check the scenarios, polish the tutorial and settings, replace placeholder assets, prepare an export (see "M9 scope") |
 | M10 | Map editor | A map editor, the only home for terrain modification (see "M10 scope") |
 
@@ -285,9 +285,10 @@ Decisions and why:
 
 **M8 scope (Additional features).** Collected from the playtest notes, nothing here is scheduled:
 - **Health and disease (pinned 2026-10-31, look into the scope first):** ill citizens that spread illness between a house, a workplace or a school, slower work and deaths, a place to treat them (an Herbalist's Hut), and a quarantine policy. See `docs/scenario_ideas.md`, "The Plague Year".
-- **Happiness and daily life:** a tavern, chapel and bathhouse (happiness buildings, closed 2026-11-02 as a good mix; no drinking downside, by decision), **decorative items** (which, whether they affect happiness), **fires** (cold homeless citizens build little fires, maybe real ones that spread).
-- **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, other catches and boats for fishing and smoking or salting fish, a tannery step for leather, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
+- **Happiness and daily life:** a tavern, chapel and bathhouse (happiness buildings, closed 2026-11-02 as a good mix; no drinking downside, by decision), **fires** (cold homeless citizens build little fires, maybe real ones that spread).
+- **Food and economy:** a root cellar or smokehouse and a spoilage tuning pass, swapping to better clothes, a mood effect for clothes, sharing a Paths build tab once there is more than the road and bridge (a paved road, a tunnel).
 - **World and weather:** overheating as well as cold, more weather (thunderstorms), shrinking buildings and growing others in place, expansion while a building is paused.
+- **Cut 2026-11-02 (by the user, not to be built in M8):** decorative items, a tannery step for leather (the hunting lodge makes leather directly), and fishing extras beyond crab pots (boats, salting or smoking fish).
 - **Known issue to chase, not a feature:** laborers sometimes get stuck hauling in a loop (needs a repro or a save).
 
 **M9 scope (Balance, scenarios and release).** Added 2026-10-31 as the home for the work that comes after the features:
