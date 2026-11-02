@@ -15,10 +15,34 @@ var _min_pop:int = 99;
 # One citizen dies on purpose (_exercise_death), so a healthy colony keeps at least this many to the end.
 const MIN_SURVIVORS:int = 4;
 
+var _spoiled_total:Dictionary = {};     # item -> units lost to spoilage over the whole run
+var _spoiled_last:int = 0;
+
+# Adds up what the world's daily spoilage tallies hold each hour (they are reset at midnight, hence the comparison).
+func _count_spoiled(_hour:int = 0) -> void:
+    var now:Dictionary = world._spoiled_stored.duplicate();
+    for item in world._spoiled_ground:
+        now[item] = now.get(item, 0) + world._spoiled_ground[item];
+    var sum:int = 0;
+    for item in now:
+        sum += now[item];
+    if sum < _spoiled_last:
+        _spoiled_last = 0;          # a new day
+        _spoiled_prev.clear();
+    for item in now:
+        _spoiled_total[item] = _spoiled_total.get(item, 0) + now[item] - _spoiled_prev.get(item, 0);
+    _spoiled_prev = now;
+    _spoiled_last = sum;
+
+var _spoiled_prev:Dictionary = {};
+
 # Pass or fail: the colony must still be alive and above MIN_SURVIVORS, and the run exits with code 1 if not.
 func _verdict() -> void:
     var pop:int = world.pawns.size();
     var ok:bool = pop >= MIN_SURVIVORS;
+    var lost:Array = _spoiled_total.keys();
+    lost.sort_custom(func(a:StringName, b:StringName) -> bool: return _spoiled_total[a] > _spoiled_total[b]);
+    print("SPOILED over %d days: %s" % [DAYS, ", ".join(lost.map(func(i:StringName) -> String: return "%d %s" % [_spoiled_total[i], i]))]);
     print("\n%s: %d citizens at the end (lowest %d, need %d)" % ["SOAK PASS" if ok else "SOAK FAIL", pop, _min_pop, MIN_SURVIVORS]);
     get_tree().quit(0 if ok else 1);
 
@@ -37,6 +61,7 @@ func _ready() -> void:
     add_child(world);
     Engine.time_scale = 4.0;
     GameClock.set_speed(3);
+    GameClock.hour_changed.connect(_count_spoiled);
     _issue_orders();
 
 # Share of the field's cells within reach of water (see Field.NEAR_WATER_RANGE). Plots out of reach dry out

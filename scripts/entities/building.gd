@@ -239,7 +239,7 @@ func storage_rank(item:StringName) -> float:
     if forbidden.has(item):
         rank += 100.0;
     if Defs.is_food(item):
-        rank += spoil_mult() * 10.0;
+        rank += Defs.store_spoil_mult(def, item) * 10.0;
     var specialised:bool = def.has("accepts_items") or (def.get("food_only", false) and Defs.is_food(item));
     return rank + (0.0 if specialised else 3.0);
 
@@ -304,20 +304,45 @@ func spoil_mult() -> float:
 
 # The air temperature in here: a cellar keeps near its ground temperature all year.
 func storage_temp() -> float:
-    if not def.has("ground_temp"):
-        return Weather.temperature;
-    return def["ground_temp"] + (Weather.temperature - def["ground_temp"]) * def.get("ground_share", 0.25);
+    return Defs.store_temp(def, Weather.temperature);
+
+# How fast this item spoils in here compared with the open (food kinds have their own multipliers in some stores).
+func spoil_mult_for(item:StringName) -> float:
+    return Defs.store_spoil_mult(def, item);
+
+# "Spoiling now: about 6 berries and 2 fish a day", the worst three, for the inspector, and a hint where a better store would help.
+# Empty when nothing here is losing at least half a unit a day.
+func spoilage_outlook() -> String:
+    var temp_factor:float = Defs.spoil_temp_factor(storage_temp());
+    var per_day:Dictionary = {};
+    for item in stored:
+        var rate:float = Defs.spoil_per_hour(item);
+        if rate > 0.0 and not Defs.ITEMS[item].get("outside_only", false):
+            var lost:float = available(item) * rate * temp_factor * spoil_mult_for(item) * GameClock.HOURS_PER_DAY;
+            if lost >= 0.5:
+                per_day[item] = lost;
+    if per_day.is_empty():
+        return "";
+    var items:Array = per_day.keys();
+    items.sort_custom(func(a:StringName, b:StringName) -> bool: return per_day[a] > per_day[b]);
+    var parts:PackedStringArray = [];
+    for item in items.slice(0, 3):
+        parts.append("%d %s" % [roundi(per_day[item]), Defs.item_name(item).to_lower()]);
+    var s:String = "Spoiling: about %s a day\n" % ", ".join(parts);
+    if not def.has("spoil_mult") and not def.get("food_only", false) and per_day[items[0]] >= 3.0 and Defs.is_food(items[0]):
+        s += "A granary or root cellar would keep it longer.\n";
+    return s;
 
 # Spoils stored food for `hours` game hours at the current temperature. Returns units lost (and adds them, by item, to tally).
 # Units promised to a pawn who is on the way to collect them are spared.
 func spoil_tick(hours:float, tally:Dictionary = {}) -> int:
     var lost:int = 0;
-    var k:float = Defs.spoil_temp_factor(storage_temp()) * spoil_mult() * hours;
+    var k:float = Defs.spoil_temp_factor(storage_temp()) * hours;
     for item in stored.keys():
         var rate:float = Defs.spoil_per_hour(item);
         if rate <= 0.0 or Defs.ITEMS[item].get("outside_only", false):
             continue;
-        _spoil_acc[item] = _spoil_acc.get(item, 0.0) + available(item) * rate * k;
+        _spoil_acc[item] = _spoil_acc.get(item, 0.0) + available(item) * rate * k * spoil_mult_for(item);
         var whole:int = mini(floori(_spoil_acc[item]), available(item));
         if whole > 0:
             _spoil_acc[item] -= whole;
@@ -902,6 +927,7 @@ func info_text() -> String:
         s += "Builders: %d\n" % builders;
     if capacity() > 0 and state == State.COMPLETE:
         s += "Stored %d / %d\n" % [used(), capacity()];
+        s += spoilage_outlook();
         for item in stored:
             s += "  %s: %d\n" % [Defs.item_name(item), stored[item]];
     if needs_water() and state == State.COMPLETE:

@@ -18,31 +18,31 @@ const ITEMS:Dictionary = {
     &"stone":   {"name": "Stone",   "color": Color(0.6, 0.6, 0.6)},
     &"iron":    {"name": "Iron",    "color": Color(0.55, 0.35, 0.3)},
     &"berries": {"name": "Berries", "color": Color(0.7, 0.15, 0.25), "food": true, "nutrition": 0.3, "spoil_days": 8.0},
-    &"wheat":   {"name": "Wheat",   "color": Color(0.9, 0.78, 0.35), "food": true, "nutrition": 0.45, "spoil_days": 120.0},
+    &"wheat":   {"name": "Wheat",   "color": Color(0.9, 0.78, 0.35), "food": true, "nutrition": 0.45, "spoil_days": 200.0},
     &"firewood": {"name": "Firewood", "color": Color(0.72, 0.5, 0.26), "spoil_days": 60.0, "outside_only": true, "heat": 1},
-    &"beans":   {"name": "Beans",   "color": Color(0.45, 0.6, 0.3),  "food": true, "nutrition": 0.4, "spoil_days": 90.0},
+    &"beans":   {"name": "Beans",   "color": Color(0.45, 0.6, 0.3),  "food": true, "nutrition": 0.4, "spoil_days": 150.0},
     &"herbs":   {"name": "Healing herbs", "color": Color(0.5, 0.68, 0.44), "spoil_days": 40.0},
     &"mushrooms": {"name": "Mushrooms", "color": Color(0.7, 0.55, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 4.0},
-    &"hazelnuts": {"name": "Hazelnuts", "color": Color(0.65, 0.5, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 150.0},
+    &"hazelnuts": {"name": "Hazelnuts", "color": Color(0.65, 0.5, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 240.0},
     &"lingonberries": {"name": "Lingonberries", "color": Color(0.62, 0.1, 0.16), "food": true, "nutrition": 0.3, "spoil_days": 40.0},
     &"cactus_fruit": {"name": "Prickly pears", "color": Color(0.85, 0.25, 0.4), "food": true, "nutrition": 0.2, "spoil_days": 9.0},
-    &"dates":    {"name": "Dates", "color": Color(0.45, 0.28, 0.12), "food": true, "nutrition": 0.45, "spoil_days": 160.0},
+    &"dates":    {"name": "Dates", "color": Color(0.45, 0.28, 0.12), "food": true, "nutrition": 0.45, "spoil_days": 240.0},
     &"bananas":  {"name": "Bananas", "color": Color(0.95, 0.85, 0.25), "food": true, "nutrition": 0.3, "spoil_days": 5.0},
     &"coconuts": {"name": "Coconuts", "color": Color(0.5, 0.38, 0.25), "food": true, "nutrition": 0.35, "spoil_days": 50.0},
     &"radish":  {"name": "Radishes", "color": Color(0.85, 0.25, 0.3),  "food": true, "nutrition": 0.18, "spoil_days": 20.0},
     &"lettuce": {"name": "Lettuce", "color": Color(0.5, 0.8, 0.35),   "food": true, "nutrition": 0.12, "spoil_days": 6.0},
-    &"barley":  {"name": "Barley",  "color": Color(0.8, 0.7, 0.4),    "food": true, "nutrition": 0.4,  "spoil_days": 120.0},
-    &"potato":  {"name": "Potatoes", "color": Color(0.7, 0.55, 0.35), "food": true, "nutrition": 0.5,  "spoil_days": 60.0},
-    &"cabbage": {"name": "Cabbages", "color": Color(0.55, 0.75, 0.45), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
-    &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 50.0},
-    &"apples":  {"name": "Apples", "color": Color(0.8, 0.25, 0.2), "food": true, "nutrition": 0.3, "spoil_days": 45.0},
-    &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 30.0},
+    &"barley":  {"name": "Barley",  "color": Color(0.8, 0.7, 0.4),    "food": true, "nutrition": 0.4,  "spoil_days": 200.0},
+    &"potato":  {"name": "Potatoes", "color": Color(0.7, 0.55, 0.35), "food": true, "nutrition": 0.5,  "spoil_days": 100.0},
+    &"cabbage": {"name": "Cabbages", "color": Color(0.55, 0.75, 0.45), "food": true, "nutrition": 0.3, "spoil_days": 50.0},
+    &"pumpkin": {"name": "Pumpkins", "color": Color(0.9, 0.55, 0.15), "food": true, "nutrition": 0.45, "spoil_days": 90.0},
+    &"apples":  {"name": "Apples", "color": Color(0.8, 0.25, 0.2), "food": true, "nutrition": 0.3, "spoil_days": 70.0},
+    &"pears":   {"name": "Pears", "color": Color(0.75, 0.75, 0.3), "food": true, "nutrition": 0.3, "spoil_days": 40.0},
     &"cherries": {"name": "Cherries", "color": Color(0.7, 0.1, 0.18), "food": true, "nutrition": 0.25, "spoil_days": 14.0},
     &"peaches":  {"name": "Peaches", "color": Color(0.95, 0.62, 0.4), "food": true, "nutrition": 0.3, "spoil_days": 16.0},
     &"plums":    {"name": "Plums", "color": Color(0.4, 0.2, 0.5), "food": true, "nutrition": 0.3, "spoil_days": 24.0},
-    &"walnuts":  {"name": "Walnuts", "color": Color(0.55, 0.42, 0.28), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 200.0},
-    &"pecans":   {"name": "Pecans", "color": Color(0.5, 0.33, 0.2), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 200.0},
-    &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 12.0},
+    &"walnuts":  {"name": "Walnuts", "color": Color(0.55, 0.42, 0.28), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 300.0},
+    &"pecans":   {"name": "Pecans", "color": Color(0.5, 0.33, 0.2), "food": true, "nut": true, "nutrition": 0.4, "spoil_days": 300.0},
+    &"eggs":    {"name": "Eggs", "color": Color(0.92, 0.88, 0.75), "food": true, "nutrition": 0.15, "spoil_days": 20.0},
     &"milk":    {"name": "Milk", "color": Color(0.95, 0.95, 0.92), "food": true, "nutrition": 0.2, "spoil_days": 3.0},
     &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
     &"leather": {"name": "Leather", "color": Color(0.55, 0.36, 0.2)},
@@ -97,6 +97,7 @@ const ITEMS:Dictionary = {
 # counts_as: another building this one counts as for goals and the tutorial (a stone house is a house)
 # becomes:  (in an upgrade) the building turns into this one when the upgrade is finished
 # spoil_mult: multiplies how fast stored food spoils here (default 1.0; lower is better)
+# spoil_groups: kind (see Defs.KEEP_GROUP: grain, dry, root, fruit, fresh) -> a further multiplier for foods of that kind here
 # ground_temp / ground_share: a cellar's own temperature: ground_temp plus ground_share of how far the air is from it (the
 #           ground stays cool in summer and is not frozen in winter; default is the air temperature)
 # capacity: total units a storage building holds
@@ -188,13 +189,15 @@ const BUILDINGS:Dictionary = {
         "name": "Granary", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 14.0,
         "shape": "silo", "height": 1.8, "color": Color(0.66, 0.55, 0.36), "roof": Color(0.45, 0.32, 0.2),
         "storage": true, "capacity": 300, "food_only": true, "spoil_mult": 0.5,
-        "desc": "Stores food only. Holds 300 units. Item filters can be set in the inspector.",
+        "spoil_groups": {&"grain": 0.6, &"dry": 0.6},
+        "desc": "Stores food only. Holds 300 units. Dry and airy: grain, beans, nuts, dates and smoked food keep best here (more than three times as long as in the open); other food keeps twice as long. Item filters can be set in the inspector.",
     },
     &"root_cellar": {
         "name": "Root Cellar", "size": Vector2i(3, 3), "cost": {&"wood": 6, &"stone": 16}, "work": 18.0, "wall": &"stone",
         "shape": "house", "height": 1.3, "roof_texture": &"turf", "color": Color(0.5, 0.47, 0.42), "roof": Color(0.5, 0.62, 0.34),
         "storage": true, "capacity": 150, "food_only": true, "spoil_mult": 0.3, "ground_temp": 9.0, "ground_share": 0.25,
-        "desc": "Stores food only. Holds 150 units, half as much as a granary. Dug into the ground, it stays cool through the summer, so food keeps about three times as long as in the open and far better than in a granary in hot weather. In deep winter, when a granary freezes its contents and almost nothing spoils, the cellar stays just above freezing and food spoils a little.",
+        "spoil_groups": {&"root": 0.6, &"fruit": 0.8, &"grain": 2.2, &"dry": 2.2},
+        "desc": "Stores food only. Holds 150 units, half as much as a granary. Dug into the ground, it stays cool through the summer, so food keeps about three times as long as in the open and far better than in a granary in hot weather, and in a frost it is never warmer than outside. Roots, vegetables and fruit keep best here; grain, beans and nuts are damp in a cellar and keep worse (a granary is the place for them).",
     },
     &"woodcutter": {
         "name": "Woodcutter", "size": Vector2i(3, 3), "cost": {&"wood": 10, &"stone": 2}, "work": 10.0,
@@ -781,6 +784,31 @@ static func spoil_temp_factor(temp:float) -> float:
     if temp < THAW_TEMP:
         return lerpf(FROZEN, pow(2.0, (THAW_TEMP - 10.0) / 10.0), temp / THAW_TEMP);
     return warm;
+
+# Which kind of keeping a food needs (stores have their own multipliers per kind, see "spoil_groups" and store_spoil_mult).
+const KEEP_GROUP:Dictionary = {
+    &"wheat": &"grain", &"barley": &"grain", &"beans": &"grain",
+    &"hazelnuts": &"dry", &"walnuts": &"dry", &"pecans": &"dry", &"dates": &"dry", &"smoked_food": &"dry",
+    &"potato": &"root", &"cabbage": &"root", &"pumpkin": &"root", &"radish": &"root",
+    &"apples": &"fruit", &"pears": &"fruit", &"cherries": &"fruit", &"peaches": &"fruit", &"plums": &"fruit", &"berries": &"fruit",
+    &"lingonberries": &"fruit", &"cactus_fruit": &"fruit", &"bananas": &"fruit", &"coconuts": &"fruit",
+    &"fish": &"fresh", &"meat": &"fresh", &"milk": &"fresh", &"eggs": &"fresh", &"crabs": &"fresh", &"mushrooms": &"fresh", &"lettuce": &"fresh",
+};
+const KEEP_GROUP_NAMES:Dictionary = {&"grain": "grain and beans", &"dry": "nuts, dates and smoked food", &"root": "roots and vegetables", &"fruit": "fruit and berries", &"fresh": "fish, meat, dairy and greens"};
+
+static func keep_group(item:StringName) -> StringName:
+    return KEEP_GROUP.get(item, &"");
+
+# How fast an item spoils in a store of this definition, as a multiplier (1.0 in the open, lower keeps it longer).
+static func store_spoil_mult(store_def:Dictionary, item:StringName) -> float:
+    return store_def.get("spoil_mult", 1.0) * store_def.get("spoil_groups", {}).get(keep_group(item), 1.0);
+
+# The temperature inside a store at an air temperature: a cellar stays near its ground temperature, but never warmer than the air.
+static func store_temp(store_def:Dictionary, air:float) -> float:
+    if not store_def.has("ground_temp"):
+        return air;
+    var ground:float = store_def["ground_temp"];
+    return minf(air, ground + (air - ground) * store_def.get("ground_share", 0.25));
 
 static func spoil_per_hour(item:StringName) -> float:
     var days:float = ITEMS[item].get("spoil_days", 0.0) if ITEMS.has(item) else 0.0;

@@ -3,6 +3,12 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.18 | 2 Nov 2026 | Spoilage tuning
+- A root cellar is never warmer than the air outside, so it is never worse than leaving food out (before, a cellar spoiled food faster than a frozen open store in winter). It is still far better in summer.
+- Stores have their own strengths. A Granary keeps grain, beans, nuts, dates and smoked food more than three times as long as the open; a Root Cellar keeps roots, vegetables and fruit best, but grain and nuts are damp in it and keep worse.
+- Foods that keep well last longer: grain, beans, nuts, dates, potatoes, cabbages, pumpkins, apples, pears and eggs. Fish, berries, mushrooms and milk are as short-lived as before.
+- A store's inspector now says what is spoiling there ("Spoiling: about 6 berries, 2 fish a day") and suggests a granary or root cellar when an open store is losing food fast.
+
 # 0.7.17 | 2 Nov 2026 | Better clothes
 - Fine clothes now lift the mood of whoever wears them ("Fine clothes", +10%).
 - Citizens in wool or leather swap up to fine clothes when some are in storage, though never ahead of someone with no clothes at all. The set they take off goes back to storage if it is still good (more than half its wear left) and is thrown away if not.

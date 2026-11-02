@@ -2,7 +2,7 @@
 # Root cellar
 #     Food-only store that keeps food far longer than the open and
 #     better than a granary in summer, with a ground temperature that
-#     stays above freezing in winter (so it loses to a granary then).
+#     is never warmer than the air (so it is never worse than outside).
 #     godot --headless --path . --fixed-fps 60 res://tests/root_cellar.tscn
 # ----------------------------------------------------------------
 extends Node;
@@ -40,8 +40,10 @@ func _ready() -> void:
     _expect("in summer the cellar loses far less (%d against %d)" % [cs, gs], cs * 2 < gs);
     var cw:int = _spoiled(c, -5.0);
     var gw:int = _spoiled(g, -5.0);
-    _expect("in deep winter it loses more than the frozen granary (%d against %d)" % [cw, gw], cw > gw);
-    _expect("but still little: it stays near ground temperature (%.1f C)" % c.storage_temp(), c.storage_temp() > 3.0 and c.storage_temp() < 9.0);
+    _expect("in deep winter it is never worse than the frozen granary (%d against %d)" % [cw, gw], cw <= gw + 1);
+    _expect("it is never warmer than the air (%.1f C)" % c.storage_temp(), c.storage_temp() <= Weather.temperature + 0.001);
+    Weather.temperature = 20.0;
+    _expect("in summer it stays cool (%.1f C)" % c.storage_temp(), c.storage_temp() > 9.0 and c.storage_temp() < 15.0);
     _expect("a granary follows the air", is_equal_approx(g.storage_temp(), Weather.temperature));
     _expect("the help says so", c.help_text().contains("much longer"));
     print("ROOT_CELLAR %s" % ("PASS" if _fails == 0 else "FAIL"));
