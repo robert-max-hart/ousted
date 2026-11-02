@@ -427,6 +427,8 @@ func pray() -> void:
 func _should_interrupt() -> bool:
     if world.fires != null and world.fires.wild_burning() and not FIRE_KINDS.has(task.kind) and world.fire_tasks.wants(self):
         return true;          # a fire close by: run, or go and fight it (FireTasks)
+    if profession == JobManager.Profession.HEALER and task.job == JobManager.Profession.HEALER and world.jobs.health.HERB_KINDS.has(task.kind) and world.jobs.health.patient_waiting(self):
+        return true;          # picking herbs: a sick citizen comes first (see HealthTasks.herb_task)
     if carry_amount == 0 and bath_due() and task.kind != &"bath":
         return true;          # bath day: whoever is about their work comes along (see NeedsTasks.bath_task)
     if carry_amount == 0 and chapel_due() and task.kind != &"chapel":

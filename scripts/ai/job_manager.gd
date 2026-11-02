@@ -74,6 +74,10 @@ func choose_task(p:Pawn) -> Task:
             t = _gather_more_task(p, p.carry_item);
             if t != null:
                 return t;
+        if p.profession == Profession.HEALER:
+            t = health.deliver_task(p);
+            if t != null:
+                return t;
         t = _deliver_task(p);
         if t != null:
             return t;
@@ -170,7 +174,7 @@ func _job_order(prof:int) -> Array[Callable]:
         Profession.HUNTER:
             return [production.hunter_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.HEALER:
-            return [health.heal_task, production.supply_inputs_task, _fuel_task, _haul_task, _collect_task, _clear_task];
+            return [health.heal_task, health.herb_task, production.supply_inputs_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.ARTISAN:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:

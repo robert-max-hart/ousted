@@ -374,9 +374,19 @@ const BUILDINGS:Dictionary = {
     &"herbalist": {
         "indoor_work": true, "wall": &"plaster", "name": "Herbalist's Hut", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 2}, "work": 10.0,
         "shape": "house", "height": 1.5, "color": Color(0.7, 0.68, 0.55), "roof": Color(0.35, 0.45, 0.3),
-        "worker_slots": 1, "profession": "HEALER", "healing": true,
+        "worker_slots": 1, "profession": "HEALER", "healing": true, "radius": 14.0,
         "inputs": {&"herbs": 8}, "keep_inputs": true,
-        "desc": "The healer visits sick citizens at home and tends them for an hour and a half. A tended citizen recovers faster and loses less health for a day. With healing herbs from the hut's store the care is much better (herbs are picked by foragers and brought here); with none the healer can still sit with the sick, but it helps little. The hut keeps up to 8 herbs. Resting at home helps too.",
+        "controls": [
+            {"id": "wild_herbs", "type": "toggle", "label": "Pick wild herbs between visits", "default": true, "wild": &"herb"},
+            {"id": "cap_herbs", "type": "cap", "label": "Stop at herb stock", "item": &"herbs", "default": 24, "step": 4},
+        ],
+        "upgrades": {
+            &"greenhouse": {
+                "name": "Herb Greenhouse", "cost": {&"wood": 30, &"stone": 36, &"iron": 14}, "work": 45.0,
+                "desc": "A glasshouse against the back wall grows herbs all year, whatever the weather: about one a day, up to 10 waiting. The herbalist picks them before wild herbs. The hut keeps 16 herbs instead of 8, and what does not fit goes to storage.",
+            },
+        },
+        "desc": "The herbalist visits sick citizens at home and tends them for an hour and a half. A tended citizen recovers faster and loses less health for a day. With healing herbs the care is much better; with none the herbalist can still sit with the sick, but it helps little. Between visits they pick wild herbs nearby and keep up to 8 in the hut (the rest go to storage). A sick citizen always comes first. The Herb Greenhouse upgrade grows a steady supply.",
     },
     &"arbor": {
         "name": "Shady Arbor", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 6.0, "wall": &"planks",

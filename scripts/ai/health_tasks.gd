@@ -9,6 +9,8 @@
 class_name HealthTasks extends TaskBase;
 
 const TEND_HOURS:float = 1.5;
+const PICK_HOURS:float = 0.5;       # picking the greenhouse beds
+const HERB_KINDS:Array[StringName] = [&"harvest", &"herb_collect"];       # task kinds of the healer's off-time work (a patient ends them)
 
 var _claimed:Dictionary = {};       # patient -> the healer on the way
 
@@ -70,4 +72,82 @@ func _tend(p:Pawn, hut:Building, patient:Pawn) -> Task:
         _claimed.erase(patient);
         if st["herbs"] and World.alive(hut):
             hut.add_input(&"herbs", 1);       # the herb was not used
+    return t;
+
+# --------------------------------
+# Herbs: the healer's work between visits. A patient always comes first (Pawn._should_interrupt asks `patient_waiting`).
+
+# Whether a healer on a herb trip should drop it for a patient: someone to tend, and a hut with a place for them.
+func patient_waiting(healer:Pawn) -> bool:
+    return _hut_for(healer) != null and _patient_for(healer) != null;
+
+func _hut_for(p:Pawn) -> Herbalist:
+    var best:Herbalist = null;
+    var best_d:float = INF;
+    for b in world.buildings:
+        if b is Herbalist and b.is_complete() and not p.has_failed(b):
+            var d:float = b.position.distance_squared_to(p.position);
+            if d < best_d:
+                best_d = d;
+                best = b;
+    return best;
+
+# Herbs are wanted while the hut has room or the colony's stock is under the hut's cap (0 = no cap) and storage has room.
+func _wants_herbs(hut:Herbalist) -> bool:
+    if hut.herb_room() > 0:
+        return true;
+    var cap:int = hut.production_cap(&"herbs");
+    return (cap <= 0 or Stock.amount(&"herbs") < cap) and Stock.has_room_for(&"herbs");
+
+# The greenhouse beds first, then wild herbs in the hut's radius.
+func herb_task(p:Pawn) -> Task:
+    var hut:Herbalist = _hut_for(p);
+    if hut == null or workers_at(hut) >= hut.def.get("worker_slots", 1) or not _wants_herbs(hut):
+        return null;
+    var t:Task = null;
+    if not hut.claimed and not hut.collectable().is_empty():
+        t = _greenhouse_task(p, hut);
+    if t == null and hut.settings.get("wild_herbs", true):
+        t = harvest_node_task(p, func(rn:ResourceNode) -> bool:
+            return rn.kind == &"herb" and rn.is_forageable() and rn.is_mature() and in_radius(hut, rn.cell));
+    if t != null:
+        t.job = JobManager.Profession.HEALER;
+        t.workplace = hut;
+    return t;
+
+func _greenhouse_task(_p:Pawn, hut:Herbalist) -> Task:
+    hut.claimed = true;
+    var t:Task = Task.new(&"herb_collect", "Picking greenhouse herbs");
+    t.target = hut;
+    t.move_rect(hut.rect(), hut.is_walkable(), "Walking to the greenhouse");
+    t.work_for(PICK_HOURS, "Picking greenhouse herbs", func(pw:Pawn) -> void:
+        if World.alive(hut):
+            var n:int = hut.take_ready(Pawn.CARRY_CAP - (pw.carry_amount if pw.carry_item == &"herbs" else 0));
+            if n > 0:
+                pw.add_carry(&"herbs", n));
+    t.on_end = func(_pw:Pawn) -> void:
+        if World.alive(hut):
+            hut.claimed = false;
+    return t;
+
+# A healer carrying herbs puts what fits into the hut's own store; the rest goes to storage as usual.
+func deliver_task(p:Pawn) -> Task:
+    if p.carry_item != &"herbs":
+        return null;
+    var hut:Herbalist = _hut_for(p);
+    if hut == null or hut.herb_room() <= 0:
+        return null;
+    var t:Task = Task.new(&"deliver", "Stocking the herbalist's hut");
+    t.target = hut;
+    t.move_rect(hut.rect(), hut.is_walkable());
+    t.act(func(pw:Pawn) -> bool:
+        if not World.alive(hut):
+            return false;
+        var put:int = mini(hut.herb_room(), pw.carry_amount);
+        hut.add_input(&"herbs", put);
+        if put >= pw.carry_amount:
+            pw.clear_carry();
+        else:
+            pw.set_carry(&"herbs", pw.carry_amount - put);
+        return true);
     return t;

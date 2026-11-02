@@ -341,6 +341,10 @@ func production_allowed(item:StringName) -> bool:
 func input_amount(item:StringName) -> int:
     return inputs.get(item, 0)
 
+# How much of an input the building keeps (a subclass may raise it with an upgrade).
+func input_cap(item:StringName) -> int:
+    return def.get("inputs", {}).get(item, 0);
+
 func add_input(item:StringName, n:int) -> void:
     inputs[item] = input_amount(item) + n;
 
@@ -430,7 +434,7 @@ func inputs_wanted() -> Dictionary:
         if def.has("policy") and not world.policies.is_on(def["policy"]):
             return want;
         for in_item in def["inputs"]:       # a store that is simply kept stocked (the herbalist's herbs, the tavern's spirits)
-            var level:int = settings.get("keep_%s" % in_item, def["inputs"][in_item]);
+            var level:int = settings.get("keep_%s" % in_item, input_cap(in_item));
             var short:int = level - input_amount(in_item) - input_incoming.get(in_item, 0);
             if short > 0:
                 want[in_item] = short;
@@ -934,7 +938,7 @@ func info_text() -> String:
     if def.has("inputs") and state == State.COMPLETE:
         var parts:PackedStringArray = [];
         for item in def["inputs"]:
-            parts.append("%s %d/%d" % [Defs.item_name(item), input_amount(item), def["inputs"][item]]);
+            parts.append("%s %d/%d" % [Defs.item_name(item), input_amount(item), input_cap(item)]);
         s += "Inputs: %s\n" % ", ".join(parts);
     if def.has("fuel_capacity") and state == State.COMPLETE:
         s += "Fuel: %d / %d" % [fuel, def["fuel_capacity"]];
