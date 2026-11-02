@@ -47,6 +47,7 @@ const ITEMS:Dictionary = {
     &"wool":    {"name": "Wool", "color": Color(0.93, 0.9, 0.82)},
     &"leather": {"name": "Leather", "color": Color(0.55, 0.36, 0.2)},
     &"crabs":   {"name": "Crabs", "color": Color(0.85, 0.4, 0.3), "food": true, "nutrition": 0.5, "spoil_days": 3.0},
+    &"smoked_food": {"name": "Smoked food", "color": Color(0.62, 0.4, 0.24), "food": true, "nutrition": 0.5, "spoil_days": 60.0},
     &"fish":    {"name": "Fish", "color": Color(0.55, 0.68, 0.78), "food": true, "nutrition": 0.45, "spoil_days": 4.0},
     &"meat":    {"name": "Meat", "color": Color(0.72, 0.28, 0.25), "food": true, "nutrition": 0.5, "spoil_days": 8.0},
     &"clothes_wool":    {"name": "Wool Clothes", "color": Color(0.82, 0.78, 0.66), "clothing": {"warm": 0.3, "days": 80.0}},
@@ -416,6 +417,25 @@ const BUILDINGS:Dictionary = {
         ],
         "desc": "Artisans make clothes that citizens wear against the cold: wool clothes from 3 wool, leather clothes from 2 leather, and fine clothes from both, which take twice as long but keep out twice as much cold and last nearly twice as long. Clothes wear out (2.5 years, 4.5 for fine) and are replaced from what is in storage. Wool comes from sheep, leather from slaughtered animals (set a pasture's keep-at-most level). Clothes also trade well.",
     },
+    &"smokehouse": {
+        "indoor_work": true, "wall": &"planks", "name": "Smokehouse", "size": Vector2i(3, 3), "cost": {&"wood": 20, &"stone": 6}, "work": 16.0,
+        "shape": "house", "height": 1.8, "color": Color(0.42, 0.32, 0.24), "roof": Color(0.28, 0.24, 0.22), "smokes": true,
+        "storage": true, "capacity": 40, "accepts_items": [&"smoked_food"],
+        "worker_slots": 1, "profession": "ARTISAN",
+        "produces": [&"smoked_food"],
+        "inputs": {&"fish": 8, &"meat": 8, &"firewood": 4},
+        "recipes": {
+            &"smoked_fish": {"output": &"smoked_food", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"fish": 4, &"firewood": 1}, "hours": 3.0, "yield": 3},
+            &"smoked_meat": {"output": &"smoked_food", "off_at_zero": true, "food_reserve": "keep_food", "inputs": {&"meat": 4, &"firewood": 1}, "hours": 3.0, "yield": 3},
+        },
+        "controls": [
+            {"id": "cap_smoked_food", "type": "cap", "label": "Smoked food cap", "item": &"smoked_food", "default": 60, "step": 10, "zero_label": "Off"},
+            {"id": "keep_food", "type": "cap", "label": "Only while food stock is over", "default": 40, "step": 20, "zero_label": "Always"},
+            {"id": "make_smoked_fish", "type": "toggle", "label": "Smoke fish", "default": true},
+            {"id": "make_smoked_meat", "type": "toggle", "label": "Smoke meat", "default": true},
+        ],
+        "desc": "Fish and meat spoil in days; smoked, they keep for two months. The smokehouse's artisan smokes 4 fish or 4 meat over a slow fire of firewood into 3 smoked food (a quarter is lost in the smoke), which keeps through the winter and trades well. It takes the surplus: it only runs while the colony's food stock is over the level you set. Laborers keep its inputs stocked from storage, and it costs firewood, which is also what heats the houses.",
+    },
     &"still": {
         "indoor_work": true, "wall": &"stone", "name": "Distillery", "size": Vector2i(3, 3), "cost": {&"wood": 14, &"stone": 8}, "work": 14.0,
         "shape": "house", "decor": "still", "height": 1.6, "color": Color(0.5, 0.42, 0.34), "roof": Color(0.32, 0.26, 0.22),
@@ -511,12 +531,12 @@ const BUILD_CATEGORIES:Array = [
     ["Housing", [&"house", &"stone_house"]],
     ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut", &"hunting_lodge"]],
-    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery"]],
+    ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery", &"smokehouse"]],
     ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"chapel", &"trading_post", &"graveyard"]],
     ["Paths", [&"bridge"]],        # plus the Path and Road tools (HudBuild)
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut", &"hunting_lodge"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"smokehouse", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut", &"hunting_lodge"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -615,7 +635,7 @@ const TRADE_VALUE:Dictionary = {
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3, &"herbs": 4,
     &"lingonberries": 2, &"cactus_fruit": 2, &"dates": 4, &"bananas": 2, &"coconuts": 4,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3, &"cherries": 3, &"peaches": 3, &"plums": 3, &"walnuts": 4, &"pecans": 5,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"crabs": 7, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"crabs": 7, &"smoked_food": 8, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods

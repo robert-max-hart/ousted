@@ -3,6 +3,10 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.13 | 2 Nov 2026 | Smokehouse
+- New Smokehouse (Industry, wood 20 and stone 6): its artisan smokes 4 fish or 4 meat and a firewood into 3 smoked food over a slow fire. Smoked food keeps for two months, trades well, and counts as a food of its own for a varied diet.
+- It only runs while the colony's food stock is over a level you set (it takes the surplus), under a cap on smoked food, with a switch for fish and for meat. The chimney smokes while it works.
+
 # 0.7.12 | 2 Nov 2026 | Hunting lodge
 - New Hunting Lodge (Food, wood 24 and stone 6) and a Hunter profession: hunters go out among the trees, bring down a deer and skin it, and carry 5 meat and 2 leather back to the lodge, which is a small store for both. Skinning is quick with an iron or steel tool and slow without one.
 - The game is limited: woods hold deer in proportion to their trees (fewer in cold and dry climates), every deer taken is gone until the woods breed more, and lodges whose circles overlap share them. The inspector says how plentiful the game is.

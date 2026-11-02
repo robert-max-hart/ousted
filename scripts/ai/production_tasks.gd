@@ -356,13 +356,20 @@ func _forge_task(_p:Pawn, b:Building) -> Task:
         t.target = b;
         t.move_rect(b.rect(), b.is_walkable(), "Walking to %s" % b.display_name().to_lower());
         t.work_for(recipe["hours"] * crafts, label);
+        if b.def.get("smokes", false):
+            b.busy_until = GameClock.total_hours + recipe["hours"] * crafts + 2.0;       # (the walk there; the smoke clears when the batch is in)
+            b.update_smoke();
         t.act(func(_pw:Pawn) -> bool:
             st["done"] = true;
+            b.busy_until = 0.0;
+            b.update_smoke();
             b.release_space(space);
             b.store(item, out);
             return true);
         t.on_cancel = func(_pw:Pawn) -> void:
             if not st["done"] and World.alive(b):
+                b.busy_until = 0.0;
+                b.update_smoke();
                 b.release_space(space);
                 for in_item in recipe["inputs"]:
                     b.add_input(in_item, recipe["inputs"][in_item] * crafts);

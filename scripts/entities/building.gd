@@ -57,6 +57,7 @@ var relocating_to:Building = null;      # on the old building: the site being bu
 var teaching     :bool = false;      # a teacher is at this school right now
 var teaching_mult:float = 1.0;       # how much faster pupils learn under the teacher present (Defs.teacher_multiplier)
 var attendees    :int = 0;           # children who have a seat here (school)
+var busy_until  :float = 0.0;       # game hour a craft in progress finishes (smoke from a smokehouse's chimney; not saved)
 var workers     :int = 0;           # citizens currently working here (job buildings)
 var _spoil_acc  :Dictionary = {};
 var _burn_acc   :float = 0.0;   # item -> fractional units spoiled so far
@@ -783,7 +784,7 @@ func _on_clock_speed(_index:int) -> void:
 func update_smoke() -> void:
     if _smoke == null:
         return;
-    var burning:bool = smoke_always or is_burning();
+    var burning:bool = smoke_always or is_burning() or (def.get("smokes", false) and GameClock.total_hours < busy_until);
     if smoke_always and not _smoke.emitting:
         _smoke.preprocess = _smoke.lifetime;       # the title's chimneys already have plumes when it appears
     _smoke.emitting = burning;

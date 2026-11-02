@@ -219,7 +219,7 @@ static func _build_boxes_house(b:Building, h:float) -> void:
     prism.size = Vector3(b.vsize.x - 0.1, h * pitch, b.vsize.y - 0.2);
     b._roof = b._add_mesh(prism, SurfaceTextures.roof_material(b.def.get("roof", Color.DARK_RED)), Vector3(0, h + h * pitch * 0.5, 0));
     BuildingVisuals._build_door(b, Vector2(b.vsize.x - 0.5, b.vsize.y - 0.5), h);
-    if b.def.has("fuel_capacity"):
+    if b.def.has("fuel_capacity") or b.def.get("smokes", false):
         BuildingVisuals._build_chimney(b, h);
 
 static func _build_boxes_well(b:Building, h:float) -> void:
@@ -281,7 +281,7 @@ static func _build_model(b:Building, bh:float, body_mat:Material = null, roof_ma
         fire.emission = Color(1.0, 0.45, 0.1);
         fire.emission_energy_multiplier = 0.9;
         b.add_decor(glow, fire, Vector3.ZERO);
-    if b.def.has("fuel_capacity"):
+    if b.def.has("fuel_capacity") or b.def.get("smokes", false):
         BuildingVisuals._build_chimney(b, bh);
     return true;
 
