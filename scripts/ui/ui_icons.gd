@@ -46,10 +46,10 @@ const BY_LABEL:Dictionary = {
     "Select": &"arrow", "Harvest": &"axe", "Forage": &"basket", "Plant trees": &"sapling", "Channel": &"trench",
     "Demolish": &"hammer", "Cancel": &"cross",
     "Housing": &"house", "Storage": &"crate", "Food": &"wheat", "Industry": &"anvil", "Civic": &"flag", "Paths": &"path",
-    "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet",
+    "Jobs": &"person", "Citizens": &"people", "Log": &"scroll", "Policies": &"tablet", "Stock": &"crate",
     "Soil": &"soil", "Water": &"drop", "Slope": &"slope", "Stores": &"crate",
     "Laborer": &"person", "Builder": &"hammer", "Farmer": &"wheat", "Woodcutter": &"axe", "Miner": &"pick",
-    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"cross", "Hunter": &"bow",
+    "Blacksmith": &"anvil", "Teacher": &"book", "Forager": &"basket", "Artisan": &"spool", "Fisherman": &"fish", "Healer": &"herb", "Hunter": &"bow",
 };
 
 static func for_label(label:String) -> StringName:
@@ -73,5 +73,5 @@ const IDS:Array[StringName] = [
     &"arrow", &"axe", &"basket", &"sapling", &"trench", &"hammer", &"cross",
     &"house", &"crate", &"wheat", &"anvil", &"flag",
     &"people", &"person", &"scroll", &"tablet", &"drop", &"slope", &"soil",
-    &"pick", &"book", &"fish", &"spool", &"bow",
+    &"pick", &"book", &"fish", &"spool", &"bow", &"herb",
 ];

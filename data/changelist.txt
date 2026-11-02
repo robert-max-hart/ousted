@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.1 | 2 Nov 2026 | Healer icon
+- The Healer profession now has its own herb icon instead of sharing the red X with Cancel.
+
 # 0.8.0 | 2 Nov 2026 | Milestone 8 done: fill bars
 - New fill bars: a small bar floats over a store showing how full it is (green, yellow from 70% full, red from 90%). It shows over the store you point at or select. A new Stores button in the top bar shows them over every store at once.
 - This closes milestone 8, Additional features: health and disease, the tavern, chapel and bathhouse, fires and heat, thunderstorms, spoilage, the hunting lodge and smokehouse, a herb greenhouse, better clothes and more.
