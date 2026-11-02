@@ -55,6 +55,7 @@ const ITEMS:Dictionary = {
     &"clothes_fine":    {"name": "Fine Clothes", "color": Color(0.55, 0.45, 0.62), "clothing": {"warm": 0.6, "days": 144.0}},
     &"spirits": {"name": "Spirits", "color": Color(0.85, 0.7, 0.35), "treat": {"nutrition": 0.02, "mood": 0.2, "days": 3.0}},
     &"pottery": {"name": "Pottery", "color": Color(0.74, 0.45, 0.3)},
+    &"gilded_pottery": {"name": "Gilded pottery", "color": Color(0.82, 0.58, 0.24)},
     &"silver":  {"name": "Silver", "color": Color(0.78, 0.8, 0.84)},
     &"gold":    {"name": "Gold", "color": Color(0.92, 0.76, 0.2)},
     &"honey":   {"name": "Honey", "color": Color(0.88, 0.62, 0.12), "treat": {"nutrition": 0.08, "mood": 0.12, "days": 4.0}},
@@ -476,17 +477,28 @@ const BUILDINGS:Dictionary = {
     &"pottery": {
         "indoor_work": true, "wall": &"stone", "name": "Potter's Workshop", "size": Vector2i(3, 3), "cost": {&"wood": 12, &"stone": 8}, "work": 14.0,
         "shape": "house", "decor": "kiln", "height": 1.5, "color": Color(0.62, 0.42, 0.32), "roof": Color(0.5, 0.3, 0.22),
-        "storage": true, "capacity": 40, "accepts_items": [&"pottery"],
+        "storage": true, "capacity": 40, "accepts_items": [&"pottery", &"gilded_pottery"],
         "worker_slots": 1, "profession": "ARTISAN", "needs_water": 12.0,
-        "produces": [&"pottery"],
-        "inputs": {&"stone": 8},
+        "produces": [&"gilded_pottery", &"pottery"],
+        "inputs": {&"stone": 8, &"gold": 2, &"silver": 4},
         "recipes": {
+            &"gilded_gold":   {"output": &"gilded_pottery", "requires_upgrade": &"gilding", "off_at_zero": true, "inputs": {&"stone": 6, &"gold": 1}, "hours": 5.0, "yield": 3},
+            &"gilded_silver": {"output": &"gilded_pottery", "requires_upgrade": &"gilding", "off_at_zero": true, "inputs": {&"stone": 4, &"silver": 2}, "hours": 4.0, "yield": 2},
             &"pottery": {"inputs": {&"stone": 4}, "hours": 2.5, "yield": 2, "off_at_zero": true},
+        },
+        "upgrades": {
+            &"gilding": {
+                "name": "Gilding", "cost": {&"stone": 10, &"iron": 4}, "work": 20.0,
+                "desc": "A second, slow kiln and the tools to paint gold or silver leaf onto fired pots. Unlocks gilded pottery: 1 gold and 6 stone make 3 pieces, or 2 silver and 4 stone make 2, each worth several times plain pottery to the merchants who ask for fine goods. Gilded pieces are made first, up to their cap.",
+            },
         },
         "controls": [
             {"id": "cap_pottery", "type": "cap", "label": "Pottery cap", "item": &"pottery", "default": 20, "step": 5, "zero_label": "Off"},
+            {"id": "cap_gilded_pottery", "type": "cap", "label": "Gilded pottery cap", "item": &"gilded_pottery", "default": 10, "step": 2, "zero_label": "Off", "requires_upgrade": &"gilding"},
+            {"id": "make_gilded_gold", "type": "toggle", "label": "Gild with gold", "default": true, "requires_upgrade": &"gilding"},
+            {"id": "make_gilded_silver", "type": "toggle", "label": "Gild with silver", "default": true, "requires_upgrade": &"gilding"},
         ],
-        "desc": "Artisans grind stone and mix it with water into clay, shape it and fire it in the kiln: 4 stone make 2 pieces of pottery, which merchants pay well for. It needs water: a well, the Town Hall or open water within 12 cells.",
+        "desc": "Artisans grind stone and mix it with water into clay, shape it and fire it in the kiln: 4 stone make 2 pieces of pottery, which merchants pay well for. It needs water: a well, the Town Hall or open water within 12 cells. The Gilding upgrade adds gold or silver leaf for fine goods that fetch far more.",
     },
     &"apiary": {
         "name": "Apiary", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 4.0,
@@ -635,7 +647,7 @@ const TRADE_VALUE:Dictionary = {
     &"wheat": 2, &"barley": 2, &"beans": 2, &"berries": 1, &"mushrooms": 2, &"hazelnuts": 3, &"herbs": 4,
     &"lingonberries": 2, &"cactus_fruit": 2, &"dates": 4, &"bananas": 2, &"coconuts": 4,
     &"radish": 1, &"lettuce": 1, &"potato": 2, &"cabbage": 2, &"pumpkin": 3, &"apples": 3, &"pears": 3, &"cherries": 3, &"peaches": 3, &"plums": 3, &"walnuts": 4, &"pecans": 5,
-    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"crabs": 7, &"smoked_food": 8, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
+    &"eggs": 2, &"milk": 2, &"honey": 12, &"silver": 30, &"gold": 80, &"spirits": 25, &"pottery": 14, &"gilded_pottery": 54, &"wool": 4, &"leather": 8, &"meat": 4, &"fish": 3, &"crabs": 7, &"smoked_food": 8, &"clothes_wool": 18, &"clothes_leather": 20, &"clothes_fine": 45, &"tool_wood": 8, &"tool_iron": 25, &"tool_steel": 45,
 };
 
 # What a crop's seed (or tree sapling) is worth in trade, and how an offer in a merchant's stock is named: ordinary goods

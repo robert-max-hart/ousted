@@ -388,6 +388,8 @@ func recipe_enabled(id:StringName) -> bool:
     var item:StringName = recipe.get("output", id);
     if recipe.get("off_at_zero", false) and production_cap(item) <= 0:
         return false;
+    if recipe.has("requires_upgrade") and not has_upgrade(recipe["requires_upgrade"]):
+        return false;
     if recipe.has("food_reserve") and Stock.food_total() < settings.get(recipe["food_reserve"], 0):
         return false;
     if not has_water():

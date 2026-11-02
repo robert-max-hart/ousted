@@ -3,6 +3,9 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.7.14 | 2 Nov 2026 | Gilded pottery
+- New Gilding upgrade for the Potter's Workshop (10 stone, 4 iron): its artisan can gild pots with gold (1 gold and 6 stone make 3 pieces) or silver (2 silver and 4 stone make 2). Gilded pottery is worth several times plain pottery to the merchants who ask for fine goods. Gilded pieces are made first, up to a cap you set, and each metal has its own switch.
+
 # 0.7.13 | 2 Nov 2026 | Smokehouse
 - New Smokehouse (Industry, wood 20 and stone 6): its artisan smokes 4 fish or 4 meat and a firewood into 3 smoked food over a slow fire. Smoked food keeps for two months, trades well, and counts as a food of its own for a varied diet.
 - It only runs while the colony's food stock is over a level you set (it takes the surplus), under a cap on smoked food, with a switch for fish and for meat. The chimney smokes while it works.

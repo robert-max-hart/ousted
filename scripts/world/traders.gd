@@ -22,7 +22,7 @@ const OTHER_PAYS       :float = 0.5;                     # ... and for goods the
 const OWN_MARGIN       :float = 1.25;                    # what they charge for their own goods, times the value
 
 const LUXURY_MULT      :Vector2 = Vector2(1.4, 2.2);     # what any merchant pays for a luxury they ask for, times the value
-const LUXURIES:Array[StringName] = [&"honey", &"spirits", &"pottery", &"clothes_fine", &"silver", &"gold"];
+const LUXURIES:Array[StringName] = [&"honey", &"spirits", &"pottery", &"gilded_pottery", &"clothes_fine", &"silver", &"gold"];
 
 # The kinds of merchant. Each draws what it brings and what it asks for from its own lists (the same item is never in
 # both on one visit, so nobody can buy from a merchant and sell straight back), has a weight for how often it calls
@@ -51,7 +51,7 @@ const TYPES:Dictionary = {
     &"luxury": {
         "name": "fine goods caravan", "weight": 1.5, "seeds": 0.15, "animals": 0.0, "sells": Vector2i(3, 4), "asks": Vector2i(4, 6), "mult": Vector2(1.0, 1.6),
         "brings": [&"honey", &"herbs", &"spirits", &"pottery", &"clothes_fine", &"clothes_wool", &"clothes_leather", &"silver", &"gold"],
-        "wants": [&"honey", &"herbs", &"spirits", &"pottery", &"clothes_fine", &"silver", &"gold", &"wool", &"leather", &"clothes_wool", &"clothes_leather"],
+        "wants": [&"honey", &"herbs", &"spirits", &"pottery", &"gilded_pottery", &"clothes_fine", &"silver", &"gold", &"wool", &"leather", &"clothes_wool", &"clothes_leather"],
         "colors": [Color(0.5, 0.22, 0.5), Color(0.9, 0.78, 0.35), Color(0.34, 0.16, 0.38)],
     },
 };
@@ -73,7 +73,7 @@ const PRICE_NOTE:float = 0.1;       # the barter window marks an item as dear or
 
 # What merchants bring, and what they ask for: all of the types' lists together (trade values are in Defs.TRADE_VALUE).
 const BRINGS:Array[StringName] = [&"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"herbs", &"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"eggs", &"hazelnuts", &"radish", &"lettuce", &"fish", &"honey", &"spirits", &"pottery", &"wool", &"leather", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"meat", &"tool_wood", &"tool_iron", &"tool_steel", &"dates", &"coconuts", &"lingonberries"];
-const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure", &"herbs", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas", &"crabs", &"smoked_food"];
+const WANTS:Array[StringName] = [&"wheat", &"barley", &"beans", &"potato", &"cabbage", &"pumpkin", &"apples", &"pears", &"cherries", &"peaches", &"plums", &"walnuts", &"pecans", &"hazelnuts", &"eggs", &"fish", &"honey", &"spirits", &"pottery", &"gilded_pottery", &"clothes_wool", &"clothes_leather", &"clothes_fine", &"leather", &"wool", &"firewood", &"wood", &"stone", &"iron", &"coal", &"silver", &"gold", &"tool_wood", &"tool_iron", &"manure", &"herbs", &"dates", &"coconuts", &"lingonberries", &"cactus_fruit", &"bananas", &"crabs", &"smoked_food"];
 
 var world     :World;
 var merchant  :Merchant = null;

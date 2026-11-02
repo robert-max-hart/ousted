@@ -26,7 +26,7 @@ func _ready() -> void:
     world.terrain.flatten_rect(Rect2i(o - Vector2i(2, 2), Vector2i(18, 14)));
     _shop = world.place_building(&"pottery", o, Vector2i(3, 3), true);
     _expect("pottery is a tradeable good, not a food", Defs.trade_value(&"pottery") >= 10 and not Defs.is_food(&"pottery") and not Defs.is_treat(&"pottery"));
-    _expect("it needs only stone (and water in reach)", _shop.def["inputs"].keys() == [&"stone"] and _shop.def["needs_water"] > 0.0);
+    _expect("it needs only stone (and water in reach)", _shop.def["recipes"][&"pottery"]["inputs"].keys() == [&"stone"] and _shop.def["needs_water"] > 0.0);
     _expect("stone is worth less than the pottery it makes", 4 * Defs.trade_value(&"stone") < 2 * Defs.trade_value(&"pottery"));
     _expect("it is in the build menu and the Industry group", Defs.BUILD_MENU.has(&"pottery") and (Defs.BUILD_CATEGORIES[3][1] as Array).has(&"pottery"));
     _expect("it is an artisan building", _shop.def["profession"] == "ARTISAN");

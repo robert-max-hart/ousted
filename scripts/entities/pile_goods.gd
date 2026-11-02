@@ -25,7 +25,7 @@ const FORMS:Dictionary = {
     &"pecans": &"sack", &"potato": &"sack", &"dates": &"sack",
     &"milk": &"barrel", &"honey": &"barrel", &"spirits": &"barrel",
     &"wool": &"bale", &"leather": &"bale", &"clothes_wool": &"bale", &"clothes_leather": &"bale", &"clothes_fine": &"bale",
-    &"pottery": &"pot",
+    &"pottery": &"pot", &"gilded_pottery": &"pot",
     &"tool_wood": &"tools", &"tool_iron": &"tools", &"tool_steel": &"tools",
 };
 const STACKED_CROSSWISE:Array[StringName] = [&"log", &"split", &"block", &"ingot", &"bale", &"tools"];   # long forms: each layer turns a quarter
