@@ -2,7 +2,8 @@
 # FillBars
 #     Decides which stores show their fill bar: the one under the
 #     cursor and the selected one, or every store while the top bar's
-#     Stores toggle is on. Checked ten times a second.
+#     Stores toggle is on, and the progress bar over a building that is
+#     being upgraded. Checked ten times a second.
 # ----------------------------------------------------------------
 class_name FillBars extends Node;
 
@@ -24,6 +25,21 @@ func _process(delta:float) -> void:
     for b in w.buildings:
         var want:bool = b.is_storage() and (show_all or is_same(b, near) or is_same(b, w.tools.selected));
         update_for(b, want);
+        update_progress(b);
+
+# The bar over a building being upgraded or expanded (always shown, not only on hover): materials in amber, then work in blue.
+func update_progress(b:Building) -> void:
+    if b.upgrading == &"" or b.state != Building.State.COMPLETE:
+        if b.progress_bar != null:
+            b.progress_bar.visible = false;
+        return;
+    if b.progress_bar == null:
+        b.progress_bar = FillBar.new();
+        b.add_child(b.progress_bar);
+    var bar:Dictionary = b.build_bar();
+    b.progress_bar.position = Vector3(0, b.def.get("height", 2.0) + LIFT + (0.35 if b.fill_bar != null and b.fill_bar.visible else 0.0), 0);
+    b.progress_bar.set_progress(bar["fill"], bar["working"]);
+    b.progress_bar.visible = true;
 
 # Makes or shows the building's bar with its current fill, or hides it.
 func update_for(b:Building, want:bool) -> void:

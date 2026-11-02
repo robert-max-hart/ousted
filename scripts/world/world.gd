@@ -591,7 +591,7 @@ func place_building(def_id:StringName, origin:Vector2i, size:Vector2i, prebuilt:
 
 func remove_building(b:Building, refund:bool) -> void:
     if b.is_storage() and not b.is_empty():
-        notify("%s can't be demolished until it is empty." % b.display_name());
+        notify("%s can't be demolished until it is empty (select it and use Empty it out)." % b.display_name());
         return;
     if b is Graveyard and (b as Graveyard).used_slots() > 0:
         notify("%s can't be demolished while it has graves in it." % b.display_name());

@@ -1,6 +1,7 @@
 # ----------------------------------------------------------------
 # Footprints
-#     Builds every ordinary building (not the drag-sized ones) and checks
+#     Builds every ordinary building (not the drag-sized ones), with all its
+#     upgrades, and checks
 #     that its meshes stay inside its footprint, so a road or another
 #     building next to it is never overlapped by an anvil, a rack or a
 #     stoop. Prints each overflow in cells and fails if any is over
@@ -22,12 +23,15 @@ func _ready() -> void:
         if def.get("drag_size", false) or def.get("bridge", false):
             continue;
         for facing in [0, 1]:
-            var b:Building = Building.new();
+            var b:Building = Herbalist.new() if def.get("healing", false) else FishingHut.new() if def.get("fishing", false) else HuntingLodge.new() if def.get("hunting", false) else Building.new();          # (the classes that show their upgrades)
             b.facing = facing;
             b.setup(world, id, Vector2i(10, 10), def["size"]);
             b.state = Building.State.COMPLETE;
             b._update_visual();
             world.add_child(b);
+            for up in def.get("upgrades", {}):          # and with every upgrade built (some add a glasshouse, pots or racks)
+                b.upgrades_done[up] = true;
+                b.on_upgrade_done(up);
             var over:Dictionary = _overflow(b);
             var worst:float = 0.0;
             for k in over:

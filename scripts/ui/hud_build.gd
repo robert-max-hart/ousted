@@ -408,6 +408,14 @@ static func _build_info_panel(hud:HUD, root:Control) -> void:
     hud._site_box = VBoxContainer.new();
     hud._site_box.visible = false;
     col.add_child(hud._site_box);
+    hud._site_bar_label = Label.new();
+    hud._site_bar_label.add_theme_font_size_override("font_size", 12);
+    hud._site_box.add_child(hud._site_bar_label);
+    hud._site_bar = ProgressBar.new();
+    hud._site_bar.show_percentage = false;
+    hud._site_bar.custom_minimum_size = Vector2(0, 12);
+    hud._site_bar.max_value = 1.0;
+    hud._site_box.add_child(hud._site_bar);
     hud._cancel_btn = Button.new();
     hud._cancel_btn.text = "Cancel construction";
     hud._cancel_btn.focus_mode = Control.FOCUS_NONE;
@@ -481,6 +489,17 @@ static func _build_info_panel(hud:HUD, root:Control) -> void:
     hud._filter_flow.add_theme_constant_override("h_separation", 3);
     hud._filter_flow.add_theme_constant_override("v_separation", 3);
     hud._filter_box.add_child(hud._filter_flow);
+    hud._empty_check = CheckButton.new();
+    hud._empty_check.text = "Empty it out";
+    hud._empty_check.focus_mode = Control.FOCUS_NONE;
+    hud._empty_check.tooltip_text = "Citizens carry everything in this store to other stores, and it takes nothing new until you switch this off: so it can be demolished or moved. (Other stores need room.)";
+    hud._empty_check.toggled.connect(hud._on_empty_toggled);
+    hud._filter_box.add_child(hud._empty_check);
+    hud._empty_note = Label.new();
+    hud._empty_note.add_theme_font_size_override("font_size", 11);
+    hud._empty_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART;
+    hud._empty_note.visible = false;
+    hud._filter_box.add_child(hud._empty_note);
     hud._filter_head.pressed.connect(func() -> void:
         hud._filter_flow.visible = not hud._filter_flow.visible;
         if World.instance.tools.selected is Building:

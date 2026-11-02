@@ -1,7 +1,8 @@
 # ----------------------------------------------------------------
 # Ledger screenshot
 #     Made-up records, the Town Hall with Governance selected, and the
-#     ledger panel on its graphs and then its history.
+#     ledger panel on its Population graph, then the Health graph (its
+#     first days have no health record, as in an old save), then its history.
 #     godot --path . res://tests/ledger_shot.tscn -- <out_dir>
 # ----------------------------------------------------------------
 extends Node;
@@ -23,6 +24,9 @@ func _ready() -> void:
     for d in 70:
         led.samples.append({"day": d, "pop": 6 + d / 9, "babies": d / 20, "children": d / 14, "adults": 6, "food": maxi(0, 160 - d * 3 + (d / 12) * 120), "firewood": 30 + (d % 20),
             "mood": 62.0 + 8.0 * sin(d * 0.3), "births": 1 if d % 11 == 0 else 0, "deaths": 1 if d % 29 == 5 else 0});
+        if d >= 12:          # (the first days predate the health record, as in an old save: a gap in the graph)
+            led.samples[d]["health"] = 96.0 - 14.0 * maxf(0.0, sin(d * 0.21)) * (1.0 if d > 40 else 0.3);
+            led.samples[d]["ill_pct"] = 2.0 + 18.0 * maxf(0.0, sin(d * 0.21)) * (1.0 if d > 40 else 0.3);
     for t in ["Your settlers have arrived. Spring has begun.", "Wooden House completed.", "Alden and Hal are now a couple.", "A baby, Rowan, was born to Alden and Hal.", "Godric has died of old age."]:
         led.record_event(t);
     world.tools.select(world.town_hall);
@@ -34,12 +38,12 @@ func _process(_delta:float) -> void:
         world.hud._ledger_panel.open();
     elif _frame == 40:
         _shot("ledger_01.png");
-        world.hud._ledger_panel._graph_btns[3].pressed.emit();
+        world.hud._ledger_panel._graph_btns[3].pressed.emit();          # Health
     elif _frame == 50:
+        _shot("ledger_02.png");          # the Health graph
         world.hud._ledger_panel.get_child(0).get_child(1).current_tab = 1;
     elif _frame == 60:
-        _shot("ledger_02.png");
-        world.hud._ledger_panel.get_child(0).get_child(1).current_tab = 1;
+        _shot("ledger_03.png");          # the history
         get_tree().quit();
 
 func _shot(file:String) -> void:

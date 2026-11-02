@@ -79,6 +79,10 @@ var _menu_resume_speed:int = 1;
 var _filter_box :VBoxContainer;
 var _filter_head:Button;              # "Accepts: ..." summary; opens and closes the item toggles
 var _filter_flow:HFlowContainer;
+var _site_bar_label:Label;            # "Waiting for materials: 40%" or "Upgrading: 20%" over the bar
+var _site_bar:ProgressBar;           # a site's progress: materials in amber, then work in blue
+var _empty_check:CheckButton;         # "Empty it out": citizens clear this store and it takes nothing new
+var _empty_note:Label;                # what is left to carry out
 var _controls_box:VBoxContainer;
 var _info_scroll:ScrollContainer;
 var _info_col:VBoxContainer;
@@ -351,6 +355,13 @@ func _refresh_site(obj:Variant) -> void:
     _site_box.visible = show;
     if not show:
         return;
+    var bar:Dictionary = b.build_bar();
+    _site_bar_label.text = bar["text"];
+    _site_bar.value = bar["fill"];
+    var tint:StyleBoxFlat = StyleBoxFlat.new();
+    tint.bg_color = FillBar.WORK_COLOR if bar["working"] else FillBar.MATERIALS_COLOR;
+    tint.set_corner_radius_all(2);
+    _site_bar.add_theme_stylebox_override("fill", tint);
     _cancel_btn.visible = b.state == Building.State.CONSTRUCTION;
     _cancel_btn.tooltip_text = "Stop building and take back every material delivered so far";
     for i in _priority_btns.size():
@@ -540,6 +551,8 @@ func _refresh_filters(obj:Variant) -> void:
             can = (b.def["accepts_items"] as Array).has(item);
         check.visible = can;
         check.set_pressed_no_signal(not b.forbidden.has(item));
+    _empty_check.set_pressed_no_signal(b.emptying);
+    _update_empty_note(b);
     _update_filter_head(b);
 
 # One line: everything is accepted, or what is switched off.
@@ -553,6 +566,31 @@ func _update_filter_head(b:Building) -> void:
                 off.append(Defs.item_name(item));
     var summary:String = "everything" if off.is_empty() else ("nothing" if off.size() == total else "all but " + (", ".join(off) if off.size() <= 2 else "%d items" % off.size()));
     _filter_head.text = "Accepts: %s %s" % [summary, "-" if _filter_flow.visible else "+"];
+
+# While a store is being emptied: how much is left, and a warning when nothing else can take it.
+func _update_empty_note(b:Building) -> void:
+    _empty_note.visible = b.emptying;
+    if not b.emptying:
+        return;
+    var left:int = b.used();
+    var room:bool = false;
+    for item in b.stored:
+        for d in World.instance.buildings:
+            if d != b and d.can_store(item):
+                room = true;
+    if left == 0 and b.in_reserved == 0:
+        _empty_note.text = "Empty. It takes nothing new: you can demolish or move it.";
+    elif room or left == 0:
+        _empty_note.text = "Being emptied: %d goods left to carry out." % left;
+    else:
+        _empty_note.text = "%d goods left, and no other store has room (or takes them): build or free up another store." % left;
+
+func _on_empty_toggled(on:bool) -> void:
+    var obj:Variant = World.instance.tools.selected;
+    if obj is Building and World.alive(obj):
+        (obj as Building).emptying = on;
+        _update_empty_note(obj);
+        PanelMover.refit_height(_info);
 
 func _on_filter_toggled(on:bool, item:StringName) -> void:
     var obj:Variant = World.instance.tools.selected;

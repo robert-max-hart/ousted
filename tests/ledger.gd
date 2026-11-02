@@ -21,6 +21,14 @@ func _ready() -> void:
     _expect("a sample counts the citizens", s["pop"] == world.pawns.size() and s["adults"] + s["children"] + s["babies"] == s["pop"] and s["babies"] == 0);
     _expect("it has food and firewood", s["food"] == Stock.food_total() and s["firewood"] == Stock.amount(&"firewood"));
     _expect("it has an average happiness", s["mood"] > 0.0 and s["mood"] <= 100.0);
+    _expect("and the colony's health (%.0f%%, %.0f%% ill)" % [s["health"], s["ill_pct"]], s["health"] > 90.0 and s["health"] <= 100.0 and s["ill_pct"] == 0.0);
+    world.pawns[1].illness = 0.5;
+    world.pawns[1].health = 0.5;
+    var sick:Ledger = Ledger.new();
+    sick.on_day(world);
+    _expect("an ill, hurt citizen shows (health %.0f%%, ill %.0f%%)" % [sick.samples[0]["health"], sick.samples[0]["ill_pct"]], sick.samples[0]["health"] < s["health"] and sick.samples[0]["ill_pct"] > 0.0);
+    world.pawns[1].illness = 0.0;
+    world.pawns[1].health = 1.0;
     world.kill_pawn(world.pawns[0], "old age");
     var house:Building = world.place_building(&"house", TestSite.spot(world, Vector2i(3, 3), Vector2i(-8, 2)), Vector2i(3, 3), true);
     world.families.move_home(world.pawns[1], house);

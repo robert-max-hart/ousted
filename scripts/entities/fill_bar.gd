@@ -51,6 +51,14 @@ func set_fill(used:int, capacity:int) -> void:
     _mat.set_shader_parameter("fill", f);
     _mat.set_shader_parameter("tint", color_for(f));
 
+# A build bar: amber while the materials are being delivered, blue while the builders work.
+func set_progress(f:float, working:bool) -> void:
+    _mat.set_shader_parameter("fill", clampf(f, 0.0, 1.0));
+    _mat.set_shader_parameter("tint", WORK_COLOR if working else MATERIALS_COLOR);
+
+const WORK_COLOR     :Color = Color(0.35, 0.68, 0.95);
+const MATERIALS_COLOR:Color = Color(0.95, 0.65, 0.25);
+
 static func color_for(f:float) -> Color:
     if f >= 0.9:
         return Color(0.9, 0.3, 0.25);

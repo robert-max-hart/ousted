@@ -287,7 +287,7 @@ const BUILDINGS:Dictionary = {
         "desc": "Hunters go out among the trees of the circle round the lodge, bring down a deer and skin it, and carry the meat and leather back to the lodge, which is a small store for both. The game is limited: it is more plentiful in thick woods and in a temperate climate, every deer taken is gone until the woods breed more, and lodges whose circles overlap share it. Skinning is slow without an iron or steel tool.",
     },
     &"mine": {
-        "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
+        "indoor_work": true, "name": "Mine", "size": Vector2i(5, 5), "cost": {&"wood": 30, &"stone": 8}, "work": 30.0,
         "shape": "mine", "height": 1.6, "color": Color(0.5, 0.48, 0.45), "roof": Color(0.36, 0.28, 0.2),
         "worker_slots": 3, "profession": "MINER",
         "produces": [&"iron", &"stone"],

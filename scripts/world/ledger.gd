@@ -10,7 +10,7 @@ class_name Ledger extends RefCounted;
 const MAX_EVENTS:int = 500;        # the oldest are dropped past this
 const MAX_SAMPLES:int = 1600;      # about 50 game years of days
 
-var samples     :Array = [];       # per day: {day, pop, babies, children, adults, food, firewood, mood, births, deaths}
+var samples     :Array = [];       # per day: {day, pop, babies, children, adults, food, firewood, mood, births, deaths, trade_in, trade_out, health, ill_pct}
 var events      :Array = [];       # oldest first: {day, when, text}
 var births_today:int = 0;
 var deaths_today:int = 0;
@@ -55,7 +55,12 @@ func on_day(world:World) -> void:
     var children:int = 0;
     var adults:int = 0;
     var mood:float = 0.0;
+    var health:float = 0.0;
+    var ill:int = 0;
     for p in world.pawns:
+        health += clampf(p.health, 0.0, 1.0);
+        if p.illness > 0.0:
+            ill += 1;
         if p.is_baby():
             babies += 1;
             continue;
@@ -70,6 +75,8 @@ func on_day(world:World) -> void:
         "food": Stock.food_total(), "firewood": Stock.amount(&"firewood"),
         "mood": mood / grown * 100.0 if grown > 0 else 0.0, "births": births_today, "deaths": deaths_today,
         "trade_in": trade_in_today, "trade_out": trade_out_today,
+        "health": health / world.pawns.size() * 100.0 if not world.pawns.is_empty() else 0.0,          # everyone's health, babies too
+        "ill_pct": float(ill) / world.pawns.size() * 100.0 if not world.pawns.is_empty() else 0.0,        # the share of the colony that is ill
     });
     births_today = 0;
     deaths_today = 0;

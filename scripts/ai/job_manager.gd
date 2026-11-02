@@ -179,7 +179,7 @@ func _job_order(prof:int) -> Array[Callable]:
             return [production.artisan_task, _fuel_task, _haul_task, _collect_task, _clear_task];
         Profession.MINER:
             return [production.miner_task, production.surface_mine_task, _fuel_task, _haul_task, _collect_task, _clear_task];
-    return [_fuel_task, production.supply_inputs_task, _clear_task, _tree_order_task, _haul_task, _collect_task, _herd_task, trade.trade_task, _build_task, _repair_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
+    return [_fuel_task, production.supply_inputs_task, _clear_task, _tree_order_task, _haul_task, _collect_task, _empty_task, _herd_task, trade.trade_task, _build_task, _repair_task, _road_task, _forage_if_hungry_task, _wood_if_short_task, _rebalance_task];
 
 # --------------------------------
 # Professions
@@ -289,12 +289,19 @@ func _deliver_task(p:Pawn) -> Task:
 const REBALANCE_MARGIN:float = 0.5;
 
 func _rebalance_task(p:Pawn) -> Task:
+    return _move_goods_task(p, false);
+
+# The player asked for a store to be emptied: carry its goods to any other store that takes them (see Building.emptying).
+func _empty_task(p:Pawn) -> Task:
+    return _move_goods_task(p, true);
+
+func _move_goods_task(p:Pawn, only_emptying:bool) -> Task:
     var from:Building = null;
     var to:Building = null;
     var item:StringName = &"";
     var best_gain:float = REBALANCE_MARGIN;
     for s in world.buildings:
-        if not s.is_storage() or s.def.get("temporary", false) or p.has_failed(s):
+        if not s.is_storage() or s.def.get("temporary", false) or p.has_failed(s) or (only_emptying and not s.emptying):
             continue;
         for it in s.stored:
             if s.available(it) <= 0:

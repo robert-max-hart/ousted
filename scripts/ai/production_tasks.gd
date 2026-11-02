@@ -14,11 +14,13 @@ func woodcutter_task(p:Pawn) -> Task:
     for b in sites:
         if workers_at(b) >= b.def.get("worker_slots", 1):
             continue;
-        var order:Array = [_chop_task, _forge_task, _stock_inputs_task, _plant_task] if b.settings.get("priority", 0) == 1 \
-            else [_forge_task, _stock_inputs_task, _chop_task, _plant_task];       # firewood first: split and fetch logs before felling more
+        var order:Array = [_replant_task, _chop_task, _forge_task, _stock_inputs_task, _plant_task] if b.settings.get("priority", 0) == 1 \
+            else [_forge_task, _stock_inputs_task, _replant_task, _chop_task, _plant_task];       # firewood first: split and fetch logs before felling more; but a felled tree is replanted before the next is felled
         for job in order:
             var t:Task = (job as Callable).call(p, b);
             if t != null:
+                if job == _chop_task:
+                    _count_felling(t, b);
                 t.workplace = b;
                 return t;
     return null;
@@ -454,6 +456,43 @@ func _chop_task(p:Pawn, b:Building) -> Task:
 # A woodcutter replants thickly, like a managed woodlot: trees may touch, and up to this many saplings grow in the radius at once.
 const PLANT_SPACING    :int = 0;
 const PLANT_SAPLING_CAP:int = 60;
+
+# Replanting keeps pace with felling: every tree a woodcutter fells adds a sapling to the hut's debt (`dig_progress[&"replant"]`,
+# saved with the building), and the debt is paid, one planting at a time, before the next tree is felled. Without this the
+# woodcutter only planted once no tree was left to fell, so a forest was cut bare before anything was replanted.
+const REPLANT_PER_TREE:float = 1.0;
+
+# Adds a felling to the debt when the chop task finishes (not when it was cut short).
+func _count_felling(t:Task, b:Building) -> void:
+    var st:Dictionary = {"cut": false};
+    var prev_cancel:Callable = t.on_cancel;
+    t.on_cancel = func(pw:Pawn) -> void:
+        st["cut"] = true;
+        if prev_cancel.is_valid():
+            prev_cancel.call(pw);
+    var prev_end:Callable = t.on_end;
+    t.on_end = func(pw:Pawn) -> void:
+        if prev_end.is_valid():
+            prev_end.call(pw);
+        if not st["cut"] and World.alive(b) and b.settings.get("plant", false):
+            b.dig_progress[&"replant"] = b.dig_progress.get(&"replant", 0.0) + REPLANT_PER_TREE;
+
+func _replant_task(p:Pawn, b:Building) -> Task:
+    if b.dig_progress.get(&"replant", 0.0) < 1.0 or not b.settings.get("plant", false):
+        return null;
+    var t:Task = _plant_task(p, b);
+    if t == null:
+        return null;          # nowhere to plant, or the woodlot is at its sapling limit: the debt waits
+    var st:Dictionary = {"cut": false};
+    var prev_cancel:Callable = t.on_cancel;          # (it frees the planting spot: keep it)
+    t.on_cancel = func(pw:Pawn) -> void:
+        st["cut"] = true;
+        if prev_cancel.is_valid():
+            prev_cancel.call(pw);
+    t.on_end = func(_pw:Pawn) -> void:
+        if not st["cut"] and World.alive(b):
+            b.dig_progress[&"replant"] = maxf(0.0, b.dig_progress.get(&"replant", 0.0) - 1.0);
+    return t;
 
 func _plant_task(_p:Pawn, b:Building) -> Task:
     if not b.settings.get("plant", false):

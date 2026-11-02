@@ -649,6 +649,8 @@ func end_task(success:bool) -> void:
 # Working at a building that is worked in (the smithy, the school): step inside while the work lasts.
 func _enter_workplace() -> void:
     var b:Variant = task.workplace;
+    if b == null and task.kind == &"school":
+        b = task.target;          # a student studies inside the school (not its workplace: that would count against the teacher's places)
     if _inside_work != null or indoors or not (b is Building) or not World.alive(b) or not (b as Building).def.get("indoor_work", false):
         return;
     var wp:Building = b;

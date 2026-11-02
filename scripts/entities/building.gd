@@ -39,6 +39,7 @@ var stored      :Dictionary = {};   # item -> int in the building
 var out_reserved:Dictionary = {};   # item -> int promised to a pawn who is on the way to collect it
 var in_reserved :int = 0;           # units of space promised to pawns on the way to deliver
 var forbidden   :Dictionary = {};   # item -> true when the player has forbidden it here
+var emptying    :bool = false;      # the player asked for this store to be emptied and kept empty (citizens carry its goods away, and it takes nothing new)
 var settings    :Dictionary = {};   # control id -> current value (see Defs control schema)
 var fuel        :int = 0;           # fuel stocked here in firewood-equivalents (houses; coal counts double)
 var fuel_coal   :int = 0;           # how much of `fuel` came from coal (it burns after the firewood: drives the smoke colour)
@@ -78,6 +79,7 @@ var _windows    :Array[MeshInstance3D] = [];
 var windows_lit_always:bool = false;      # the title screen's mock town: lit without residents
 var smoke_always:bool = false;            # ... and smoking without a fire to feed
 var _window_mat :StandardMaterial3D;
+var progress_bar:FillBar;        # floats over a building while it is being upgraded or expanded (FillBars)
 var fill_bar    :FillBar;        # floats over a store while it is hovered, selected or the Stores toggle is on (FillBars)
 var _site_label :Label3D;        # floats over a site that is paused or short of materials
 
@@ -232,7 +234,7 @@ func free_space() -> int:
 
 # Whether this building would take the item at all (type rules and the player's filter).
 func accepts(item:StringName) -> bool:
-    if not is_storage() or forbidden.has(item) or def.get("temporary", false) or relocating_to != null:
+    if not is_storage() or emptying or forbidden.has(item) or def.get("temporary", false) or relocating_to != null:
         return false;       # a supply cart only gives, and a building being moved takes nothing new
     if def.has("accepts_items"):
         return (def["accepts_items"] as Array).has(item);
@@ -242,7 +244,7 @@ func accepts(item:StringName) -> bool:
 # for certain goods beats a general one. A store the player has since forbidden the item in is the worst place.
 func storage_rank(item:StringName) -> float:
     var rank:float = 0.0;
-    if forbidden.has(item):
+    if forbidden.has(item) or emptying:
         rank += 100.0;
     if Defs.is_food(item):
         rank += Defs.store_spoil_mult(def, item) * 10.0;
@@ -539,6 +541,22 @@ func progress() -> float:
     if work_required() <= 0.0:
         return 1.0;
     return clampf(work_done / work_required(), 0.0, 1.0);
+
+# How much of the materials of the build (or upgrade) in hand are delivered, 0 to 1.
+func materials_share() -> float:
+    var need:int = 0;
+    var have:int = 0;
+    var c:Dictionary = cost();
+    for item in c:
+        need += c[item];
+        have += mini(delivered.get(item, 0), c[item]);
+    return 1.0 if need <= 0 else float(have) / float(need);
+
+# What a progress bar shows for a site: the materials delivered while they are short, then the work done.
+func build_bar() -> Dictionary:
+    if not has_all_materials():
+        return {"fill": materials_share(), "working": false, "text": "Waiting for materials: %d%%" % roundi(materials_share() * 100.0)};
+    return {"fill": progress(), "working": true, "text": "%s: %d%%" % ["Upgrading" if upgrading != &"" else "Building", roundi(progress() * 100.0)]};
 
 func ready_for_work() -> bool:
     return is_site() and has_all_materials() and (upgrading != &"" or world.is_site_clear(self));
@@ -869,7 +887,7 @@ func update_windows() -> void:
 func to_dict() -> Dictionary:
     return {
         "id": def_id, "origin": origin, "size": size, "facing": facing, "state": state, "delivered": delivered.duplicate(),
-        "work_done": work_done, "stored": stored.duplicate(), "forbidden": forbidden.duplicate(),
+        "work_done": work_done, "stored": stored.duplicate(), "forbidden": forbidden.duplicate(), "emptying": emptying,
         "settings": settings.duplicate(), "fuel": fuel, "fuel_coal": fuel_coal, "inputs": inputs.duplicate(),
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
@@ -885,6 +903,7 @@ func restore_dict(d:Dictionary) -> void:
     work_done = d["work_done"];
     stored = d["stored"];
     forbidden = d["forbidden"];
+    emptying = d.get("emptying", false);
     for key in d["settings"]:
         if settings.has(key):          # controls added since the save keep their defaults
             settings[key] = d["settings"][key];
@@ -1012,6 +1031,14 @@ func add_decor(mesh:Mesh, mat:Material, at:Vector3, rot:Vector3 = Vector3.ZERO) 
     mi.rotation = rot;
     _decor.append(mi);
     return mi;
+
+# Fits the model to the footprint again after something was added to it (a glasshouse, say): undoes the earlier shift and scale
+# and measures everything now in it (see BuildingVisuals._fit_to_footprint).
+func refit_visual() -> void:
+    position -= fit_shift;
+    scale = Vector3.ONE;
+    fit_shift = Vector3.ZERO;
+    BuildingVisuals._fit_to_footprint(self);
 
 func _update_visual() -> void:
     if _body == null:

@@ -8,11 +8,12 @@ class_name LedgerPanel extends PanelContainer;
 
 const SUM_DAYS:int = 8;        # lines marked as sums show the total of this many days up to each day (a season)
 
-# Each graph: a name and its lines (sample key, label, colour, optionally true for a rolling sum).
+# Each graph: a name and its lines (sample key, label, colour, optionally true for a rolling sum), and optionally a fixed "max" for the scale.
 const GRAPHS:Array[Dictionary] = [
     {"name": "Population", "lines": [["pop", "Total", Color(0.95, 0.95, 0.9)], ["adults", "Adults", Color(0.45, 0.75, 0.95)], ["children", "Children", Color(0.95, 0.8, 0.35)], ["babies", "Babies", Color(0.95, 0.5, 0.65)]]},
     {"name": "Food", "lines": [["food", "Food", Color(0.9, 0.78, 0.35)], ["firewood", "Firewood", Color(0.75, 0.5, 0.28)]]},
     {"name": "Happiness", "lines": [["mood", "Average happiness (%)", Color(0.55, 0.85, 0.5)]]},
+    {"name": "Health", "max": 100.0, "lines": [["health", "Average health (%)", Color(0.55, 0.85, 0.5)], ["ill_pct", "Citizens ill (%)", Color(0.85, 0.5, 0.85)]]},
     {"name": "Trade", "lines": [["trade_in", "Sold (value, per 8 days)", Color(0.55, 0.85, 0.5), true], ["trade_out", "Bought (value, per 8 days)", Color(0.95, 0.65, 0.3), true]]},
     {"name": "Births and deaths", "lines": [["births", "Births (per 8 days)", Color(0.55, 0.85, 0.5), true], ["deaths", "Deaths (per 8 days)", Color(0.9, 0.4, 0.4), true]]},
 ];
@@ -112,7 +113,7 @@ func _show_graph(i:int) -> void:
     for j in _graph_btns.size():
         _graph_btns[j].set_pressed_no_signal(j == i);
     var lines:Array = GRAPHS[i]["lines"];
-    _chart.set_data(_ledger, lines);
+    _chart.set_data(_ledger, lines, GRAPHS[i].get("max", 0.0));
     for c in _legend.get_children():
         _legend.remove_child(c);
         c.queue_free();
@@ -205,10 +206,12 @@ func _refresh_history() -> void:
 class LedgerChart extends Control:
     var _ledger:Ledger;
     var _lines:Array = [];
+    var _fixed_top:float = 0.0;          # a fixed top of the scale (0: fit the data)
 
-    func set_data(ledger:Ledger, lines:Array) -> void:
+    func set_data(ledger:Ledger, lines:Array, fixed_top:float = 0.0) -> void:
         _ledger = ledger;
         _lines = lines;
+        _fixed_top = fixed_top;
         queue_redraw();
 
     func _draw() -> void:
@@ -227,8 +230,9 @@ class LedgerChart extends Control:
             var v:Array[float] = _values(samples, line);
             values.append(v);
             for x in v:
-                top = maxf(top, x);
-        top = _nice_top(top);
+                if not is_nan(x):
+                    top = maxf(top, x);
+        top = _fixed_top if _fixed_top > 0.0 else _nice_top(top);
         for k in range(0, 5):
             var y:float = area.end.y - area.size.y * k / 4.0;
             draw_line(Vector2(area.position.x, y), Vector2(area.end.x, y), Color(1, 1, 1, 0.12));
@@ -244,8 +248,14 @@ class LedgerChart extends Control:
         for k in _lines.size():
             var pts:PackedVector2Array = [];
             for j in samples.size():
+                if is_nan(values[k][j]):          # days from before this was recorded (an old save): a gap, not a zero
+                    if pts.size() > 1:
+                        draw_polyline(pts, _lines[k][2], 2.0, true);
+                    pts = [];
+                    continue;
                 pts.append(Vector2(area.position.x + area.size.x * (samples[j]["day"] - first) / span, area.end.y - area.size.y * clampf(values[k][j] / top, 0.0, 1.0)));
-            draw_polyline(pts, _lines[k][2], 2.0, true);
+            if pts.size() > 1:
+                draw_polyline(pts, _lines[k][2], 2.0, true);
 
     # A line's value for every sample: the sample itself, or for a sum the last SUM_DAYS samples added up.
     func _values(samples:Array, line:Array) -> Array[float]:
@@ -258,7 +268,7 @@ class LedgerChart extends Control:
                     running -= float(samples[j - SUM_DAYS].get(line[0], 0));
                 out.append(running);
             else:
-                out.append(float(samples[j].get(line[0], 0)));
+                out.append(float(samples[j][line[0]]) if samples[j].has(line[0]) else NAN);
                 running = 0.0;
         return out;
 

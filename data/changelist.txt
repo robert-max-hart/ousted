@@ -3,6 +3,14 @@
 # Versions are 0.M.N: M = milestones completed, N = pushes since M last went up (see scripts/data/changelist.gd).
 # Add a section with every push; a section not pushed yet is the next number with -dev, and loses the -dev on push.
 
+# 0.8.6 | 2 Nov 2026 | Stores, workplaces, replanting and progress bars
+- New "Empty it out" switch on every store: citizens carry its goods to other stores and it takes nothing new, so it can be demolished or moved.
+- Miners now work inside the mine, and students study inside the school, out of sight like the other workplaces.
+- Woodcutters now replant as they fell: each tree felled is replaced before the next is cut, instead of only planting once the forest was gone.
+- The herb greenhouse no longer sticks out past the herbalist's hut; the hut is scaled to fit its footprint with it built.
+- The ledger has a new Health graph (average health and the share of citizens who are ill).
+- A building being upgraded or expanded shows a progress bar over it (amber while materials arrive, blue while builders work), and the inspector shows the same bar.
+
 # 0.8.5 | 2 Nov 2026 | Settings window fixes
 - The settings window now scrolls when the screen is short, so the Back button can always be clicked (it used to run off the bottom of the title screen).
 - New Window size setting: pick a window size that fits your screen (it is greyed out in fullscreen).

@@ -60,7 +60,7 @@ func on_upgrade_done(id:StringName) -> void:
         return;
     _glass_shown = true;
     var back:float = -float(vsize.y) * 0.5 + 0.25;       # the back wall of the cottage body
-    var depth:float = 0.85;
+    var depth:float = 0.7;
     var w:float = float(vsize.x) - 1.0;
     var cz:float = back - depth * 0.5;
     var wall_h:float = 1.05;
@@ -105,10 +105,11 @@ func on_upgrade_done(id:StringName) -> void:
     var soil:StandardMaterial3D = _flat_mat(Color(0.3, 0.22, 0.15));
     var green:StandardMaterial3D = _flat_mat(Color(0.34, 0.6, 0.3));
     for row in 2:
-        var rz:float = back - 0.28 - row * 0.3;
+        var rz:float = back - 0.24 - row * 0.26;
         add_decor(bed, soil, Vector3(0, 0.2, rz));
         for k in 5:
             add_decor(leaf, green, Vector3((k - 2) * w * 0.17, 0.32 + (0.03 if k % 2 == 0 else 0.0), rz));
+    refit_visual();          # the glasshouse reaches past the cottage's back wall: the whole hut is scaled to keep inside its footprint, as the model was
 
 func to_dict() -> Dictionary:
     var d:Dictionary = super.to_dict();

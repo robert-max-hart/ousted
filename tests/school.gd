@@ -19,6 +19,8 @@ var _max_attendees:int = 0;
 var _teacher_taught:bool = false;
 var _done:bool = false;
 var _teaching_hours:float = 0.0;
+var _inside_frames:int = 0;
+var _max_inside:int = 0;
 var _study_frames:int = 0;
 var _bad_frames:int = 0;                # frames in which a child learned outside school hours or with no teacher
 var _last_xp:Dictionary = {};
@@ -85,10 +87,13 @@ func _process(_delta:float) -> void:
         _last_xp[k] = k.general_xp;
         if gained:
             _study_frames += 1;
+            if k._inside_work != null and is_same(k._inside_work, school) and not k.visible:
+                _inside_frames += 1;
             # judged against the previous frame too: a bell or a teacher's break can land mid-frame
             if not (_school_open() or _open_prev) or not (school.teaching or _teaching_prev):
                 _bad_frames += 1;
     _teaching_prev = school.teaching;
+    _max_inside = maxi(_max_inside, kids.filter(func(k:Pawn) -> bool: return k._inside_work != null and not k.visible).size());
     _open_prev = _school_open();
     if (GameClock.total_hours - _start) / 24.0 < 4.0:
         return;
@@ -110,6 +115,9 @@ func _process(_delta:float) -> void:
         if p.is_adult() and p.general_xp > 0.0:
             adults_with_xp += 1;
     _expect("adults gained no schooling", adults_with_xp == 0);
+    _expect("students study inside the school, out of sight (%d of %d study frames, up to %d inside at once)" % [_inside_frames, _study_frames, _max_inside], _study_frames > 0 and _inside_frames == _study_frames and _max_inside > 0);
+    var stuck:int = kids.filter(func(k:Pawn) -> bool: return k._inside_work != null and k.task == null).size();
+    _expect("and nobody is left hidden without a task (%d)" % stuck, stuck == 0);
     _expect("a child's work speed includes schooling", is_equal_approx(kids[0].work_efficiency(), Defs.CHILD_EFFICIENCY * (1.0 + kids[0].general_xp) * kids[0].mood_efficiency()));
     get_tree().quit();
 
