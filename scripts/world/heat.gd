@@ -72,7 +72,7 @@ static func cooling_spot(p:Pawn) -> bool:
             continue;
         if b.def.get("water", false) and b.rect().grow(WELL_COOL).has_point(c):
             return true;
-        if b.def.get("shade", false) and b.rect().grow(1).has_point(c):
+        if b.def.get("shade", false) and b.is_open() and b.rect().grow(1).has_point(c):
             return true;
     return false;
 

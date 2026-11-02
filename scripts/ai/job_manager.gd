@@ -107,6 +107,10 @@ func choose_task(p:Pawn) -> Task:
         if t != null:
             return t;
 
+    if not night and not p.is_baby():
+        t = needs.bath_task(p);
+        if t != null:
+            return t;
     if not night and p.is_adult():
         t = needs.chapel_task(p);
         if t != null:

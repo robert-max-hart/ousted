@@ -19,7 +19,7 @@ const ENERGY_HOURS      :float = 20.0;
 const SLEEP_RESTORE     :float = 1.0 / 7.0;
 const FAIL_COOLDOWN     :float = 6.0;      # hours before retrying a failed target
 const NON_WORK_KINDS    :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle"];   # tools don't speed these up or wear
-const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"chapel", &"flee", &"fire", &"camp", &"cool"];
+const NON_LABOR_KINDS   :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"idle", &"stay_home", &"school", &"care", &"bury", &"heal", &"tavern", &"chapel", &"bath", &"flee", &"fire", &"camp", &"cool"];
 const FIRE_KINDS        :Array[StringName] = [&"flee", &"fire"];
 const NIGHT_EXEMPT      :Array[StringName] = [&"sleep", &"eat", &"drink", &"warm", &"deliver", &"haul", &"flee", &"fire", &"cool"];
 
@@ -51,6 +51,11 @@ var tavern_day  :int = -1;                 # the day they last went to the taver
 var tavern_until:float = 0.0;              # game hour the lift from the evening out wears off
 var chapel_day  :int = -1;                 # the service day they last decided about
 var chapel_until:float = 0.0;              # game hour the lift from a service wears off
+var bath_day    :int = -1;                 # the bath day they last decided about
+var bath_until  :float = 0.0;              # game hour the "freshly bathed" mood wears off
+var bath_mood   :float = 0.0;
+var clean_until :float = 0.0;              # game hour the protection from illness wears off
+var clean_mult  :float = 1.0;              # the share of the usual illness chances while clean
 var illness     :float = 0.0;              # how sick: 0 is well, 1 is gravely ill (see Illness)
 var bucket      :bool = false;             # carrying a bucket of water to a fire (not saved)
 var burned_until:float = 0.0;              # game hour until which a death counts as burns (Fires)
@@ -141,7 +146,7 @@ func to_dict() -> Dictionary:
         "parents": parents.map(func(x:Pawn) -> int: return world.pawns.find(x)),
         "due_hour": due_hour, "pair_ready_hour": pair_ready_hour, "conceive_ready_hour": conceive_ready_hour,
         "treat_item": treat_item, "treat_mood": treat_mood, "treat_until": treat_until, "treat_ready": treat_ready,
-        "tavern_day": tavern_day, "tavern_until": tavern_until, "chapel_day": chapel_day, "chapel_until": chapel_until, "illness": illness, "overheat": overheat, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
+        "tavern_day": tavern_day, "tavern_until": tavern_until, "chapel_day": chapel_day, "chapel_until": chapel_until, "bath_day": bath_day, "bath_until": bath_until, "bath_mood": bath_mood, "clean_until": clean_until, "clean_mult": clean_mult, "illness": illness, "overheat": overheat, "immune_until": immune_until, "care_until": care_until, "care_quality": care_quality,
         "mood": mood, "grief": grief.duplicate(true), "unhappy_hours": _unhappy_hours, "homeless_hours": homeless_hours,
     };
 
@@ -176,6 +181,11 @@ func restore(w:World, d:Dictionary) -> void:
     tavern_until = d.get("tavern_until", 0.0);
     chapel_day = d.get("chapel_day", -1);
     chapel_until = d.get("chapel_until", 0.0);
+    bath_day = d.get("bath_day", -1);
+    bath_until = d.get("bath_until", 0.0);
+    bath_mood = d.get("bath_mood", 0.0);
+    clean_until = d.get("clean_until", 0.0);
+    clean_mult = d.get("clean_mult", 1.0);
     illness = d.get("illness", 0.0);
     overheat = d.get("overheat", 0.0);
     immune_until = d.get("immune_until", 0.0);
@@ -365,7 +375,7 @@ func tavern_due() -> bool:
     if not is_adult() or tavern_day == GameClock.day_index() or illness > 0.0 or h < Defs.TAVERN_FROM or h >= Defs.TAVERN_TO or energy < 0.3:
         return false;
     for b in world.buildings:
-        if b.def.get("tavern", false) and b.is_complete():
+        if b.def.get("tavern", false) and b.is_open():
             return true;
     return false;
 
@@ -376,9 +386,36 @@ func chapel_due() -> bool:
     if not is_adult() or chapel_day == day or not Defs.is_service_day(day) or illness > 0.0 or h < Defs.CHAPEL_FROM or h >= Defs.CHAPEL_TO or energy < 0.3:
         return false;
     for b in world.buildings:
-        if b.def.get("chapel", false) and b.is_complete():
+        if b.def.get("chapel", false) and b.is_open():
             return true;
     return false;
+
+# A citizen of 5 or over, not ill, whose bath day it is, in the bath hours, with an open bathhouse that has water.
+func bath_due() -> bool:
+    var h:float = GameClock.hour();
+    var day:int = GameClock.day_index();
+    if is_baby() or bath_day == day or illness > 0.0 or h < Defs.BATH_FROM or h >= Defs.BATH_TO or energy < 0.3:
+        return false;
+    if (day + get_instance_id() % Defs.BATH_EVERY) % Defs.BATH_EVERY != 0:
+        return false;
+    for b in world.buildings:
+        if b.def.get("bath", false) and b.is_open() and b.has_water():
+            return true;
+    return false;
+
+# Comes out of a bath: better for it a couple of days, less likely to catch or spread a sickness for three, and with hot
+# water in the cold warmed through.
+func bathe(hot:bool) -> void:
+    bath_until = GameClock.total_hours + Defs.BATH_MOOD_HOURS;
+    bath_mood = Defs.BATH_MOOD if hot else Defs.BATH_COLD_MOOD;
+    clean_until = GameClock.total_hours + Defs.BATH_CLEAN_HOURS;
+    clean_mult = Defs.BATH_ILLNESS_MULT if hot else Defs.BATH_COLD_ILLNESS_MULT;
+    if hot and Weather.temperature < Defs.BATH_COLD_BELOW:
+        warmth = 1.0;
+
+# The share of the usual illness chances this citizen has right now (1 when not freshly bathed).
+func clean_factor() -> float:
+    return clean_mult if GameClock.total_hours < clean_until else 1.0;
 
 # A service halves the grief for any death in the last few days, once for each.
 func pray() -> void:
@@ -390,6 +427,8 @@ func pray() -> void:
 func _should_interrupt() -> bool:
     if world.fires != null and world.fires.wild_burning() and not FIRE_KINDS.has(task.kind) and world.fire_tasks.wants(self):
         return true;          # a fire close by: run, or go and fight it (FireTasks)
+    if carry_amount == 0 and bath_due() and task.kind != &"bath":
+        return true;          # bath day: whoever is about their work comes along (see NeedsTasks.bath_task)
     if carry_amount == 0 and chapel_due() and task.kind != &"chapel":
         return true;          # the bell rings on a service day (see NeedsTasks.chapel_task)
     if carry_amount == 0 and tavern_due() and task.kind != &"tavern":
@@ -462,6 +501,8 @@ func happiness_factors() -> Array:
         f.append(["Too hot", -Heat.mood_loss(self)]);
     if GameClock.total_hours < tavern_until:
         f.append(["Evening at the tavern", Defs.TAVERN_MOOD]);
+    if GameClock.total_hours < bath_until:
+        f.append(["Freshly bathed", bath_mood]);
     if GameClock.total_hours < chapel_until:
         f.append(["Attended service", Defs.CHAPEL_MOOD]);
     if kinds >= 2:

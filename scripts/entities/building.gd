@@ -57,6 +57,7 @@ var relocating_to:Building = null;      # on the old building: the site being bu
 var teaching     :bool = false;      # a teacher is at this school right now
 var teaching_mult:float = 1.0;       # how much faster pupils learn under the teacher present (Defs.teacher_multiplier)
 var attendees    :int = 0;           # children who have a seat here (school)
+var bath_acc    :float = 0.0;       # share of a firewood's hot water still left (a bathhouse)
 var busy_until  :float = 0.0;       # game hour a craft in progress finishes (smoke from a smokehouse's chimney; not saved)
 var workers     :int = 0;           # citizens currently working here (job buildings)
 var _spoil_acc  :Dictionary = {};
@@ -404,8 +405,27 @@ func has_inputs(recipe:Dictionary) -> bool:
     return true;
 
 # Input units still wanted for the recipes that are switched on and under their cap.
+# Finished and not switched off by the player ("closable" buildings have an Open switch in the inspector, saved in settings).
+func is_open() -> bool:
+    return is_complete() and settings.get("open", true);
+
+# Hot water for a bath: one firewood serves several bathers (a third as many in the cold). Returns false when the
+# bathhouse is out of firewood (a cold bath).
+func bath_use(cold:bool) -> bool:
+    var cost:float = 1.0 / float(Defs.BATH_PER_FIREWOOD_COLD if cold else Defs.BATH_PER_FIREWOOD);
+    if bath_acc >= cost:
+        bath_acc -= cost;
+        return true;
+    if input_amount(&"firewood") > 0:
+        take_input(&"firewood", 1);
+        bath_acc += 1.0 - cost;
+        return true;
+    return false;
+
 func inputs_wanted() -> Dictionary:
     var want:Dictionary = {};
+    if def.get("closable", false) and not settings.get("open", true):
+        return want;
     if is_complete() and def.get("keep_inputs", false):
         if def.has("policy") and not world.policies.is_on(def["policy"]):
             return want;
@@ -801,8 +821,9 @@ func update_windows() -> void:
     if _window_mat == null:
         return;
     var lit:bool = windows_lit_always or (state == State.COMPLETE and not residents.is_empty()) \
-        or (state == State.COMPLETE and def.get("tavern", false) and GameClock.hour() >= Defs.TAVERN_FROM - 1.0 and GameClock.hour() < 23.0) \
-        or (state == State.COMPLETE and def.get("chapel", false) and Defs.is_service_day(GameClock.day_index()) and GameClock.hour() >= Defs.CHAPEL_FROM - 1.0 and GameClock.hour() < Defs.CHAPEL_TO + Defs.CHAPEL_STAY);
+        or (is_open() and def.get("tavern", false) and GameClock.hour() >= Defs.TAVERN_FROM - 1.0 and GameClock.hour() < 23.0) \
+        or (is_open() and def.get("chapel", false) and Defs.is_service_day(GameClock.day_index()) and GameClock.hour() >= Defs.CHAPEL_FROM - 1.0 and GameClock.hour() < Defs.CHAPEL_TO + Defs.CHAPEL_STAY) \
+        or (is_open() and def.get("bath", false) and GameClock.hour() >= Defs.BATH_FROM - 1.0 and GameClock.hour() < Defs.BATH_TO + 1.0);
     _window_mat.albedo_color = Color(1.0, 0.82, 0.4) if lit else Color(0.16, 0.2, 0.26);
 
 
@@ -818,12 +839,13 @@ func to_dict() -> Dictionary:
         "upgrades_done": upgrades_done.duplicate(), "upgrading": upgrading, "base_spent": _base_spent.duplicate(),
         "dig_progress": dig_progress.duplicate(), "spoil_acc": _spoil_acc.duplicate(), "burn_acc": _burn_acc,
         "expansion": expansion.duplicate(true), "cost_mult": cost_mult, "priority": priority, "reloc_from": world.buildings.find(relocating_from) if relocating_from != null else -1,
-        "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1, "health": health,
+        "reloc_to": world.buildings.find(relocating_to) if relocating_to != null else -1, "health": health, "bath_acc": bath_acc,
     };
 
 func restore_dict(d:Dictionary) -> void:
     state = d["state"];
     health = d.get("health", 1.0);
+    bath_acc = d.get("bath_acc", 0.0);
     delivered = d["delivered"];
     work_done = d["work_done"];
     stored = d["stored"];

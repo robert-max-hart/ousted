@@ -139,7 +139,7 @@ func on_hour() -> void:
                 chance += NEAR_PER_HOUR;
             elif a.indoors and b.indoors and is_same(a.shelter, b.shelter):
                 chance += NEAR_PER_HOUR;
-            if chance > 0.0 and world.rng.randf() < chance * a.illness * share:
+            if chance > 0.0 and world.rng.randf() < chance * a.illness * share * a.clean_factor() * b.clean_factor():
                 if infect(b, true):
                     world.notify("%s has caught the sickness." % b.first_name);
 
@@ -169,7 +169,7 @@ func onset_chance(p:Pawn) -> float:
         chance *= HEAT_ONSET_MULT;
     if p.home == null:
         chance *= HOMELESS_ONSET_MULT;
-    return chance;
+    return chance * p.clean_factor();
 
 # A merchant reaches the Trading Post: they may carry a sickness in.
 func on_merchant_arrival() -> void:

@@ -52,6 +52,7 @@ var families    :Families;
 var illness     :Illness;
 var fires       :Fires;
 var wildlife    :Wildlife;
+const VISIT_KINDS:Array[StringName] = [&"tavern", &"chapel", &"bath"];       # tasks inside a building the player can close
 var fire_tasks  :FireTasks;
 var fire_view   :FireRenderer;
 var bodies      :Array[Body] = [];
@@ -899,13 +900,16 @@ func _on_hour(h:int) -> void:
         for b in buildings:
             if b.is_complete() and b.def.get("chapel", false):
                 Sfx.at(&"chapel_bell", b.global_position + Vector3(0, 3.0, 0), 0.0, -2.0, 70.0);      # the call to the service
+    for p in pawns:                 # a visit building the player has closed sends its visitors out
+        if p.task != null and VISIT_KINDS.has(p.task.kind) and is_instance_valid(p.task.target) and p.task.target is Building and not (p.task.target as Building).is_open():
+            p.end_task(false);
     jobs.reconcile();
     _update_nav_snow();
     families.on_hour();
     illness.on_hour();
     fires.on_hour();
     for b in buildings:
-        if b.def.get("tavern", false) or b.def.get("chapel", false):
+        if b.def.get("tavern", false) or b.def.get("chapel", false) or b.def.get("bath", false):
             b.update_windows();
     for b in buildings.duplicate():
         if b.def.get("temporary", false) and b.is_complete() and b.is_empty():

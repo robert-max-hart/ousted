@@ -381,22 +381,40 @@ const BUILDINGS:Dictionary = {
     &"arbor": {
         "name": "Shady Arbor", "size": Vector2i(2, 2), "cost": {&"wood": 6}, "work": 6.0, "wall": &"planks",
         "shape": "house", "height": 1.75, "color": Color(0.5, 0.4, 0.28), "roof": Color(0.45, 0.62, 0.3), "roof_texture": &"turf",
-        "shade": true, "walkable": true,
+        "shade": true, "walkable": true, "closable": true,
+        "controls": [
+            {"id": "open", "type": "toggle", "label": "Open", "default": true},
+        ],
         "desc": "A leafy shelter with a bench. Citizens who are too hot come to cool off in its shade, and it keeps the heat off anyone resting beside it. Cheap and open: build one where people work, or in a hot climate beside the fields and the well.",
     },
     &"tavern": {
         "wall": &"planks", "name": "Tavern", "size": Vector2i(4, 3), "cost": {&"wood": 40, &"stone": 20, &"iron": 4}, "work": 36.0,
         "shape": "house", "height": 2.0, "color": Color(0.62, 0.44, 0.3), "roof": Color(0.42, 0.26, 0.2),
-        "tavern": true, "patrons": 10, "inputs": {&"spirits": 8}, "keep_inputs": true, "policy": &"treats",
+        "tavern": true, "patrons": 10, "inputs": {&"spirits": 8}, "keep_inputs": true, "policy": &"treats", "closable": true,
         "controls": [
+            {"id": "open", "type": "toggle", "label": "Open", "default": true},
             {"id": "keep_spirits", "type": "cap", "label": "Spirits kept here", "item": &"spirits", "default": 8, "step": 2, "zero_label": "None"},
         ],
         "desc": "A place to spend the evening. From 5 in the evening adults come for a pint and some company, an hour and a half at a time, up to 10 at once, and leave a little happier (a very small lift that lasts a day) even when there is nothing to drink. With spirits in the tavern's store they also drink one, for the full happiness boost of spirits. Laborers fill the store from storage up to the level you set (it is not filled while the Policies rule on treats is off, so spirits kept for trading are left alone). A good tavern costs a good deal to build.",
     },
+    &"bathhouse": {
+        "wall": &"stone", "name": "Bathhouse", "size": Vector2i(4, 3), "cost": {&"wood": 30, &"stone": 24}, "work": 36.0,
+        "shape": "house", "height": 1.7, "color": Color(0.66, 0.64, 0.6), "roof": Color(0.4, 0.34, 0.3),
+        "bath": true, "patrons": 12, "needs_water": 12.0, "smokes": true, "closable": true,
+        "inputs": {&"firewood": 8}, "keep_inputs": true,
+        "controls": [
+            {"id": "open", "type": "toggle", "label": "Open", "default": true},
+            {"id": "keep_firewood", "type": "cap", "label": "Firewood kept here", "item": &"firewood", "default": 8, "step": 2, "zero_label": "None"},
+        ],
+        "desc": "Every 4th day or so each citizen from the age of 5 may come for a bath in the late afternoon, an hour at a time, up to 12 at once. A bath leaves them in a better mood for a couple of days and less likely to catch or spread a sickness for three, and in the cold the hot water warms them through. It needs water within 12 cells, and laborers keep it stocked with firewood from storage: one firewood heats the water for six bathers, three in the cold. Without firewood the bath is cold, which is worth much less.",
+    },
     &"chapel": {
         "wall": &"stone", "name": "Chapel", "size": Vector2i(3, 4), "cost": {&"wood": 30, &"stone": 40}, "work": 40.0,
         "shape": "house", "height": 2.0, "color": Color(0.64, 0.62, 0.58), "roof": Color(0.36, 0.34, 0.4),
-        "chapel": true, "patrons": 20,
+        "chapel": true, "patrons": 20, "closable": true,
+        "controls": [
+            {"id": "open", "type": "toggle", "label": "Open", "default": true},
+        ],
         "desc": "A place to gather. Every 8th day, in the morning, the bell rings and about 6 in 10 adults come to a service (up to 20 inside), a couple of hours, led by no one. Those who attend feel better for a few days, and anyone grieving a recent death has that grief halved. The sick and the children stay away. No one has to work here and nothing needs stocking.",
     },
     &"tailor": {
@@ -544,11 +562,11 @@ const BUILD_CATEGORIES:Array = [
     ["Storage", [&"stockpile", &"granary", &"root_cellar"]],
     ["Food", [&"field", &"orchard", &"pasture", &"apiary", &"forager", &"fishing_hut", &"hunting_lodge"]],
     ["Industry", [&"woodcutter", &"mine", &"blacksmith", &"tailor", &"still", &"pottery", &"smokehouse"]],
-    ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"chapel", &"trading_post", &"graveyard"]],
+    ["Civic", [&"town_hall", &"well", &"arbor", &"school", &"herbalist", &"tavern", &"chapel", &"bathhouse", &"trading_post", &"graveyard"]],
     ["Paths", [&"bridge"]],        # plus the Path and Road tools (HudBuild)
 ];
 
-const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"smokehouse", &"herbalist", &"tavern", &"chapel", &"graveyard", &"bridge", &"fishing_hut", &"hunting_lodge"];
+const BUILD_MENU:Array[StringName] = [&"town_hall", &"house", &"stone_house", &"well", &"arbor", &"stockpile", &"granary", &"root_cellar", &"woodcutter", &"forager", &"mine", &"blacksmith", &"school", &"trading_post", &"field", &"orchard", &"pasture", &"apiary", &"tailor", &"still", &"pottery", &"smokehouse", &"herbalist", &"tavern", &"chapel", &"bathhouse", &"graveyard", &"bridge", &"fishing_hut", &"hunting_lodge"];
 
 # grow_days:  days to ripen at ideal conditions (a game year is 32 days: 8 per season)
 # min_temp:   no growth below this; also the planting threshold
@@ -819,6 +837,22 @@ const CHAPEL_MOOD      :float = 0.1;        # "Attended service"
 const CHAPEL_MOOD_HOURS:float = 72.0;       # how long it lasts
 const CHAPEL_GRIEF_DAYS:int = 8;            # grief begun within this many days is halved by a service
 const CHAPEL_GRIEF_MULT:float = 0.5;
+
+# The bathhouse (M8): bath day comes round every BATH_EVERY days for each citizen (staggered), 5 and over.
+const BATH_EVERY       :int = 4;
+const BATH_FROM        :float = 16.0;       # the hours citizens set out (after school)
+const BATH_TO          :float = 18.0;
+const BATH_STAY        :float = 1.0;
+const BATH_SHARE       :int = 60;           # percent of those whose day it is
+const BATH_MOOD        :float = 0.06;       # "Freshly bathed" with hot water
+const BATH_COLD_MOOD   :float = 0.02;       # and with a cold bath (no firewood)
+const BATH_MOOD_HOURS  :float = 48.0;
+const BATH_CLEAN_HOURS :float = 72.0;       # how long the protection from illness lasts
+const BATH_ILLNESS_MULT:float = 0.6;        # a clean citizen catches and spreads illness at this share (hot bath)
+const BATH_COLD_ILLNESS_MULT:float = 0.8;   # (cold bath: half the protection)
+const BATH_PER_FIREWOOD:int = 6;            # bathers one firewood heats the water for
+const BATH_PER_FIREWOOD_COLD:int = 3;       # (in the cold)
+const BATH_COLD_BELOW  :float = 5.0;        # C: a hot bath warms the bather to full warmth, and uses fuel faster
 
 static func is_service_day(day:int) -> bool:
     return day % CHAPEL_EVERY == CHAPEL_EVERY - 1;

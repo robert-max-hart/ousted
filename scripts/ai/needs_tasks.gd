@@ -79,7 +79,7 @@ func tavern_task(p:Pawn) -> Task:
     if hash(Vector2i(p.get_instance_id() % 100003, today)) % 100 >= Defs.TAVERN_SHARE:
         return null;              # not tonight
     var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-        return x.is_complete() and x.def.get("tavern", false) and not p.has_failed(x) and _patrons(x) < x.def.get("patrons", 10));
+        return x.is_open() and x.def.get("tavern", false) and not p.has_failed(x) and _patrons(x) < x.def.get("patrons", 10));
     if b == null:
         return null;
     var t:Task = Task.new(&"tavern", "Going to the tavern", false);
@@ -106,6 +106,39 @@ func _patrons(b:Building, kind:StringName = &"tavern") -> int:
             n += 1;
     return n;
 
+# Bath day: a citizen of 5 or over whose day it is (every BATH_EVERY days, staggered) and who feels like it (BATH_SHARE) goes to the
+# nearest open bathhouse with water and room in the late afternoon, bathes for an hour and comes out better for it.
+func bath_task(p:Pawn) -> Task:
+    if not p.bath_due():
+        return null;
+    var today:int = GameClock.day_index();
+    p.bath_day = today;           # decided for this bath day, whatever comes of it
+    if hash(Vector3i(p.get_instance_id() % 100003, today, 11)) % 100 >= Defs.BATH_SHARE:
+        return null;
+    var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
+        return x.is_open() and x.def.get("bath", false) and x.has_water() and not p.has_failed(x) and _patrons(x, &"bath") < x.def.get("patrons", 12));
+    if b == null:
+        return null;
+    var st:Dictionary = {"hot": false};
+    var t:Task = Task.new(&"bath", "Going to the bathhouse", false);
+    t.target = b;
+    t.move_rect(b.rect(), false);
+    t.act(func(pw:Pawn) -> bool:
+        pw.go_inside(b, false);
+        st["hot"] = b.bath_use(Weather.temperature < Defs.BATH_COLD_BELOW);
+        if st["hot"]:
+            b.busy_until = GameClock.total_hours + Defs.BATH_STAY + 0.5;
+            b.update_smoke();
+        Sfx.at(&"splash", b.global_position, 0.1, -8.0, 25.0);
+        return true);
+    t.work_for(Defs.BATH_STAY, "Bathing", func(pw:Pawn) -> void:
+        pw.bathe(st["hot"]);
+        pw.go_outside());
+    t.on_cancel = func(pw:Pawn) -> void:
+        if pw.indoors and is_same(pw.shelter, b):
+            pw.go_outside();
+    return t;
+
 # The morning service on a service day (Defs.is_service_day): about 6 in 10 adults go to the nearest chapel with room, stay
 # a couple of hours, and come out lifted for a few days, with the grief for any recent death halved.
 func chapel_task(p:Pawn) -> Task:
@@ -116,7 +149,7 @@ func chapel_task(p:Pawn) -> Task:
     if hash(Vector3i(p.get_instance_id() % 100003, today, 7)) % 100 >= Defs.CHAPEL_SHARE:
         return null;
     var b:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-        return x.is_complete() and x.def.get("chapel", false) and not p.has_failed(x) and _patrons(x, &"chapel") < x.def.get("patrons", 20));
+        return x.is_open() and x.def.get("chapel", false) and not p.has_failed(x) and _patrons(x, &"chapel") < x.def.get("patrons", 20));
     if b == null:
         return null;
     var t:Task = Task.new(&"chapel", "Going to the service", false);
@@ -371,7 +404,7 @@ func cool_task(p:Pawn) -> Task:
     var well:Building = world.nearest_building(p.position, func(x:Building) -> bool:
         return x.is_complete() and x.def.get("water", false));
     var shade:Building = world.nearest_building(p.position, func(x:Building) -> bool:
-        return x.is_complete() and x.def.get("shade", false));
+        return x.is_open() and x.def.get("shade", false));
     var shade_d:float = INF if shade == null else Vector2(shade.center_cell()).distance_to(here_c);
     var tree:Vector2i = _nearest_tree(p.cell());
     var home_d:float = INF if home == null else Vector2(home.center_cell()).distance_to(here_c);
