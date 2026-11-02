@@ -75,6 +75,7 @@ func start_piece(season:int) -> bool:
         _streams[id] = load("%s%s.ogg" % [DIR, id]) as AudioStream;
     if _streams[id] == null:
         return false;
+    Sfx.apply_volumes();          # (a stale bus level must not keep a piece silent)
     current = id;
     last = id;
     _fade = 0.0;

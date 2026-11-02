@@ -10,6 +10,7 @@
 class_name AmbientAudio extends Node;
 
 const DIR      :String = "res://assets/audio/ambient/";
+const TITLE_QUIET:float = 0.12;          # behind the title screen (no volume control there) the land is barely heard
 const FADE_PER_SEC:float = 0.5;          # how fast a level moves toward its target
 const LOOK_EVERY:float = 0.5;            # seconds between looks at the camera's surroundings
 const WATER_SEEN_RADIUS:int = 14;        # cells round the point the camera looks at
@@ -60,7 +61,7 @@ func _process(delta:float) -> void:
 
 func _apply(id:StringName) -> void:
     var p:AudioStreamPlayer = _players[id];
-    var level:float = levels[id] * LOUDNESS[id];
+    var level:float = levels[id] * LOUDNESS[id] * (TITLE_QUIET if world.is_backdrop else 1.0);
     if level < 0.004:
         if p.playing:
             p.stop();

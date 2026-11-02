@@ -21,20 +21,33 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
     hud._weather = Label.new();
     hud._weather.custom_minimum_size.x = 78;
     row.add_child(hud._weather);
-    hud._stock = HBoxContainer.new();
-    hud._stock.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
-    hud._stock.clip_contents = true;           # a long stock line is cut off instead of pushing the speed buttons off-screen
-    hud._stock.add_theme_constant_override("separation", 10);
-    hud._stock.mouse_filter = Control.MOUSE_FILTER_PASS;
-    row.add_child(hud._stock);
+    var spacer:Control = Control.new();
+    spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE;
+    row.add_child(spacer);
+    # the figures live in their own panel (opened with the Stock button), not in the bar: the bar ran out of room
+    var stock_panel:PanelContainer = hud._panel(root, &"stock");
+    hud._stock_panel = stock_panel;
+    stock_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT);
+    stock_panel.offset_left = 282;
+    stock_panel.offset_top = 48;
+    var col:VBoxContainer = VBoxContainer.new();
+    stock_panel.add_child(col);
+    var title:Label = Label.new();
+    title.text = "Stock";
+    col.add_child(title);
+    hud._stock = VBoxContainer.new();
+    hud._stock.add_theme_constant_override("separation", 2);
+    col.add_child(hud._stock);
     for id in hud.SHOWN_ITEMS:
         HudBuild._stock_entry(hud, id, Defs.item_name(id));
     HudBuild._stock_entry(hud, &"food", "Food");
     HudBuild._stock_entry(hud, &"pop", "Citizens");
-    HudBuild._stock_entry(hud, &"idle", "Citizens with nothing to do");
-    HudBuild._stock_entry(hud, &"homeless", "Citizens with no home");
-    HudBuild._stock_entry(hud, &"ill", "Citizens who are ill");
-    HudBuild._stock_entry(hud, &"fire", "Cells on fire: a wildfire is burning");
+    HudBuild._stock_entry(hud, &"idle", "Citizens with nothing to do", "Idle");
+    HudBuild._stock_entry(hud, &"homeless", "Citizens with no home", "Homeless");
+    HudBuild._stock_entry(hud, &"ill", "Citizens who are ill", "Ill");
+    HudBuild._stock_entry(hud, &"fire", "Cells on fire: a wildfire is burning", "Fires");
+    hud._stock_toggle = hud._panel_toggle(row, "Stock");
     # panel toggles: each button opens and closes its panel
     hud._jobs_toggle = hud._panel_toggle(row, "Jobs");
     hud._citizens_toggle = hud._panel_toggle(row, "Citizens");
@@ -82,7 +95,7 @@ static func _build_top_bar(hud:HUD, root:Control) -> void:
         hud._speed_btns.append(b);
 
 # One figure in the top bar: its icon (UIIcons) and a number, with a tooltip.
-static func _stock_entry(hud:HUD, id:StringName, tip:String) -> void:
+static func _stock_entry(hud:HUD, id:StringName, tip:String, name_text:String = "") -> void:
     var box:HBoxContainer = HBoxContainer.new();
     box.add_theme_constant_override("separation", 4);
     box.mouse_filter = Control.MOUSE_FILTER_PASS;
@@ -93,7 +106,15 @@ static func _stock_entry(hud:HUD, id:StringName, tip:String) -> void:
     icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED;
     icon.mouse_filter = Control.MOUSE_FILTER_PASS;
     box.add_child(icon);
+    var nm:Label = Label.new();
+    nm.text = name_text if name_text != "" else tip;
+    nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL;
+    nm.custom_minimum_size.x = 70;
+    nm.mouse_filter = Control.MOUSE_FILTER_PASS;
+    box.add_child(nm);
     var num:Label = Label.new();
+    num.custom_minimum_size.x = 36;
+    num.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT;
     num.mouse_filter = Control.MOUSE_FILTER_PASS;
     box.add_child(num);
     hud._stock.add_child(box);

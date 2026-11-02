@@ -10,3 +10,5 @@ __pycache__/
 !/playtests/README.md
 /playtest*.txt
 /*.sav
+
+/tools/upright_piano/

@@ -15,7 +15,7 @@ const REFRESH_RATE  :float = 0.25;
 
 var _date       :Label;
 var _weather    :Label;
-var _stock      :HBoxContainer;         # the stock figures in the top bar, each an icon and a number
+var _stock      :VBoxContainer;         # the stock figures in the Stock panel, each an icon and a number
 var _stock_vals :Dictionary = {};       # entry id -> its number Label (the entry's box is the label's parent)
 var _speed_btns :Array[Button] = [];
 var _tool_btns  :Dictionary = {};       # key -> Button
@@ -52,6 +52,8 @@ var _stores_toggle:Button;             # shows every store's fill bar (the hover
 var _slope_toggle:Button;              # colours the ground by how steep it is for building
 var _soil_toggle:Button;               # colours the ground by soil fertility and numbers the selected field's plots
 var _citizens_toggle:Button;
+var _stock_toggle:Button;
+var _stock_panel:PanelContainer;
 var _log_toggle :Button;
 var _citizens   :CitizensPanel;
 var _extras     :InspectorExtras;    # mark-for-harvest button and the worker list
@@ -170,6 +172,7 @@ func _ready() -> void:
     _bind_toggle(_jobs_toggle, _jobs_panel, true);
     _bind_toggle(_log_toggle, _log_panel, true);
     _bind_toggle(_citizens_toggle, _citizens, false);
+    _bind_toggle(_stock_toggle, _stock_panel, true);
 
     var tools:PlayerTools = World.instance.tools;
     tools.mode_changed.connect(_on_mode_changed);

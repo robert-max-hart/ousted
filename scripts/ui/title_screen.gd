@@ -58,6 +58,20 @@ func _build_backdrop() -> void:
     add_child((load(SaveGame.MAIN_SCENE) as PackedScene).instantiate());
     World.backdrop = false;
 
+# The title piece (piano alone, tools/make_music.py), looping on the Music bus and fading in.
+func _start_music() -> void:
+    var stream:AudioStreamOggVorbis = load("res://assets/audio/music/title.ogg") as AudioStreamOggVorbis;
+    if stream == null:
+        return;
+    stream.loop = true;
+    var player:AudioStreamPlayer = AudioStreamPlayer.new();
+    player.stream = stream;
+    player.bus = Sfx.BUS_MUSIC;
+    player.volume_db = -60.0;
+    add_child(player);
+    player.play();
+    create_tween().tween_property(player, "volume_db", 0.0, 3.0);
+
 func _build_ui() -> void:
     var layer:CanvasLayer = CanvasLayer.new();
     add_child(layer);
@@ -116,6 +130,7 @@ func _build_ui() -> void:
     Settings.apply_window();
     Sfx.apply_volumes();
     Sfx.hook_buttons(get_tree());
+    _start_music();
     _continue_slot = "quicksave" if SaveGame.loadable(SaveGame.QUICKSAVE) else "autosave" if SaveGame.loadable(SaveGame.AUTOSAVE) else "";
     var cont:Button = _menu_button("Continue");
     cont.disabled = _continue_slot == "";
